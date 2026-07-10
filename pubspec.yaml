@@ -1,0 +1,75 @@
+name: rehat_app
+description: "Rehat Coffeehouse — aplikasi mobile ordering."
+publish_to: "none"
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.5.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+
+  # Networking
+  dio: ^5.7.0
+
+  # Navigation
+  go_router: ^14.6.2
+
+  # State management
+  flutter_riverpod: ^2.6.1
+
+  # Secure token storage
+  flutter_secure_storage: ^9.2.2
+
+  # Images
+  cached_network_image: ^3.4.1
+  image_picker: ^1.1.2
+
+  # Membuka halaman pembayaran DOKU Checkout
+  url_launcher: ^6.3.1
+
+  # Animations
+  flutter_animate: ^4.5.0
+
+  # Fonts (Cormorant Garamond + Inter)
+  google_fonts: ^6.2.1
+
+  # Formatting (Rupiah currency, dates)
+  intl: ^0.20.2
+
+  # Push notification (FCM)
+  firebase_core: ^3.8.0
+  firebase_messaging: ^15.1.5
+  flutter_neumorphic_plus: ^3.5.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+  # Generator ikon launcher (Android & iOS) dari satu gambar sumber.
+  flutter_launcher_icons: ^0.14.1
+
+# Konfigurasi ikon aplikasi.
+# Sumber: assets/icon/app_icon.png (1024x1024). Jalankan:
+#   dart run flutter_launcher_icons
+flutter_launcher_icons:
+  android: "ic_launcher"
+  ios: true
+  remove_alpha_ios: true
+  image_path: "assets/icon/app_icon.png"
+  min_sdk_android: 23
+  # Ikon adaptif Android: latar kuning brand + logo sebagai foreground.
+  adaptive_icon_background: "#FFC400"
+  adaptive_icon_foreground: "assets/icon/app_icon.png"
+
+flutter:
+  uses-material-design: true
+  # Catatan: font dimuat runtime via google_fonts, jadi tidak perlu
+  # mendaftarkan file font di sini.
+  assets:
+    - assets/qris/

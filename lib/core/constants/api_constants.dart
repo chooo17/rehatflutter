@@ -1,0 +1,96 @@
+import 'package:flutter/foundation.dart';
+
+/// Konstanta endpoint API backend (Node.js + Supabase).
+class ApiConstants {
+  ApiConstants._();
+
+  /// Host backend saat pengembangan.
+  ///
+  /// - **Android emulator**: `10.0.2.2` (loopback host dari emulator), otomatis.
+  /// - **Web / iOS simulator / desktop**: `localhost`.
+  /// - **HP Android fisik**: ganti [_devHost] ke IP LAN Pmu (mis. `10.20.25.15`).
+  static const String _port = '3000';
+
+  static String get _host {
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+      return '10.0.2.2';
+    }
+    return 'localhost';
+  }
+
+  /// URL backend produksi, di-inject saat build:
+  /// `flutter build web --dart-define=API_BASE_URL=https://api.domainmu/v1`
+  /// Bila kosong, memakai host dev otomatis (localhost / 10.0.2.2).
+  static const String _prodBaseUrl =
+      String.fromEnvironment('API_BASE_URL');
+
+  /// Base URL backend (`/v1`). Produksi bila `API_BASE_URL` di-set saat build,
+  /// selain itu jatuh ke host pengembangan lokal.
+  static String get baseUrl =>
+      _prodBaseUrl.isNotEmpty ? _prodBaseUrl : 'http://$_host:$_port/v1';
+
+  // Auth ----------------------------------------------------------------
+  static const String login = '/auth/login';
+  static const String register = '/auth/register';
+  static const String verifyOtp = '/auth/verify-otp';
+  static const String resendOtp = '/auth/resend-otp';
+  static const String refreshToken = '/auth/refresh';
+  static const String logout = '/auth/logout';
+
+  // User ----------------------------------------------------------------
+  static const String me = '/users/me';
+  static const String updateProfile = '/users/me';
+  static const String avatar = '/users/me/avatar';
+
+  // Menu ----------------------------------------------------------------
+  static const String menu = '/menu/items';
+  static const String featuredMenu = '/menu/featured';
+  static const String menuCategories = '/menu/categories';
+  static String menuDetail(String id) => '/menu/items/$id';
+  static String menuItemImage(String id) => '/menu/items/$id/image';
+
+  // Order ---------------------------------------------------------------
+  static const String orders = '/orders'; // POST buat, GET riwayat (paginated)
+  static String orderDetail(String id) => '/orders/$id';
+  static String reorder(String id) => '/orders/$id/reorder';
+  static String orderStatus(String id) => '/orders/$id/status';
+  static String orderPay(String id) => '/orders/$id/pay';
+
+  // Admin orders -------------------------------------------------------
+  static const String adminOrders = '/admin/orders';
+  static String adminOrderDetail(String id) => '/admin/orders/$id';
+  static const String adminSalesReport = '/admin/reports/sales';
+
+  // Voucher -------------------------------------------------------------
+  static const String vouchers = '/vouchers';
+  static const String voucherValidate = '/vouchers/validate';
+
+  // Review --------------------------------------------------------------
+  static const String reviews = '/reviews';
+  static String menuItemReviews(String id) => '/menu/items/$id/reviews';
+
+  // Spin & Loyalty ------------------------------------------------------
+  static const String spinStatus = '/spin/status';
+  static const String spin = '/spin';
+  static const String loyalty = '/loyalty';
+  static const String loyaltyHistory = '/loyalty/history';
+
+  // Favorites -----------------------------------------------------------
+  static const String favorites = '/favorites';
+  static String favorite(String menuItemId) => '/favorites/$menuItemId';
+
+  // Banners (promo beranda) ---------------------------------------------
+  static const String banners = '/banners';
+  static const String adminBanners = '/admin/banners';
+  static String banner(String id) => '/banners/$id';
+
+  // Notifications -------------------------------------------------------
+  static const String notifications = '/notifications';
+  static const String notificationsReadAll = '/notifications/read-all';
+  static String notificationRead(String id) => '/notifications/$id/read';
+  static const String registerDevice = '/notifications/register-device';
+
+  /// Timeout default (ms).
+  static const int connectTimeoutMs = 15000;
+  static const int receiveTimeoutMs = 15000;
+}
