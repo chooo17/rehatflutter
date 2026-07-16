@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/app_colors.dart';
@@ -9,15 +10,25 @@ import '../../../core/utils/formatters.dart';
 import '../../../shared/models/order_model.dart';
 import '../../../shared/widgets/neu.dart';
 import '../../../shared/widgets/qris_payment_card.dart';
+import '../../auth/application/auth_controller.dart';
+import '../data/order_repository.dart';
 
 /// Layar konfirmasi setelah pesanan berhasil dibuat.
-class OrderConfirmationScreen extends StatelessWidget {
+class OrderConfirmationScreen extends ConsumerWidget {
   const OrderConfirmationScreen({super.key, required this.result});
 
   final CheckoutResult result;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isGuest = ref.watch(authControllerProvider).isGuest;
+    // Polling status pembayaran → nomor antrian muncul otomatis saat lunas.
+    final liveQueue = ref
+            .watch(orderStatusPollProvider(result.orderId))
+            .valueOrNull
+            ?.queueNumber ??
+        '';
+    final queueNumber = liveQueue.isNotEmpty ? liveQueue : result.queueNumber;
     return Scaffold(
       body: SafeArea(
         child: Column(
@@ -63,14 +74,14 @@ class OrderConfirmationScreen extends StatelessWidget {
                         color: AppColors.crema,
                         borderRadius: BorderRadius.circular(18),
                       ),
-                      child: result.queueNumber.isNotEmpty
+                      child: queueNumber.isNotEmpty
                           ? Column(
                               children: [
                                 Text('Nomor antrian',
                                     style: AppTextStyles.caption.copyWith(
                                         color: AppColors.textSecondary)),
                                 const SizedBox(height: 4),
-                                Text(result.queueNumber,
+                                Text(queueNumber,
                                     style: AppTextStyles.displayLarge
                                         .copyWith(color: AppColors.espresso)),
                               ],
@@ -131,18 +142,30 @@ class OrderConfirmationScreen extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(24, 0, 24, 12),
               child: Column(
                 children: [
-                  NeuButton(
-                    expand: true,
-                    accent: true,
-                    onPressed: () => context.goNamed(RouteNames.orderHistory),
-                    child: Text('Lihat Pesanan Saya',
-                        style: AppTextStyles.button.copyWith(color: Colors.white)),
-                  ),
-                  const SizedBox(height: 10),
-                  TextButton(
-                    onPressed: () => context.goNamed(RouteNames.home),
-                    child: const Text('Kembali ke Beranda'),
-                  ),
+                  if (isGuest)
+                    NeuButton(
+                      expand: true,
+                      accent: true,
+                      onPressed: () => context.goNamed(RouteNames.guestMenu),
+                      child: Text('Kembali ke Menu',
+                          style: AppTextStyles.button
+                              .copyWith(color: Colors.white)),
+                    )
+                  else ...[
+                    NeuButton(
+                      expand: true,
+                      accent: true,
+                      onPressed: () => context.goNamed(RouteNames.orderHistory),
+                      child: Text('Lihat Pesanan Saya',
+                          style: AppTextStyles.button
+                              .copyWith(color: Colors.white)),
+                    ),
+                    const SizedBox(height: 10),
+                    TextButton(
+                      onPressed: () => context.goNamed(RouteNames.home),
+                      child: const Text('Kembali ke Beranda'),
+                    ),
+                  ],
                 ],
               ),
             ),

@@ -7,7 +7,6 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/utils/customization_labels.dart';
 import '../../../core/utils/formatters.dart';
-import '../../../core/router/route_names.dart';
 import '../../../shared/models/menu_item_model.dart';
 import '../../../shared/models/review_model.dart';
 import '../../../shared/widgets/cart_fly.dart';
@@ -61,38 +60,19 @@ class _DetailBodyState extends ConsumerState<_DetailBody> {
   void initState() {
     super.initState();
     final o = widget.item.options;
-    // Default ke opsi pertama yang tersedia.
-    _size = o.sizes.isNotEmpty ? _defaultSize(o.sizes) : null;
+    // Ukuran dihilangkan (produk hanya 1 ukuran) → tak dikirim ke pesanan.
+    _size = null;
     _temperature = o.temperatures.isNotEmpty ? o.temperatures.first : null;
     _sugarLevel = o.sugarLevels.isNotEmpty ? _defaultSugar(o.sugarLevels) : null;
   }
 
-  String _defaultSize(List<String> sizes) =>
-      sizes.contains('regular') ? 'regular' : sizes.first;
 
   int _defaultSugar(List<int> levels) =>
       levels.contains(100) ? 100 : levels.first;
 
   int get _total => widget.item.price * _qty;
 
-  void _promptLogin() {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(
-        content: const Text('Masuk dulu untuk memesan'),
-        action: SnackBarAction(
-          label: 'Masuk',
-          onPressed: () => context.goNamed(RouteNames.login),
-        ),
-      ));
-  }
-
   void _addToCart(BuildContext source) {
-    // Tamu belum bisa memesan — ajak login.
-    if (ref.read(authControllerProvider).isGuest) {
-      _promptLogin();
-      return;
-    }
     // Terbangkan dulu (posisi dihitung sinkron sebelum layar di-pop).
     flyToCart(source, imageUrl: widget.item.imageUrl);
     ref.read(cartControllerProvider.notifier).add(
@@ -129,9 +109,9 @@ class _DetailBodyState extends ConsumerState<_DetailBody> {
                 icon: Icons.arrow_back_rounded,
                 onTap: () => context.pop(),
               ),
-              // Tamu tak punya favorit/keranjang → sembunyikan aksinya.
+              // Tamu tak punya favorit → sembunyikan; keranjang tetap ada.
               actions: isGuest
-                  ? const []
+                  ? [CartIconButton(color: AppColors.espresso)]
                   : [
                       Padding(
                         padding: const EdgeInsets.only(right: 4),
@@ -176,18 +156,7 @@ class _DetailBodyState extends ConsumerState<_DetailBody> {
                           style: AppTextStyles.bodyMedium.copyWith(
                               color: AppColors.textSecondary, height: 1.6)),
                     ],
-                    // Ukuran ----------------------------------------------
-                    if (o.sizes.isNotEmpty) ...[
-                      const SizedBox(height: 24),
-                      _label('Ukuran'),
-                      const SizedBox(height: 10),
-                      _chips(
-                        values: o.sizes,
-                        selected: _size,
-                        labelOf: CustomizationLabels.size,
-                        onTap: (v) => setState(() => _size = v),
-                      ),
-                    ],
+                    // Ukuran dihilangkan — produk hanya tersedia 1 ukuran.
                     // Suhu ------------------------------------------------
                     if (o.temperatures.isNotEmpty) ...[
                       const SizedBox(height: 24),
@@ -254,18 +223,14 @@ class _DetailBodyState extends ConsumerState<_DetailBody> {
                   child: Builder(
                     builder: (btnContext) => NeuButton(
                       expand: true,
-                      accent: isGuest || item.isAvailable,
-                      onPressed: (isGuest || item.isAvailable)
+                      accent: item.isAvailable,
+                      onPressed: item.isAvailable
                           ? () => _addToCart(btnContext)
                           : null,
                       child: Text(
-                        isGuest
-                            ? 'Masuk untuk Memesan'
-                            : (item.isAvailable
-                                ? 'Tambah ke Keranjang'
-                                : 'Habis'),
+                        item.isAvailable ? 'Tambah ke Keranjang' : 'Habis',
                         style: AppTextStyles.button.copyWith(
-                            color: (isGuest || item.isAvailable)
+                            color: item.isAvailable
                                 ? Colors.white
                                 : AppColors.textSecondary),
                       ),

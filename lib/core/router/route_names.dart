@@ -23,6 +23,10 @@ class RouteNames {
   static const String menu = 'menu';
   static const String menuPath = '/menu';
 
+  /// Tab Laporan penjualan (admin) di bottom navigation.
+  static const String report = 'report';
+  static const String reportPath = '/report';
+
   /// Menu untuk tamu (tanpa login) — hanya lihat menu.
   static const String guestMenu = 'guest-menu';
   static const String guestMenuPath = '/guest-menu';
@@ -80,4 +84,10 @@ class RouteNames {
 
   static const String adminDashboard = 'admin-dashboard';
   static const String adminDashboardPath = '/profile/admin-dashboard';
+
+  static const String savedOrders = 'saved-orders';
+  static const String savedOrdersPath = '/profile/saved-orders';
+
+  static const String printerSettings = 'printer-settings';
+  static const String printerSettingsPath = '/profile/printer-settings';
 }

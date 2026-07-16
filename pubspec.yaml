@@ -32,6 +32,9 @@ dependencies:
   # Membuka halaman pembayaran DOKU Checkout
   url_launcher: ^6.3.1
 
+  # Render QRIS dinamis (DOKU Direct API) jadi kode QR
+  qr_flutter: ^4.1.0
+
   # Animations
   flutter_animate: ^4.5.0
 
@@ -45,6 +48,14 @@ dependencies:
   firebase_core: ^3.8.0
   firebase_messaging: ^15.1.5
   flutter_neumorphic_plus: ^3.5.0
+
+  # Printer thermal Bluetooth (Android) + ESC/POS. Di-import HANYA pada impl
+  # mobile (conditional import) agar build web tidak terpengaruh.
+  print_bluetooth_thermal: ^1.1.1
+  esc_pos_utils_plus: ^2.0.4
+  permission_handler: ^11.3.1
+  # Resize logo struk (pure Dart, aman utk web) sebelum dicetak.
+  image: ^4.0.0
 
 dev_dependencies:
   flutter_test:

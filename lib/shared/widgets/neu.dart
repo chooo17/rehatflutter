@@ -85,15 +85,18 @@ class NeuCard extends StatelessWidget {
       color: color,
       boxShape: NeumorphicBoxShape.roundRect(BorderRadius.circular(radius)),
     );
-    if (onTap != null) {
-      return NeumorphicButton(
-        onPressed: onTap,
-        style: style,
-        padding: padding,
-        child: child,
-      );
-    }
-    return Neumorphic(style: style, padding: padding, child: child);
+    // RepaintBoundary: cache raster kartu neumorphic (shadow mahal) agar saat
+    // scroll cukup di-translate, tidak di-repaint tiap frame.
+    return RepaintBoundary(
+      child: onTap != null
+          ? NeumorphicButton(
+              onPressed: onTap,
+              style: style,
+              padding: padding,
+              child: child,
+            )
+          : Neumorphic(style: style, padding: padding, child: child),
+    );
   }
 }
 

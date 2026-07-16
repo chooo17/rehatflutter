@@ -1,32 +1,40 @@
 import 'package:flutter_neumorphic_plus/flutter_neumorphic.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
+import '../../features/auth/application/auth_controller.dart';
 import '../../features/notifications/presentation/widgets/notification_poller.dart';
 
+/// Satu entri tab: indeks CABANG di StatefulShellRoute + ikon + label.
+typedef _Tab = ({int branch, IconData icon, IconData selectedIcon, String label});
+
 /// Kerangka utama dengan bottom navigation neumorphic.
-class MainShell extends StatelessWidget {
+class MainShell extends ConsumerWidget {
   const MainShell({super.key, required this.navigationShell});
 
   final StatefulNavigationShell navigationShell;
 
-  static const _items = [
-    (Icons.home_outlined, Icons.home_rounded, 'Beranda'),
-    (Icons.local_cafe_outlined, Icons.local_cafe_rounded, 'Menu'),
-    (Icons.card_giftcard_outlined, Icons.card_giftcard_rounded, 'Loyalti'),
-    (Icons.person_outline_rounded, Icons.person_rounded, 'Profil'),
-  ];
-
-  void _onTap(int index) {
+  void _onTap(int branch) {
     navigationShell.goBranch(
-      index,
-      initialLocation: index == navigationShell.currentIndex,
+      branch,
+      initialLocation: branch == navigationShell.currentIndex,
     );
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isAdmin = ref.watch(authControllerProvider).user?.isAdmin ?? false;
+    // Urutan cabang di router: 0 Beranda, 1 Menu, 2 Loyalti, 3 Profil, 4 Laporan.
+    final tabs = <_Tab>[
+      (branch: 0, icon: Icons.home_outlined, selectedIcon: Icons.home_rounded, label: 'Beranda'),
+      (branch: 1, icon: Icons.local_cafe_outlined, selectedIcon: Icons.local_cafe_rounded, label: 'Menu'),
+      (branch: 2, icon: Icons.card_giftcard_outlined, selectedIcon: Icons.card_giftcard_rounded, label: 'Loyalti'),
+      if (isAdmin)
+        (branch: 4, icon: Icons.bar_chart_outlined, selectedIcon: Icons.bar_chart_rounded, label: 'Laporan'),
+      (branch: 3, icon: Icons.person_outline_rounded, selectedIcon: Icons.person_rounded, label: 'Profil'),
+    ];
     return Scaffold(
       backgroundColor: AppColors.backgroundLight,
       body: Stack(
@@ -50,14 +58,14 @@ class MainShell extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             child: Row(
               children: [
-                for (var i = 0; i < _items.length; i++)
+                for (final t in tabs)
                   Expanded(
                     child: _NavItem(
-                      icon: _items[i].$1,
-                      selectedIcon: _items[i].$2,
-                      label: _items[i].$3,
-                      selected: navigationShell.currentIndex == i,
-                      onTap: () => _onTap(i),
+                      icon: t.icon,
+                      selectedIcon: t.selectedIcon,
+                      label: t.label,
+                      selected: navigationShell.currentIndex == t.branch,
+                      onTap: () => _onTap(t.branch),
                     ),
                   ),
               ],

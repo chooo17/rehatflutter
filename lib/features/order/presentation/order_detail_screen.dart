@@ -10,6 +10,7 @@ import '../../../core/router/route_names.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../shared/models/order_model.dart';
 import '../../../shared/widgets/neu.dart';
+import '../../printer/application/printer_controller.dart';
 import '../../../shared/widgets/qris_payment_card.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../review/presentation/review_sheet.dart';
@@ -166,8 +167,10 @@ class _Body extends StatelessWidget {
         Text('Lacak Pesanan', style: AppTextStyles.titleMedium),
         const SizedBox(height: 10),
         OrderTrackingTimeline(status: order.status),
-        // Auto-refresh untuk pelanggan selama pesanan masih berjalan.
-        if (!isAdmin) _OrderAutoRefresh(orderId: order.id, status: order.status),
+        // Auto-refresh berkala selama pesanan berjalan (admin & pelanggan) →
+        // status pembayaran (mis. QRIS lunas via webhook) tampil otomatis.
+        _OrderAutoRefresh(
+            orderId: order.id, status: order.status, isAdmin: isAdmin),
         _AdminStatusControls(order: order),
         if (order.status == OrderStatus.pending && !isAdmin) ...[
           const SizedBox(height: 20),
@@ -335,11 +338,13 @@ class _AdminStatusControls extends ConsumerStatefulWidget {
 class _AdminStatusControlsState extends ConsumerState<_AdminStatusControls> {
   bool _busy = false;
 
-  Future<void> _setStatus(OrderStatus status) async {
+  Future<void> _setStatus(OrderStatus status,
+      {PaymentMethod? paymentMethod}) async {
     setState(() => _busy = true);
     final messenger = ScaffoldMessenger.of(context);
     try {
-      await ref.read(orderRepositoryProvider).updateStatus(widget.order.id, status);
+      await ref.read(orderRepositoryProvider).updateStatus(widget.order.id, status,
+          paymentMethod: paymentMethod);
       ref.invalidate(orderDetailProvider(widget.order.id));
       ref.invalidate(adminOrderDetailProvider(widget.order.id));
       ref.invalidate(orderHistoryProvider);
@@ -347,6 +352,17 @@ class _AdminStatusControlsState extends ConsumerState<_AdminStatusControls> {
       // Saat selesai, poin/stamp bertambah di server — segarkan profil.
       if (status == OrderStatus.completed) {
         ref.read(authControllerProvider.notifier).refreshUser();
+      }
+      // Baru ditandai LUNAS → auto-cetak struk (ambil data terbaru + antrian).
+      if (status == OrderStatus.paid) {
+        try {
+          final fresh = await ref
+              .read(orderRepositoryProvider)
+              .fetchDetailAdmin(widget.order.id);
+          await ref
+              .read(printerControllerProvider.notifier)
+              .autoPrintOnce(fresh);
+        } catch (_) {}
       }
       messenger
         ..hideCurrentSnackBar()
@@ -360,6 +376,52 @@ class _AdminStatusControlsState extends ConsumerState<_AdminStatusControls> {
     } finally {
       if (mounted) setState(() => _busy = false);
     }
+  }
+
+  Future<void> _printReceipt() async {
+    final messenger = ScaffoldMessenger.of(context);
+    final ok = await ref
+        .read(printerControllerProvider.notifier)
+        .printOrder(widget.order);
+    if (!mounted) return;
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(
+          content: Text(ok
+              ? 'Struk dicetak.'
+              : 'Gagal mencetak. Sambungkan printer di Profil → Printer & Struk.')));
+  }
+
+  /// Tampilkan QRIS pesanan (mis. pelanggan mau scan lagi) di bottom sheet.
+  void _showQris() {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (_) => SafeArea(
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(
+              16, 16, 16, 16 + MediaQuery.of(context).viewInsets.bottom),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('Pembayaran QRIS', style: AppTextStyles.titleLarge),
+              const SizedBox(height: 4),
+              Text('Nomor antrian keluar otomatis setelah pembayaran.',
+                  textAlign: TextAlign.center,
+                  style: AppTextStyles.bodySmall
+                      .copyWith(color: AppColors.textSecondary)),
+              const SizedBox(height: 16),
+              QrisPaymentCard(
+                  orderId: widget.order.id, amount: widget.order.total),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -392,6 +454,25 @@ class _AdminStatusControlsState extends ConsumerState<_AdminStatusControls> {
             ],
           ),
           const SizedBox(height: 12),
+          // Cetak struk (hanya Android; web tak mendukung printer thermal).
+          if (ref.watch(printerControllerProvider).supported) ...[
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: ref.watch(printerControllerProvider).busy
+                    ? null
+                    : _printReceipt,
+                icon: const Icon(Icons.print_rounded, size: 18),
+                label: const Text('Cetak Struk'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.espresso,
+                  side: BorderSide(color: AppColors.border),
+                  minimumSize: const Size(0, 46),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
           if (_busy)
             const Center(
               child: Padding(
@@ -403,7 +484,40 @@ class _AdminStatusControlsState extends ConsumerState<_AdminStatusControls> {
                         strokeWidth: 2.4, color: AppColors.amber)),
               ),
             )
-          else
+          else ...[
+            // Pesanan menunggu bayar → customer bisa bayar QRIS (berlaku juga
+            // untuk pesanan disimpan/bayar-nanti) ATAU kasir tandai lunas tunai.
+            if (status == OrderStatus.pending) ...[
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: _showQris,
+                  icon: const Icon(Icons.qr_code_2_rounded, size: 18),
+                  label: const Text('Tampilkan QRIS'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.amberDark,
+                    side: BorderSide(color: AppColors.amberDark),
+                    minimumSize: const Size(0, 48),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () =>
+                      _setStatus(OrderStatus.paid, paymentMethod: PaymentMethod.cash),
+                  icon: const Icon(Icons.payments_outlined, size: 18),
+                  label: const Text('Lunas (Tunai)'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.success,
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size(0, 48),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+            ],
             Row(
               children: [
                 if (next != null)
@@ -430,6 +544,7 @@ class _AdminStatusControlsState extends ConsumerState<_AdminStatusControls> {
                           .copyWith(color: AppColors.textSecondary)),
               ],
             ),
+          ],
         ],
       ),
     );
@@ -439,9 +554,11 @@ class _AdminStatusControlsState extends ConsumerState<_AdminStatusControls> {
 /// Menyegarkan detail pesanan secara berkala (invisible) selama pesanan masih
 /// berjalan, agar pelanggan melihat perubahan status otomatis.
 class _OrderAutoRefresh extends ConsumerStatefulWidget {
-  const _OrderAutoRefresh({required this.orderId, required this.status});
+  const _OrderAutoRefresh(
+      {required this.orderId, required this.status, this.isAdmin = false});
   final String orderId;
   final OrderStatus status;
+  final bool isAdmin;
 
   @override
   ConsumerState<_OrderAutoRefresh> createState() => _OrderAutoRefreshState();
@@ -474,7 +591,11 @@ class _OrderAutoRefreshState extends ConsumerState<_OrderAutoRefresh> {
     if (_isTerminal) return;
     _timer = Timer(_pollInterval, () {
       if (!mounted) return;
-      ref.invalidate(orderDetailProvider(widget.orderId));
+      if (widget.isAdmin) {
+        ref.invalidate(adminOrderDetailProvider(widget.orderId));
+      } else {
+        ref.invalidate(orderDetailProvider(widget.orderId));
+      }
     });
   }
 

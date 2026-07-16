@@ -112,29 +112,48 @@ class CheckoutController extends Notifier<CheckoutState> {
   void clearVoucher() =>
       state = state.copyWith(voucherCode: '', clearVoucher: true);
 
-  /// Mengirim pesanan. Mengembalikan [CheckoutResult] jika sukses, atau `null`.
-  Future<CheckoutResult?> placeOrder() async {
+  /// Mengirim pesanan. Untuk tamu, sertakan [guestName]/[guestPhone].
+  /// Mengembalikan [CheckoutResult] jika sukses, atau `null`.
+  Future<CheckoutResult?> placeOrder({String? guestName, String? guestPhone}) async {
     final items = ref.read(cartControllerProvider);
     if (items.isEmpty) {
       state = state.copyWith(errorMessage: 'Keranjang kosong.');
       return null;
     }
 
+    final isGuest = ref.read(authControllerProvider).isGuest;
+    if (isGuest && (guestName == null || guestName.trim().isEmpty)) {
+      state = state.copyWith(errorMessage: 'Nama wajib diisi.');
+      return null;
+    }
+
     state = state.copyWith(isSubmitting: true, clearError: true);
     try {
-      final result = await ref.read(orderRepositoryProvider).createOrder(
-            items: items,
-            paymentMethod: state.paymentMethod,
-            orderType: state.orderType,
-            voucherCode: state.voucherCode.isEmpty ? null : state.voucherCode,
-            notes: state.notes.isEmpty ? null : state.notes,
-          );
+      final repo = ref.read(orderRepositoryProvider);
+      final result = isGuest
+          ? await repo.createGuestOrder(
+              items: items,
+              paymentMethod: state.paymentMethod,
+              orderType: state.orderType,
+              notes: state.notes.isEmpty ? null : state.notes,
+              guestName: guestName!,
+              guestPhone: guestPhone,
+            )
+          : await repo.createOrder(
+              items: items,
+              paymentMethod: state.paymentMethod,
+              orderType: state.orderType,
+              voucherCode: state.voucherCode.isEmpty ? null : state.voucherCode,
+              notes: state.notes.isEmpty ? null : state.notes,
+            );
       // Simpan hasil dulu agar layar konfirmasi bisa membacanya meski router refresh.
       ref.read(lastCheckoutResultProvider.notifier).state = result;
       ref.read(cartControllerProvider.notifier).clear();
-      ref.invalidate(orderHistoryProvider);
-      // Poin/stamp bertambah di sisi server setelah bayar — segarkan profil.
-      ref.read(authControllerProvider.notifier).refreshUser();
+      if (!isGuest) {
+        ref.invalidate(orderHistoryProvider);
+        // Poin/stamp bertambah di sisi server setelah bayar — segarkan profil.
+        ref.read(authControllerProvider.notifier).refreshUser();
+      }
       state = const CheckoutState(); // reset pilihan untuk order berikutnya
       return result;
     } on ApiException catch (e) {

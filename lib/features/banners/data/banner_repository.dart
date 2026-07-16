@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/constants/api_constants.dart';
@@ -43,6 +44,27 @@ class BannerRepository {
 
   Future<void> delete(String id) async {
     await _client.delete<dynamic>(ApiConstants.banner(id));
+  }
+
+  /// (Admin) Upload gambar banner dari perangkat → mengembalikan URL publik.
+  Future<String> uploadImage({
+    required List<int> bytes,
+    required String filename,
+  }) async {
+    final form = FormData.fromMap({
+      'file': MultipartFile.fromBytes(bytes, filename: filename),
+    });
+    final res = await _client.post<dynamic>(
+      ApiConstants.adminBannerUpload,
+      data: form,
+    );
+    final data = res.data;
+    final inner = data is Map ? (data['data'] ?? data) : const {};
+    final url = (inner is Map ? inner['image_url'] : null)?.toString();
+    if (url == null || url.isEmpty) {
+      throw Exception('URL gambar tidak ditemukan pada respons.');
+    }
+    return url;
   }
 }
 

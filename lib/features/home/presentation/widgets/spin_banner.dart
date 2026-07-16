@@ -83,15 +83,18 @@ class SpinBanner extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 12),
-            Icon(
-              Icons.casino_rounded,
-              color: AppColors.amberLight.withValues(alpha: 0.9),
-              size: 72,
-            )
-                .animate(onPlay: (c) => c.repeat())
-                .rotate(duration: 4.seconds, curve: Curves.easeInOut)
-                .then()
-                .rotate(begin: 1, end: 0, duration: 4.seconds),
+            // RepaintBoundary: animasi loop ikon tak memaksa repaint beranda.
+            RepaintBoundary(
+              child: Icon(
+                Icons.casino_rounded,
+                color: AppColors.amberLight.withValues(alpha: 0.9),
+                size: 72,
+              )
+                  .animate(onPlay: (c) => c.repeat())
+                  .rotate(duration: 4.seconds, curve: Curves.easeInOut)
+                  .then()
+                  .rotate(begin: 1, end: 0, duration: 4.seconds),
+            ),
           ],
         ),
       ),

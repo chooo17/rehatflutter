@@ -8,8 +8,13 @@ import '../../../core/router/route_names.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../shared/models/order_model.dart';
 import '../../../shared/widgets/neu.dart';
+import '../../auth/application/auth_controller.dart';
 import '../../menu/application/cart_controller.dart';
 import '../application/checkout_controller.dart';
+
+/// Metode pembayaran yang tampil untuk pelanggan (tanpa 'cash' = kasir saja).
+final _customerMethods =
+    PaymentMethod.values.where((m) => m != PaymentMethod.cash).toList();
 
 /// Checkout: pilih metode pembayaran, terapkan voucher, lalu buat pesanan.
 class CheckoutScreen extends ConsumerStatefulWidget {
@@ -22,16 +27,26 @@ class CheckoutScreen extends ConsumerStatefulWidget {
 class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   final _voucherCtrl = TextEditingController();
   final _notesCtrl = TextEditingController();
+  final _guestNameCtrl = TextEditingController();
+  final _guestPhoneCtrl = TextEditingController();
 
   @override
   void dispose() {
     _voucherCtrl.dispose();
     _notesCtrl.dispose();
+    _guestNameCtrl.dispose();
+    _guestPhoneCtrl.dispose();
     super.dispose();
   }
 
   Future<void> _placeOrder() async {
-    final result = await ref.read(checkoutControllerProvider.notifier).placeOrder();
+    FocusScope.of(context).unfocus();
+    final isGuest = ref.read(authControllerProvider).isGuest;
+    final result =
+        await ref.read(checkoutControllerProvider.notifier).placeOrder(
+              guestName: isGuest ? _guestNameCtrl.text : null,
+              guestPhone: isGuest ? _guestPhoneCtrl.text : null,
+            );
     if (!mounted) return;
     if (result != null) {
       context.pushReplacementNamed(RouteNames.confirmation, extra: result);
@@ -64,6 +79,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     final subtotal = ref.watch(cartTotalProvider);
     final state = ref.watch(checkoutControllerProvider);
     final notifier = ref.read(checkoutControllerProvider.notifier);
+    final isGuest = ref.watch(authControllerProvider).isGuest;
     final discount = state.discountAmount;
     final total = subtotal - discount;
 
@@ -78,6 +94,22 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
           : ListView(
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
               children: [
+                if (isGuest) ...[
+                  const _SectionLabel('Data pemesan'),
+                  const SizedBox(height: 10),
+                  _GuestField(
+                      controller: _guestNameCtrl,
+                      hint: 'Nama kamu *',
+                      icon: Icons.person_outline_rounded,
+                      textCapitalization: TextCapitalization.words),
+                  const SizedBox(height: 10),
+                  _GuestField(
+                      controller: _guestPhoneCtrl,
+                      hint: 'No. HP / WhatsApp (opsional)',
+                      icon: Icons.phone_outlined,
+                      keyboardType: TextInputType.phone),
+                  const SizedBox(height: 24),
+                ],
                 const _SectionLabel('Tipe pesanan'),
                 const SizedBox(height: 10),
                 Row(
@@ -98,29 +130,33 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                 const SizedBox(height: 24),
                 const _SectionLabel('Metode pembayaran'),
                 const SizedBox(height: 10),
-                for (final method in PaymentMethod.values) ...[
+                // 'cash' hanya untuk kasir (admin) — sembunyikan dari pelanggan.
+                for (final method in _customerMethods) ...[
                   _PaymentRow(
                     method: method,
                     selected: state.paymentMethod == method,
                     onTap: () => notifier.setPaymentMethod(method),
                   ),
-                  if (method != PaymentMethod.values.last)
+                  if (method != _customerMethods.last)
                     const SizedBox(height: 8),
                 ],
                 const SizedBox(height: 24),
-                const _SectionLabel('Kode voucher'),
-                const SizedBox(height: 10),
-                _VoucherField(
-                  controller: _voucherCtrl,
-                  applied: state.voucher?.isValid == true,
-                  isLoading: state.isValidatingVoucher,
-                  onApply: _applyVoucher,
-                  onClear: () {
-                    _voucherCtrl.clear();
-                    notifier.clearVoucher();
-                  },
-                ),
-                const SizedBox(height: 24),
+                // Voucher tak berlaku untuk tamu (butuh akun).
+                if (!isGuest) ...[
+                  const _SectionLabel('Kode voucher'),
+                  const SizedBox(height: 10),
+                  _VoucherField(
+                    controller: _voucherCtrl,
+                    applied: state.voucher?.isValid == true,
+                    isLoading: state.isValidatingVoucher,
+                    onApply: _applyVoucher,
+                    onClear: () {
+                      _voucherCtrl.clear();
+                      notifier.clearVoucher();
+                    },
+                  ),
+                  const SizedBox(height: 24),
+                ],
                 const _SectionLabel('Catatan untuk barista'),
                 const SizedBox(height: 10),
                 TextField(
@@ -240,6 +276,47 @@ class _SectionLabel extends StatelessWidget {
   @override
   Widget build(BuildContext context) =>
       Text(text, style: AppTextStyles.titleMedium);
+}
+
+/// Field input tamu (nama/HP) bergaya neumorphic (sumur cekung).
+class _GuestField extends StatelessWidget {
+  const _GuestField({
+    required this.controller,
+    required this.hint,
+    required this.icon,
+    this.keyboardType,
+    this.textCapitalization = TextCapitalization.none,
+  });
+
+  final TextEditingController controller;
+  final String hint;
+  final IconData icon;
+  final TextInputType? keyboardType;
+  final TextCapitalization textCapitalization;
+
+  @override
+  Widget build(BuildContext context) {
+    return NeuInset(
+      radius: 16,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      child: TextField(
+        controller: controller,
+        keyboardType: keyboardType,
+        textCapitalization: textCapitalization,
+        style: AppTextStyles.bodyLarge,
+        decoration: InputDecoration(
+          filled: false,
+          border: InputBorder.none,
+          enabledBorder: InputBorder.none,
+          focusedBorder: InputBorder.none,
+          isDense: true,
+          contentPadding: const EdgeInsets.symmetric(vertical: 14),
+          hintText: hint,
+          prefixIcon: Icon(icon, color: AppColors.textSecondary, size: 20),
+        ),
+      ),
+    );
+  }
 }
 
 /// Kartu pilihan tipe pesanan (dine-in / bawa pulang).

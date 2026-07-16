@@ -9,6 +9,7 @@ import 'core/notifications/fcm_service.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/theme_controller.dart';
 import 'shared/widgets/neu.dart';
+import 'shared/widgets/responsive_shell.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -99,7 +100,11 @@ class _RehatAppState extends ConsumerState<RehatApp>
               debugShowCheckedModeBanner: false,
               theme: AppTheme.build(brightness),
               builder: (context, child) => NeuThemeScope(
-                  mode: mode, child: child ?? const SizedBox.shrink()),
+                mode: mode,
+                child: ResponsiveShell(
+                  child: child ?? const SizedBox.shrink(),
+                ),
+              ),
               routerConfig: router,
               locale: const Locale('id', 'ID'),
               supportedLocales: const [Locale('id', 'ID'), Locale('en', 'US')],

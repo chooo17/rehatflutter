@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../features/admin/presentation/admin_banners_screen.dart';
 import '../../features/admin/presentation/admin_dashboard_screen.dart';
+import '../../features/admin/presentation/saved_orders_screen.dart';
+import '../../features/printer/presentation/printer_settings_screen.dart';
 import '../../features/admin/presentation/admin_menu_images_screen.dart';
 import '../../features/admin/presentation/admin_orders_screen.dart';
 import '../../features/auth/application/auth_controller.dart';
@@ -60,10 +62,14 @@ final routerProvider = Provider<GoRouter>((ref) {
         return onSplash ? null : RouteNames.splashPath;
       }
 
-      // Mode tamu: hanya boleh menu tamu, detail menu, dan alur login.
+      // Mode tamu: boleh menu, detail, keranjang, checkout, konfirmasi, dan
+      // alur login. Fitur berakun lain (beranda/loyalti/profil) tetap terkunci.
       if (auth.status == AuthStatus.guest) {
         final guestAllowed = loc == RouteNames.guestMenuPath ||
             loc.startsWith('/menu/detail') ||
+            loc == RouteNames.cartPath ||
+            loc == RouteNames.checkoutPath ||
+            loc == RouteNames.confirmationPath ||
             onAuthFlow;
         return guestAllowed ? null : RouteNames.guestMenuPath;
       }
@@ -264,7 +270,27 @@ final routerProvider = Provider<GoRouter>((ref) {
                     name: RouteNames.adminDashboard,
                     builder: (context, state) => const AdminDashboardScreen(),
                   ),
+                  GoRoute(
+                    path: 'saved-orders',
+                    name: RouteNames.savedOrders,
+                    builder: (context, state) => const SavedOrdersScreen(),
+                  ),
+                  GoRoute(
+                    path: 'printer-settings',
+                    name: RouteNames.printerSettings,
+                    builder: (context, state) => const PrinterSettingsScreen(),
+                  ),
                 ],
+              ),
+            ],
+          ),
+          // Cabang ke-5 (index 4): tab Laporan — hanya tampil untuk admin.
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: RouteNames.reportPath,
+                name: RouteNames.report,
+                builder: (context, state) => const AdminDashboardScreen(),
               ),
             ],
           ),

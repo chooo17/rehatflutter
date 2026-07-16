@@ -7,9 +7,12 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/router/route_names.dart';
 import '../../../core/utils/formatters.dart';
+import '../../../core/utils/responsive.dart';
 import '../../../shared/models/cart_item_model.dart';
 import '../../../shared/widgets/neu.dart';
+import '../../auth/application/auth_controller.dart';
 import '../application/cart_controller.dart';
+import 'widgets/cashier_actions.dart';
 
 /// Keranjang belanja: daftar item, ubah jumlah, ringkasan & checkout.
 class CartScreen extends ConsumerWidget {
@@ -19,6 +22,16 @@ class CartScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final items = ref.watch(cartControllerProvider);
     final total = ref.watch(cartTotalProvider);
+    final isAdmin = ref.watch(authControllerProvider).user?.isAdmin ?? false;
+    // Tablet/desktop: tampilan berdampingan (daftar item | ringkasan).
+    final wide = !context.isMobile && items.isNotEmpty;
+
+    final list = ListView.separated(
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+      itemCount: items.length,
+      separatorBuilder: (_, __) => const Divider(height: 28),
+      itemBuilder: (context, i) => _CartLine(line: items[i]),
+    );
 
     return Scaffold(
       appBar: AppBar(
@@ -33,14 +46,39 @@ class CartScreen extends ConsumerWidget {
       ),
       body: items.isEmpty
           ? const _EmptyCart()
-          : ListView.separated(
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-              itemCount: items.length,
-              separatorBuilder: (_, __) => const Divider(height: 28),
-              itemBuilder: (context, i) => _CartLine(line: items[i]),
-            ),
-      bottomNavigationBar:
-          items.isEmpty ? null : _CheckoutBar(total: total, count: items.length),
+          : wide
+              ? Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 12, 12, 20),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: ListView.separated(
+                            padding: const EdgeInsets.only(bottom: 24),
+                            itemCount: items.length,
+                            separatorBuilder: (_, __) =>
+                                const Divider(height: 28),
+                            itemBuilder: (context, i) =>
+                                _CartLine(line: items[i]),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      SizedBox(
+                        width: 320,
+                        child: _SummaryPanel(
+                            total: total, count: items.length, isAdmin: isAdmin),
+                      ),
+                    ],
+                  ),
+                )
+              : list,
+      // Bar bawah hanya untuk mobile; di wide ringkasan ada di panel samping.
+      bottomNavigationBar: (items.isEmpty || wide)
+          ? null
+          : _CheckoutBar(total: total, count: items.length, isAdmin: isAdmin),
     );
   }
 
@@ -177,12 +215,18 @@ class _MiniStepper extends StatelessWidget {
 }
 
 class _CheckoutBar extends StatelessWidget {
-  const _CheckoutBar({required this.total, required this.count});
+  const _CheckoutBar(
+      {required this.total, required this.count, this.isAdmin = false});
   final int total;
   final int count;
+  final bool isAdmin;
 
   @override
   Widget build(BuildContext context) {
+    // Admin = kasir: tampilkan aksi Tunai/QRIS/Simpan langsung di bar bawah.
+    if (isAdmin) {
+      return const NeuBottomBar(child: CashierActions());
+    }
     return NeuBottomBar(
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -204,6 +248,53 @@ class _CheckoutBar extends StatelessWidget {
             child: Text('Lanjut ke Pembayaran',
                 style: AppTextStyles.button.copyWith(color: Colors.white)),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Panel ringkasan samping untuk tampilan wide (tablet/desktop).
+class _SummaryPanel extends StatelessWidget {
+  const _SummaryPanel(
+      {required this.total, required this.count, this.isAdmin = false});
+  final int total;
+  final int count;
+  final bool isAdmin;
+
+  @override
+  Widget build(BuildContext context) {
+    return NeuCard(
+      padding: const EdgeInsets.all(20),
+      radius: 20,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(isAdmin ? 'Kasir' : 'Ringkasan',
+              style: AppTextStyles.titleMedium),
+          const SizedBox(height: 16),
+          if (isAdmin)
+            const CashierActions()
+          else ...[
+          Row(
+            children: [
+              Text('Total ($count item)',
+                  style: AppTextStyles.bodyMedium
+                      .copyWith(color: AppColors.textSecondary)),
+              const Spacer(),
+              Text(Formatters.rupiah(total), style: AppTextStyles.titleLarge),
+            ],
+          ),
+          const SizedBox(height: 18),
+          NeuButton(
+            expand: true,
+            accent: true,
+            onPressed: () => context.pushNamed(RouteNames.checkout),
+            child: Text('Lanjut ke Pembayaran',
+                style: AppTextStyles.button.copyWith(color: Colors.white)),
+          ),
+          ],
         ],
       ),
     );

@@ -51,15 +51,21 @@ class ApiConstants {
 
   // Order ---------------------------------------------------------------
   static const String orders = '/orders'; // POST buat, GET riwayat (paginated)
+  static const String ordersGuest = '/orders/guest'; // POST pesanan tamu
+
   static String orderDetail(String id) => '/orders/$id';
   static String reorder(String id) => '/orders/$id/reorder';
-  static String orderStatus(String id) => '/orders/$id/status';
+  static String orderStatus(String id) => '/orders/$id/status'; // GET publik / PATCH admin
   static String orderPay(String id) => '/orders/$id/pay';
+  static String orderQris(String id) => '/orders/$id/qris'; // DOKU QRIS API
 
   // Admin orders -------------------------------------------------------
   static const String adminOrders = '/admin/orders';
   static String adminOrderDetail(String id) => '/admin/orders/$id';
   static const String adminSalesReport = '/admin/reports/sales';
+  static const String adminReportCalendar = '/admin/reports/calendar';
+  static const String adminExpenses = '/admin/expenses';
+  static String adminExpense(String id) => '/admin/expenses/$id';
 
   // Voucher -------------------------------------------------------------
   static const String vouchers = '/vouchers';
@@ -82,6 +88,7 @@ class ApiConstants {
   // Banners (promo beranda) ---------------------------------------------
   static const String banners = '/banners';
   static const String adminBanners = '/admin/banners';
+  static const String adminBannerUpload = '/admin/banners/upload';
   static String banner(String id) => '/banners/$id';
 
   // Notifications -------------------------------------------------------

@@ -19,3 +19,9 @@ Thumbs.db
 
 # Env / secrets
 *.env
+
+.vercel
+
+# Build APK/AAB — jangan commit binari besar ke git
+*.apk
+*.aab

@@ -97,6 +97,7 @@ class _Image extends StatelessWidget {
     return CachedNetworkImage(
       imageUrl: url!,
       fit: BoxFit.cover,
+      memCacheWidth: 500,
       placeholder: (_, __) => Container(color: AppColors.crema),
       errorWidget: (_, __, ___) => Container(
         color: AppColors.crema,

@@ -16,6 +16,45 @@ class PaymentSession {
   bool get hasUrl => configured && paymentUrl != null && paymentUrl!.isNotEmpty;
 }
 
+/// Hasil pembayaran QRIS. Bisa berupa QR di dalam app (SNAP) ATAU URL DOKU
+/// Checkout (redirect ke halaman QRIS DOKU).
+class QrisResult {
+  const QrisResult({
+    required this.configured,
+    this.qrisContent,
+    this.paymentUrl,
+    this.amount = 0,
+  });
+
+  /// `false` bila DOKU belum dikonfigurasi → app pakai QRIS statis.
+  final bool configured;
+
+  /// String QRIS untuk dirender jadi QR di app (jalur SNAP).
+  final String? qrisContent;
+
+  /// URL halaman DOKU Checkout (jalur redirect).
+  final String? paymentUrl;
+  final int amount;
+
+  /// Ada QR untuk dirender di dalam app.
+  bool get hasQr => configured && (qrisContent?.isNotEmpty ?? false);
+
+  /// Ada URL Checkout untuk dibuka.
+  bool get hasUrl => configured && (paymentUrl?.isNotEmpty ?? false);
+}
+
+/// Status ringkas pesanan (untuk polling pembayaran).
+class OrderStatusLite {
+  const OrderStatusLite({required this.status, required this.queueNumber});
+  final String status;
+  final String queueNumber;
+
+  bool get hasQueue => queueNumber.isNotEmpty;
+  bool get isPaid =>
+      hasQueue ||
+      const ['paid', 'processing', 'ready', 'completed'].contains(status);
+}
+
 /// Hasil validasi voucher di checkout.
 class VoucherValidation {
   const VoucherValidation({
@@ -65,6 +104,37 @@ class OrderRepository {
     return CheckoutResult.fromJson(_unwrap(res.data), paymentMethod);
   }
 
+  /// Membuat pesanan sebagai TAMU (tanpa login) — tanpa voucher/poin.
+  Future<CheckoutResult> createGuestOrder({
+    required List<CartItemModel> items,
+    required PaymentMethod paymentMethod,
+    OrderType orderType = OrderType.dineIn,
+    String? notes,
+    required String guestName,
+    String? guestPhone,
+  }) async {
+    final payload = {
+      'items': [
+        for (final e in items)
+          {
+            'menu_item_id': e.item.id,
+            'quantity': e.quantity,
+            if (e.customizationJson.isNotEmpty)
+              'customization': e.customizationJson,
+          },
+      ],
+      'payment_method': paymentMethod.apiValue,
+      'order_type': orderType.apiValue,
+      if (notes != null && notes.trim().isNotEmpty) 'notes': notes.trim(),
+      'guest_name': guestName.trim(),
+      if (guestPhone != null && guestPhone.trim().isNotEmpty)
+        'guest_phone': guestPhone.trim(),
+    };
+    final res =
+        await _client.post<dynamic>(ApiConstants.ordersGuest, data: payload);
+    return CheckoutResult.fromJson(_unwrap(res.data), paymentMethod);
+  }
+
   /// Memvalidasi kode voucher terhadap subtotal.
   Future<VoucherValidation> validateVoucher({
     required String code,
@@ -105,14 +175,17 @@ class OrderRepository {
     return OrderModel.fromJson(_unwrap(res.data));
   }
 
-  /// (Admin) Semua pesanan, opsional difilter status (`GET /admin/orders`).
-  Future<List<OrderModel>> fetchAllOrders({String? status, int page = 1, int limit = 30}) async {
+  /// (Admin) Semua pesanan, opsional difilter status/tanggal (`GET /admin/orders`).
+  /// [date] format YYYY-MM-DD → hanya pesanan pada hari itu.
+  Future<List<OrderModel>> fetchAllOrders(
+      {String? status, String? date, int page = 1, int limit = 30}) async {
     final res = await _client.get<dynamic>(
       ApiConstants.adminOrders,
       query: {
         'page': page,
         'limit': limit,
         if (status != null && status.isNotEmpty) 'status': status,
+        if (date != null && date.isNotEmpty) 'date': date,
       },
     );
     final data = res.data;
@@ -143,12 +216,73 @@ class OrderRepository {
     );
   }
 
+  /// Generate QRIS dinamis via DOKU Direct API (`POST /orders/:id/qris`).
+  /// Bila DOKU SNAP belum aktif, `configured=false` → app pakai QRIS statis.
+  Future<QrisResult> fetchQris(String id) async {
+    final res = await _client.post<dynamic>(ApiConstants.orderQris(id));
+    final data = _unwrap(res.data);
+    return QrisResult(
+      configured: (data['configured'] ?? false) == true,
+      qrisContent: (data['qris_content'] ?? data['qrisContent'])?.toString(),
+      paymentUrl: (data['payment_url'] ?? data['paymentUrl'])?.toString(),
+      amount: _asInt(data['amount']),
+    );
+  }
+
+  /// Status ringkas pesanan (`GET /orders/:id/status`, publik) — untuk polling.
+  Future<OrderStatusLite> fetchOrderStatus(String id) async {
+    final res = await _client.get<dynamic>(ApiConstants.orderStatus(id));
+    final data = _unwrap(res.data);
+    return OrderStatusLite(
+      status: (data['status'] ?? '').toString(),
+      queueNumber:
+          (data['queue_number'] ?? data['queueNumber'] ?? '').toString(),
+    );
+  }
+
   /// (Admin) Memperbarui status pesanan (`PATCH /orders/:id/status`).
-  Future<void> updateStatus(String id, OrderStatus status) async {
+  /// [paymentMethod] opsional — mis. kasir menandai lunas tunai (`cash`).
+  Future<void> updateStatus(String id, OrderStatus status,
+      {PaymentMethod? paymentMethod}) async {
     await _client.patch<dynamic>(
       ApiConstants.orderStatus(id),
-      data: {'status': status.apiValue},
+      data: {
+        'status': status.apiValue,
+        if (paymentMethod != null) 'payment_method': paymentMethod.apiValue,
+      },
     );
+  }
+
+  /// (Admin/Kasir) Membuat pesanan TUNAI untuk pelanggan walk-in — langsung
+  /// lunas & dapat nomor antrian (`POST /admin/orders`).
+  Future<CheckoutResult> createCashierOrder({
+    required List<CartItemModel> items,
+    OrderType orderType = OrderType.dineIn,
+    String? notes,
+    String? customerName,
+    bool payNow = true,
+    PaymentMethod paymentMethod = PaymentMethod.cash,
+  }) async {
+    final payload = {
+      'items': [
+        for (final e in items)
+          {
+            'menu_item_id': e.item.id,
+            'quantity': e.quantity,
+            if (e.customizationJson.isNotEmpty)
+              'customization': e.customizationJson,
+          },
+      ],
+      'order_type': orderType.apiValue,
+      'pay_now': payNow,
+      'payment_method': paymentMethod == PaymentMethod.qris ? 'qris' : 'cash',
+      if (notes != null && notes.trim().isNotEmpty) 'notes': notes.trim(),
+      if (customerName != null && customerName.trim().isNotEmpty)
+        'customer_name': customerName.trim(),
+    };
+    final res =
+        await _client.post<dynamic>(ApiConstants.adminOrders, data: payload);
+    return CheckoutResult.fromJson(_unwrap(res.data), paymentMethod);
   }
 
   /// Memesan ulang pesanan lama (`POST /orders/:id/reorder`).
@@ -190,17 +324,63 @@ final orderDetailProvider =
   return ref.watch(orderRepositoryProvider).fetchDetail(id);
 });
 
-/// (Admin) Filter status aktif di panel pesanan masuk ('' = semua).
-final adminOrdersFilterProvider = StateProvider<String>((ref) => '');
+/// Polling status pembayaran tiap 5 dtk sampai nomor antrian keluar (lunas).
+/// Publik → jalan untuk user & tamu.
+final orderStatusPollProvider =
+    StreamProvider.autoDispose.family<OrderStatusLite, String>((ref, id) async* {
+  final repo = ref.watch(orderRepositoryProvider);
+  while (true) {
+    OrderStatusLite? s;
+    try {
+      s = await repo.fetchOrderStatus(id);
+    } catch (_) {}
+    if (s != null) {
+      yield s;
+      if (s.hasQueue) break; // nomor antrian sudah keluar → hentikan polling
+    }
+    await Future.delayed(const Duration(seconds: 5));
+  }
+});
 
-/// (Admin) Semua pesanan sesuai filter status.
-final adminOrdersProvider = FutureProvider<List<OrderModel>>((ref) {
-  final status = ref.watch(adminOrdersFilterProvider);
-  return ref.watch(orderRepositoryProvider).fetchAllOrders(status: status);
+/// (Admin) Pesanan Masuk = pesanan yang SUDAH DIBAYAR (paid → selesai),
+/// terbaru dulu. Pesanan belum bayar ada di [pendingOrdersProvider].
+final adminOrdersProvider = FutureProvider<List<OrderModel>>((ref) async {
+  final all =
+      await ref.watch(orderRepositoryProvider).fetchAllOrders(limit: 100);
+  const shown = {
+    OrderStatus.paid,
+    OrderStatus.preparing,
+    OrderStatus.ready,
+    OrderStatus.completed,
+  };
+  return all.where((o) => shown.contains(o.status)).toList();
 });
 
 /// (Admin) Detail pesanan mana pun.
 final adminOrderDetailProvider =
     FutureProvider.family<OrderModel, String>((ref, id) {
   return ref.watch(orderRepositoryProvider).fetchDetailAdmin(id);
+});
+
+/// (Admin) Pesanan BELUM BAYAR **hari ini** — disimpan/bayar-nanti (tunai) &
+/// QRIS menunggu. Sumber untuk pintasan "Pesanan Belum Bayar" di beranda.
+final pendingOrdersProvider = FutureProvider<List<OrderModel>>((ref) {
+  final now = DateTime.now();
+  final today = '${now.year.toString().padLeft(4, '0')}-'
+      '${now.month.toString().padLeft(2, '0')}-'
+      '${now.day.toString().padLeft(2, '0')}';
+  return ref
+      .watch(orderRepositoryProvider)
+      .fetchAllOrders(status: 'pending_payment', date: today, limit: 100);
+});
+
+/// (Admin) Riwayat transaksi = pesanan yang sudah SELESAI atau DIBATALKAN
+/// (log lampau, read-only). Berbeda dari "Pesanan Masuk" (pesanan aktif).
+final adminOrderHistoryProvider = FutureProvider<List<OrderModel>>((ref) async {
+  final all = await ref.watch(orderRepositoryProvider).fetchAllOrders(limit: 100);
+  return all
+      .where((o) =>
+          o.status == OrderStatus.completed ||
+          o.status == OrderStatus.cancelled)
+      .toList();
 });

@@ -86,6 +86,8 @@ class ProfileScreen extends ConsumerWidget {
                 onTap: () => context.pushNamed(RouteNames.adminMenuImages)),
             _tile(Icons.campaign_outlined, 'Kelola Banner',
                 onTap: () => context.pushNamed(RouteNames.adminBanners)),
+            _tile(Icons.print_rounded, 'Printer & Struk',
+                onTap: () => context.pushNamed(RouteNames.printerSettings)),
           ],
           const SizedBox(height: 24),
           Text('Tampilan', style: AppTextStyles.titleMedium),

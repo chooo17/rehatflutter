@@ -1,0 +1,62 @@
+name: Deploy Web (Vercel)
+
+# Deploy otomatis Flutter web ke Vercel setiap push ke main, atau manual.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'lib/**'
+      - 'web/**'
+      - 'pubspec.yaml'
+      - '.github/workflows/deploy-web.yml'
+  workflow_dispatch:
+
+# Secrets yang HARUS diisi di GitHub → Settings → Secrets and variables → Actions:
+#   VERCEL_TOKEN       : token akun Vercel (vercel.com/account/tokens)
+#   VERCEL_ORG_ID      : team_XihjgOUyxny5SGvvVYp7diI4
+#   VERCEL_PROJECT_ID  : prj_3bWLBPG6MaSX1EYA2IrxGkKldpCf
+env:
+  VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+  VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+  API_BASE_URL: https://rehat-backend-production.up.railway.app/v1
+
+concurrency:
+  group: deploy-web
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.4'
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      # `flutter clean` mencegah bug build web (manifest aset kadang hilang).
+      - name: Clean
+        run: flutter clean
+
+      - name: Build web
+        run: >
+          flutter build web --release --pwa-strategy=none
+          --dart-define=API_BASE_URL=$API_BASE_URL
+
+      # Rewrite SPA + verifikasi build lengkap sebelum deploy.
+      - name: Prepare & verify
+        run: |
+          cp web/vercel.json build/web/vercel.json
+          test -f build/web/assets/AssetManifest.bin.json \
+            || (echo "❌ AssetManifest hilang — build tidak lengkap" && exit 1)
+          echo "✅ Build lengkap"
+
+      - name: Deploy to Vercel (production)
+        run: |
+          npm i -g vercel@latest
+          vercel deploy build/web --prod --yes --token=${{ secrets.VERCEL_TOKEN }}

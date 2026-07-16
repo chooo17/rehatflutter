@@ -94,7 +94,8 @@ enum PaymentMethod {
   dana('DANA', Icons.account_balance_wallet_outlined),
   bca('BCA', Icons.account_balance_outlined),
   bni('BNI', Icons.account_balance_outlined),
-  mandiri('Mandiri', Icons.account_balance_outlined);
+  mandiri('Mandiri', Icons.account_balance_outlined),
+  cash('Tunai', Icons.payments_outlined);
 
   const PaymentMethod(this.label, this.icon);
 

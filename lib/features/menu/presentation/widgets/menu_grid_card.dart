@@ -23,6 +23,9 @@ class MenuGridCard extends StatelessWidget {
       onTap: onTap,
       padding: EdgeInsets.zero,
       radius: 18,
+      // Shadow lebih dangkal → blur lebih kecil → paint lebih murah di grid
+      // padat (terutama web CanvasKit), tampilan tetap neumorphic.
+      depth: 5,
       child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -127,6 +130,8 @@ class _Image extends StatelessWidget {
     return CachedNetworkImage(
       imageUrl: url!,
       fit: BoxFit.cover,
+      // Batasi resolusi decode di memori (kartu kecil) → hemat GPU & lebih mulus.
+      memCacheWidth: 400,
       placeholder: (_, __) => Container(color: AppColors.crema),
       errorWidget: (_, __, ___) => Container(
         color: AppColors.crema,

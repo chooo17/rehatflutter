@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../shared/models/banner_model.dart';
 import '../../../shared/widgets/neu.dart';
+import '../../../shared/widgets/web_safe_image.dart';
 import '../../banners/data/banner_repository.dart';
 
 /// (Admin) Kelola banner promo beranda: tambah, edit, aktif/nonaktif, hapus.
@@ -232,8 +234,36 @@ class _BannerFormState extends ConsumerState<_BannerForm> {
   late final TextEditingController _sortOrder;
   bool _active = true;
   bool _saving = false;
+  bool _uploading = false;
 
   bool get _isEdit => widget.banner != null;
+
+  Future<void> _pickAndUpload() async {
+    final picked = await ImagePicker().pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 1600,
+      imageQuality: 85,
+    );
+    if (picked == null) return;
+    setState(() => _uploading = true);
+    try {
+      final bytes = await picked.readAsBytes();
+      final url = await ref
+          .read(bannerRepositoryProvider)
+          .uploadImage(bytes: bytes, filename: picked.name);
+      if (!mounted) return;
+      setState(() {
+        _imageUrl.text = url;
+        _uploading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _uploading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Gagal mengunggah gambar.')),
+      );
+    }
+  }
 
   @override
   void initState() {
@@ -323,14 +353,77 @@ class _BannerFormState extends ConsumerState<_BannerForm> {
               textCapitalization: TextCapitalization.sentences,
               decoration: const InputDecoration(labelText: 'Subjudul (opsional)'),
             ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _imageUrl,
-              keyboardType: TextInputType.url,
-              decoration: const InputDecoration(
-                labelText: 'URL gambar (opsional)',
-                hintText: 'https://…  (kosong = kartu gradien)',
+            const SizedBox(height: 16),
+            Text('Gambar Banner (opsional)', style: AppTextStyles.label),
+            const SizedBox(height: 8),
+            // Preview gambar terpilih / tersimpan.
+            if (_imageUrl.text.isNotEmpty)
+              ClipRRect(
+                borderRadius: BorderRadius.circular(14),
+                child: AspectRatio(
+                  aspectRatio: 16 / 7,
+                  child: WebSafeImage(
+                    url: _imageUrl.text,
+                    fit: BoxFit.cover,
+                    placeholder: Container(color: AppColors.crema),
+                    error: Container(
+                      color: AppColors.crema,
+                      child: Icon(Icons.broken_image_outlined,
+                          color: AppColors.textSecondary),
+                    ),
+                  ),
+                ),
+              )
+            else
+              Container(
+                height: 90,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: AppColors.crema,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Text('Belum ada gambar (kartu gradien)',
+                    style: AppTextStyles.bodySmall
+                        .copyWith(color: AppColors.textSecondary)),
               ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: NeuButton(
+                    onPressed: _uploading ? null : _pickAndUpload,
+                    child: _uploading
+                        ? const SizedBox(
+                            height: 18,
+                            width: 18,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2.2, color: AppColors.amber))
+                        : Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.upload_rounded,
+                                  size: 18, color: AppColors.espresso),
+                              const SizedBox(width: 8),
+                              Text(
+                                  _imageUrl.text.isEmpty
+                                      ? 'Upload Gambar'
+                                      : 'Ganti Gambar',
+                                  style: AppTextStyles.button
+                                      .copyWith(color: AppColors.espresso)),
+                            ],
+                          ),
+                  ),
+                ),
+                if (_imageUrl.text.isNotEmpty) ...[
+                  const SizedBox(width: 8),
+                  IconButton(
+                    onPressed: () => setState(() => _imageUrl.clear()),
+                    icon: const Icon(Icons.delete_outline_rounded,
+                        color: AppColors.error),
+                    tooltip: 'Hapus gambar',
+                  ),
+                ],
+              ],
             ),
             const SizedBox(height: 12),
             TextField(

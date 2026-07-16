@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -9,6 +8,7 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_text_styles.dart';
 import '../../../../core/router/route_names.dart';
 import '../../../../shared/models/banner_model.dart';
+import '../../../../shared/widgets/web_safe_image.dart';
 import '../../../banners/data/banner_repository.dart';
 
 /// Carousel banner promo di beranda. Menyembunyikan diri bila tak ada banner
@@ -116,11 +116,11 @@ class _BannerCard extends StatelessWidget {
           children: [
             // Latar: gambar bila ada, atau gradien brand.
             if (banner.hasImage)
-              CachedNetworkImage(
-                imageUrl: banner.imageUrl!,
+              WebSafeImage(
+                url: banner.imageUrl!,
                 fit: BoxFit.cover,
-                placeholder: (_, __) => Container(color: AppColors.crema),
-                errorWidget: (_, __, ___) => const _GradientBg(),
+                placeholder: Container(color: AppColors.crema),
+                error: const _GradientBg(),
               )
             else
               const _GradientBg(),

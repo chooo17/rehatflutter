@@ -20,17 +20,33 @@ class AdminDashboardScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final range = ref.watch(salesRangeProvider);
+    final date = ref.watch(salesDateProvider);
     final async = ref.watch(salesReportProvider);
 
+    Future<void> pickDate() async {
+      final now = DateTime.now();
+      final picked = await showDatePicker(
+        context: context,
+        initialDate: date ?? now,
+        firstDate: DateTime(now.year - 2),
+        lastDate: now,
+      );
+      if (picked != null) ref.read(salesDateProvider.notifier).state = picked;
+    }
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Dashboard Penjualan')),
+      appBar: AppBar(title: const Text('Laporan Penjualan')),
       body: RefreshIndicator(
         color: AppColors.amber,
-        onRefresh: () async => ref.invalidate(salesReportProvider),
+        onRefresh: () async {
+          ref.invalidate(salesReportProvider);
+          ref.invalidate(expensesProvider);
+          ref.invalidate(salesCalendarProvider);
+        },
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
           children: [
-            // Pemilih rentang waktu.
+            // Pemilih rentang waktu (pill) — nonaktif bila tanggal spesifik dipilih.
             NeuInset(
               padding: const EdgeInsets.all(6),
               radius: 16,
@@ -41,15 +57,17 @@ class AdminDashboardScreen extends ConsumerWidget {
                       child: Padding(
                         padding: const EdgeInsets.all(2),
                         child: NeuButton(
-                          onPressed: () =>
-                              ref.read(salesRangeProvider.notifier).state = value,
-                          accent: value == range,
+                          onPressed: () {
+                            ref.read(salesRangeProvider.notifier).state = value;
+                            ref.read(salesDateProvider.notifier).state = null;
+                          },
+                          accent: value == range && date == null,
                           radius: 11,
                           padding: const EdgeInsets.symmetric(vertical: 10),
                           child: Text(
                             label,
                             style: AppTextStyles.caption.copyWith(
-                              color: value == range
+                              color: value == range && date == null
                                   ? Colors.white
                                   : AppColors.textSecondary,
                               fontWeight: FontWeight.w700,
@@ -60,6 +78,51 @@ class AdminDashboardScreen extends ConsumerWidget {
                     ),
                 ],
               ),
+            ),
+            const SizedBox(height: 10),
+            // Pilih tanggal spesifik.
+            Row(
+              children: [
+                Expanded(
+                  child: NeuButton(
+                    onPressed: pickDate,
+                    accent: date != null,
+                    radius: 12,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.calendar_today_rounded,
+                            size: 16,
+                            color: date != null
+                                ? Colors.white
+                                : AppColors.textSecondary),
+                        const SizedBox(width: 8),
+                        Text(
+                          date != null
+                              ? Formatters.tanggal(date)
+                              : 'Pilih tanggal',
+                          style: AppTextStyles.caption.copyWith(
+                            color: date != null
+                                ? Colors.white
+                                : AppColors.textSecondary,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                if (date != null) ...[
+                  const SizedBox(width: 8),
+                  IconButton(
+                    onPressed: () =>
+                        ref.read(salesDateProvider.notifier).state = null,
+                    icon: const Icon(Icons.close_rounded),
+                    tooltip: 'Hapus filter tanggal',
+                  ),
+                ],
+              ],
             ),
             const SizedBox(height: 20),
             async.when(
@@ -72,6 +135,10 @@ class AdminDashboardScreen extends ConsumerWidget {
                   onRetry: () => ref.invalidate(salesReportProvider)),
               data: (r) => _Report(report: r),
             ),
+            const SizedBox(height: 24),
+            const _SalesCalendar(),
+            const SizedBox(height: 24),
+            const _ExpensesSection(),
           ],
         ),
       ),
@@ -88,13 +155,13 @@ class _Report extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // KPI 2x2.
+        // KPI utama: omzet & laba bersih (40%).
         Row(
           children: [
             Expanded(
               child: _KpiCard(
                 icon: Icons.payments_rounded,
-                label: 'Pendapatan',
+                label: 'Total omzet',
                 value: Formatters.rupiah(report.revenue),
                 accent: true,
               ),
@@ -102,9 +169,51 @@ class _Report extends StatelessWidget {
             const SizedBox(width: 12),
             Expanded(
               child: _KpiCard(
-                icon: Icons.receipt_long_rounded,
-                label: 'Pesanan',
-                value: '${report.orders}',
+                icon: Icons.savings_rounded,
+                label: 'Laba bersih (40%)',
+                value: Formatters.rupiah(report.netProfit),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        // Penerimaan dipisah metode bayar.
+        Row(
+          children: [
+            Expanded(
+              child: _KpiCard(
+                icon: Icons.qr_code_2_rounded,
+                label: 'Diterima via QRIS',
+                value: Formatters.rupiah(report.qrisRevenue),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _KpiCard(
+                icon: Icons.payments_outlined,
+                label: 'Diterima Tunai',
+                value: Formatters.rupiah(report.cashRevenue),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        // Kas tunai di kasir = omzet - QRIS - pengeluaran.
+        Row(
+          children: [
+            Expanded(
+              child: _KpiCard(
+                icon: Icons.account_balance_wallet_rounded,
+                label: 'Kas Tunai Kasir',
+                value: Formatters.rupiah(report.cashInDrawer),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _KpiCard(
+                icon: Icons.money_off_rounded,
+                label: 'Pengeluaran',
+                value: Formatters.rupiah(report.expenses),
               ),
             ),
           ],
@@ -114,17 +223,17 @@ class _Report extends StatelessWidget {
           children: [
             Expanded(
               child: _KpiCard(
-                icon: Icons.local_cafe_rounded,
-                label: 'Item terjual',
-                value: '${report.itemsSold}',
+                icon: Icons.receipt_long_rounded,
+                label: 'Pesanan',
+                value: '${report.orders}',
               ),
             ),
             const SizedBox(width: 12),
             Expanded(
               child: _KpiCard(
-                icon: Icons.trending_up_rounded,
-                label: 'Rata-rata/pesanan',
-                value: Formatters.rupiah(report.avgOrderValue),
+                icon: Icons.local_cafe_rounded,
+                label: 'Item terjual',
+                value: '${report.itemsSold}',
               ),
             ),
           ],
@@ -377,6 +486,297 @@ class _ErrorState extends StatelessWidget {
             TextButton(onPressed: onRetry, child: const Text('Coba lagi')),
           ],
         ),
+      ),
+    );
+  }
+}
+
+const _idMonths = [
+  'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+  'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember',
+];
+
+/// Kalender penjualan: omzet harian (dalam ribuan, mis. 1.435.000 → 1435).
+class _SalesCalendar extends ConsumerWidget {
+  const _SalesCalendar();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final month = ref.watch(calendarMonthProvider);
+    final data = ref.watch(salesCalendarProvider).valueOrNull ?? const {};
+    final first = DateTime(month.year, month.month, 1);
+    final daysInMonth = DateTime(month.year, month.month + 1, 0).day;
+    final leading = first.weekday - 1; // Senin sebagai kolom pertama.
+
+    final cells = <Widget>[];
+    for (var i = 0; i < leading; i++) {
+      cells.add(const SizedBox.shrink());
+    }
+    for (var d = 1; d <= daysInMonth; d++) {
+      final key = '${month.year.toString().padLeft(4, '0')}-'
+          '${month.month.toString().padLeft(2, '0')}-'
+          '${d.toString().padLeft(2, '0')}';
+      final rev = data[key] ?? 0;
+      cells.add(_DayCell(day: d, omzetK: rev > 0 ? (rev / 1000).round() : null));
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Kalender Penjualan', style: AppTextStyles.titleMedium),
+        const SizedBox(height: 12),
+        NeuCard(
+          padding: const EdgeInsets.fromLTRB(12, 12, 12, 14),
+          radius: 20,
+          child: Column(
+            children: [
+              Row(
+                children: [
+                  IconButton(
+                    onPressed: () => ref.read(calendarMonthProvider.notifier).state =
+                        DateTime(month.year, month.month - 1),
+                    icon: const Icon(Icons.chevron_left_rounded),
+                  ),
+                  Expanded(
+                    child: Text('${_idMonths[month.month - 1]} ${month.year}',
+                        textAlign: TextAlign.center,
+                        style: AppTextStyles.label),
+                  ),
+                  IconButton(
+                    onPressed: () => ref.read(calendarMonthProvider.notifier).state =
+                        DateTime(month.year, month.month + 1),
+                    icon: const Icon(Icons.chevron_right_rounded),
+                  ),
+                ],
+              ),
+              Row(
+                children: [
+                  for (final w in const ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'])
+                    Expanded(
+                      child: Text(w,
+                          textAlign: TextAlign.center,
+                          style: AppTextStyles.caption.copyWith(
+                              color: AppColors.textSecondary, fontSize: 10)),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              GridView.count(
+                crossAxisCount: 7,
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                childAspectRatio: 0.82,
+                children: cells,
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _DayCell extends StatelessWidget {
+  const _DayCell({required this.day, this.omzetK});
+  final int day;
+  final int? omzetK;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.all(2),
+      decoration: BoxDecoration(
+        color: omzetK != null
+            ? AppColors.amber.withValues(alpha: 0.14)
+            : Colors.transparent,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text('$day',
+              style: AppTextStyles.caption
+                  .copyWith(fontWeight: FontWeight.w700, fontSize: 12)),
+          const SizedBox(height: 1),
+          if (omzetK != null)
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text('$omzetK',
+                  style: AppTextStyles.caption.copyWith(
+                      color: AppColors.amberDark,
+                      fontSize: 9,
+                      fontWeight: FontWeight.w700)),
+            )
+          else
+            const Text(' ', style: TextStyle(fontSize: 9)),
+        ],
+      ),
+    );
+  }
+}
+
+/// Bagian pengeluaran: total + catat baru + daftar (dengan hapus).
+class _ExpensesSection extends ConsumerWidget {
+  const _ExpensesSection();
+
+  Future<void> _add(BuildContext context, WidgetRef ref) async {
+    final amountCtrl = TextEditingController();
+    final noteCtrl = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        title: Text('Catat Pengeluaran', style: AppTextStyles.titleLarge),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: amountCtrl,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                  labelText: 'Jumlah (Rp)', prefixText: 'Rp '),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: noteCtrl,
+              decoration: const InputDecoration(labelText: 'Keterangan (opsional)'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Batal')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Simpan')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    final amount = int.tryParse(amountCtrl.text.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+    if (amount <= 0) return;
+    await ref
+        .read(adminReportRepositoryProvider)
+        .addExpense(amount: amount, note: noteCtrl.text);
+    ref.invalidate(expensesProvider);
+    ref.invalidate(salesReportProvider);
+  }
+
+  Future<void> _delete(WidgetRef ref, String id) async {
+    await ref.read(adminReportRepositoryProvider).deleteExpense(id);
+    ref.invalidate(expensesProvider);
+    ref.invalidate(salesReportProvider);
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final async = ref.watch(expensesProvider);
+    final list = async.valueOrNull;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text('Pengeluaran', style: AppTextStyles.titleMedium),
+            const Spacer(),
+            NeuButton(
+              onPressed: () => _add(context, ref),
+              accent: true,
+              radius: 12,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              child: Text('Catat',
+                  style: AppTextStyles.caption
+                      .copyWith(color: Colors.white, fontWeight: FontWeight.w700)),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        if (async.hasError)
+          NeuCard(
+            radius: 14,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 6),
+              child: Text(
+                  'Fitur pengeluaran belum aktif. Jalankan migrasi 007_add_expenses.sql di Supabase.',
+                  style: AppTextStyles.bodySmall
+                      .copyWith(color: AppColors.textSecondary)),
+            ),
+          )
+        else if (list == null)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 16),
+            child: Center(child: CircularProgressIndicator(color: AppColors.amber)),
+          )
+        else ...[
+          NeuCard(
+            padding: const EdgeInsets.all(14),
+            radius: 16,
+            child: Row(
+              children: [
+                Icon(Icons.money_off_rounded, color: AppColors.amberDark),
+                const SizedBox(width: 10),
+                Text('Total pengeluaran', style: AppTextStyles.bodyMedium),
+                const Spacer(),
+                Text(Formatters.rupiah(list.total),
+                    style: AppTextStyles.titleMedium
+                        .copyWith(color: AppColors.amberDark)),
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
+          if (list.items.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Text('Belum ada pengeluaran pada rentang ini.',
+                  style: AppTextStyles.bodySmall
+                      .copyWith(color: AppColors.textSecondary)),
+            )
+          else
+            for (final e in list.items) ...[
+              _ExpenseRow(item: e, onDelete: () => _delete(ref, e.id)),
+              const SizedBox(height: 8),
+            ],
+        ],
+      ],
+    );
+  }
+}
+
+class _ExpenseRow extends StatelessWidget {
+  const _ExpenseRow({required this.item, required this.onDelete});
+  final ExpenseItem item;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    return NeuCard(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      radius: 14,
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(item.note.isEmpty ? 'Pengeluaran' : item.note,
+                    style: AppTextStyles.bodyMedium,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis),
+                Text(Formatters.tanggalJam(item.spentAt),
+                    style: AppTextStyles.caption
+                        .copyWith(color: AppColors.textSecondary)),
+              ],
+            ),
+          ),
+          Text(Formatters.rupiah(item.amount),
+              style: AppTextStyles.label.copyWith(color: AppColors.amberDark)),
+          IconButton(
+            onPressed: onDelete,
+            icon: Icon(Icons.delete_outline_rounded,
+                size: 20, color: AppColors.textSecondary),
+          ),
+        ],
       ),
     );
   }

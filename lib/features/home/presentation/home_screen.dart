@@ -10,6 +10,7 @@ import '../../../shared/models/loyalty_model.dart';
 import '../../../shared/models/menu_item_model.dart';
 import '../../../shared/widgets/neu.dart';
 import '../../../shared/widgets/section_header.dart';
+import '../../admin/presentation/widgets/saved_orders_icon_button.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../loyalty/data/loyalty_repository.dart';
 import '../../menu/presentation/widgets/cart_icon_button.dart';
@@ -58,7 +59,10 @@ class HomeScreen extends ConsumerWidget {
             children: [
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-                child: _Header(greeting: _greeting(), name: user?.name),
+                child: _Header(
+                    greeting: _greeting(),
+                    name: user?.name,
+                    isAdmin: user?.isAdmin ?? false),
               ),
               const SizedBox(height: 20),
               Padding(
@@ -102,9 +106,10 @@ class HomeScreen extends ConsumerWidget {
 }
 
 class _Header extends StatelessWidget {
-  const _Header({required this.greeting, this.name});
+  const _Header({required this.greeting, this.name, this.isAdmin = false});
   final String greeting;
   final String? name;
+  final bool isAdmin;
 
   @override
   Widget build(BuildContext context) {
@@ -127,6 +132,8 @@ class _Header extends StatelessWidget {
             ],
           ),
         ),
+        // Admin: pintasan ke pesanan belum bayar (disimpan/QRIS menunggu).
+        if (isAdmin) SavedOrdersIconButton(color: AppColors.espresso),
         NotificationIconButton(color: AppColors.espresso),
         CartIconButton(color: AppColors.espresso),
       ],
@@ -209,16 +216,15 @@ class _FeaturedList extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 20),
       itemCount: items.length,
       separatorBuilder: (_, __) => const SizedBox(width: 14),
-      itemBuilder: (context, i) => FeaturedMenuCard(
-        item: items[i],
-        onTap: () => context.pushNamed(
-          RouteNames.menuDetail,
-          pathParameters: {'id': items[i].id},
+      itemBuilder: (context, i) => RepaintBoundary(
+        child: FeaturedMenuCard(
+          item: items[i],
+          onTap: () => context.pushNamed(
+            RouteNames.menuDetail,
+            pathParameters: {'id': items[i].id},
+          ),
         ),
-      )
-          .animate()
-          .fadeIn(delay: (i * 70).ms, duration: 300.ms)
-          .slideX(begin: 0.1, end: 0),
+      ),
     );
   }
 }

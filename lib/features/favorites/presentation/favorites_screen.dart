@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/router/route_names.dart';
+import '../../../core/utils/responsive.dart';
 import '../../../shared/widgets/neu.dart';
 import '../../menu/application/cart_controller.dart';
 import '../../menu/presentation/widgets/cart_icon_button.dart';
@@ -37,8 +38,8 @@ class FavoritesScreen extends ConsumerWidget {
             onRefresh: () async => ref.invalidate(favoritesControllerProvider),
             child: GridView.builder(
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: context.menuColumns,
                 mainAxisSpacing: 14,
                 crossAxisSpacing: 14,
                 childAspectRatio: 0.66,

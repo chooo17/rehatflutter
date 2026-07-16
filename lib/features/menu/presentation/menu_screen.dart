@@ -1,17 +1,20 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/router/route_names.dart';
+import '../../../core/utils/formatters.dart';
+import '../../../core/utils/responsive.dart';
 import '../../../shared/widgets/neu.dart';
+import '../../admin/presentation/widgets/saved_orders_icon_button.dart';
 import '../../auth/application/auth_controller.dart';
 import '../application/cart_controller.dart';
 import '../application/menu_sort.dart';
 import '../data/menu_repository.dart';
 import 'widgets/cart_icon_button.dart';
+import 'widgets/cashier_actions.dart';
 import 'widgets/menu_grid_card.dart';
 
 /// Katalog menu: pencarian, filter kategori, dan grid item.
@@ -74,19 +77,6 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
     }
   }
 
-  /// Tamu menekan aksi pesan → ajak login.
-  void _promptLogin() {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(
-        content: const Text('Masuk dulu untuk memesan'),
-        action: SnackBarAction(
-          label: 'Masuk',
-          onPressed: () => context.goNamed(RouteNames.login),
-        ),
-      ));
-  }
-
   @override
   Widget build(BuildContext context) {
     final categoriesAsync = ref.watch(menuCategoriesProvider);
@@ -94,37 +84,59 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
     final selected = ref.watch(selectedCategoryProvider);
     final isGuest =
         ref.watch(authControllerProvider).status == AuthStatus.guest;
+    final isAdmin = ref.watch(authControllerProvider).user?.isAdmin ?? false;
+    // Tablet/desktop: keranjang tampil sebagai side cart di tab Menu.
+    final wide = !context.isMobile;
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Menu'),
         actions: isGuest
             ? [
-                Padding(
-                  padding: const EdgeInsets.only(right: 12, top: 8, bottom: 8),
-                  child: NeuButton(
-                    onPressed: () => context.goNamed(RouteNames.login),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 8),
-                    child: Text('Masuk',
-                        style: AppTextStyles.button
-                            .copyWith(color: AppColors.espresso)),
+                Center(
+                  child: Padding(
+                    padding: const EdgeInsets.only(left: 8),
+                    child: NeuButton(
+                      onPressed: () => context.goNamed(RouteNames.login),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 8),
+                      child: Text('Masuk',
+                          style: AppTextStyles.button
+                              .copyWith(color: AppColors.espresso)),
+                    ),
                   ),
                 ),
+                CartIconButton(color: AppColors.espresso),
               ]
             : [
-                IconButton(
-                  icon: Icon(Icons.favorite_border_rounded,
-                      color: AppColors.espresso),
-                  tooltip: 'Favorit',
-                  onPressed: () => context.pushNamed(RouteNames.favorites),
-                ),
+                if (isAdmin) ...[
+                  // Admin: pintasan Pesanan Masuk & pesanan belum bayar.
+                  NeuCircleButton(
+                    icon: Icons.receipt_long_rounded,
+                    iconColor: AppColors.espresso,
+                    onPressed: () => context.pushNamed(RouteNames.adminOrders),
+                  ),
+                  const SizedBox(width: 6),
+                  SavedOrdersIconButton(color: AppColors.espresso),
+                ] else
+                  // Pelanggan: Favorit (bundar seragam dengan keranjang).
+                  NeuCircleButton(
+                    icon: Icons.favorite_border_rounded,
+                    iconColor: AppColors.espresso,
+                    onPressed: () => context.pushNamed(RouteNames.favorites),
+                  ),
+                const SizedBox(width: 6),
                 CartIconButton(color: AppColors.espresso),
+                const SizedBox(width: 12),
               ],
       ),
-      body: Column(
+      body: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (isGuest) _GuestBanner(onLogin: () => context.goNamed(RouteNames.login)),
+          Expanded(
+            child: Column(
+              children: [
+                if (isGuest) _GuestBanner(onLogin: () => context.goNamed(RouteNames.login)),
           // Pencarian + Urutkan -------------------------------------------
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
@@ -174,19 +186,21 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
           ),
           // Kategori ------------------------------------------------------
           SizedBox(
-            height: 40,
+            height: 56,
             child: categoriesAsync.when(
               loading: () => const SizedBox.shrink(),
               error: (_, __) => const SizedBox.shrink(),
               data: (categories) => ListView.separated(
                 scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 20),
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
                 itemCount: categories.length,
                 separatorBuilder: (_, __) => const SizedBox(width: 8),
                 itemBuilder: (context, i) {
                   final cat = categories[i];
                   final isActive = cat.id == selected;
-                  return NeuButton(
+                  // Center: pill di tengah + ruang untuk shadow neumorphic.
+                  return Center(
+                    child: NeuButton(
                     onPressed: () => ref
                         .read(selectedCategoryProvider.notifier)
                         .state = cat.id,
@@ -201,7 +215,7 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
                         fontWeight: FontWeight.w600,
                       ),
                     ),
-                  );
+                  ));
                 },
               ),
             ),
@@ -224,9 +238,11 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
                   onRefresh: () async => ref.invalidate(menuListProvider),
                   child: GridView.builder(
                     padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+                    // Kolom otomatis dari lebar tersedia (memperhitungkan side
+                    // cart): ~2 di mobile, 3 di tablet landscape, tanpa sempit.
                     gridDelegate:
-                        const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
+                        const SliverGridDelegateWithMaxCrossAxisExtent(
+                      maxCrossAxisExtent: 210,
                       mainAxisSpacing: 14,
                       crossAxisSpacing: 14,
                       childAspectRatio: 0.66,
@@ -234,40 +250,167 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
                     itemCount: items.length,
                     itemBuilder: (context, i) {
                       final item = items[i];
-                      return MenuGridCard(
-                        item: item,
-                        onTap: () => context.pushNamed(
-                          RouteNames.menuDetail,
-                          pathParameters: {'id': item.id},
+                      // RepaintBoundary: isolasi repaint kartu neumorphic saat
+                      // scroll. Animasi per-item dihapus agar tidak patah-patah.
+                      return RepaintBoundary(
+                        child: MenuGridCard(
+                          item: item,
+                          onTap: () => context.pushNamed(
+                            RouteNames.menuDetail,
+                            pathParameters: {'id': item.id},
+                          ),
+                          onAdd: () {
+                            ref.read(cartControllerProvider.notifier).add(item);
+                            ScaffoldMessenger.of(context)
+                              ..hideCurrentSnackBar()
+                              ..showSnackBar(SnackBar(
+                                content: Text(
+                                    '${item.name} ditambahkan ke keranjang'),
+                              ));
+                          },
                         ),
-                        onAdd: isGuest
-                            ? _promptLogin
-                            : () {
-                                ref
-                                    .read(cartControllerProvider.notifier)
-                                    .add(item);
-                                ScaffoldMessenger.of(context)
-                                  ..hideCurrentSnackBar()
-                                  ..showSnackBar(SnackBar(
-                                    content: Text(
-                                        '${item.name} ditambahkan ke keranjang'),
-                                  ));
-                              },
-                      )
-                          .animate()
-                          .fadeIn(delay: (i * 40).ms, duration: 260.ms)
-                          .slideY(
-                              begin: 0.12,
-                              end: 0,
-                              delay: (i * 40).ms,
-                              duration: 320.ms,
-                              curve: Curves.easeOutCubic);
+                      );
                     },
                   ),
                 );
               },
             ),
           ),
+              ],
+            ),
+          ),
+          if (wide) SizedBox(width: 340, child: _SideCart(isAdmin: isAdmin)),
+        ],
+      ),
+    );
+  }
+}
+
+/// Side cart (tablet/desktop) di tab Menu: review pesanan + aksi bayar.
+/// Admin → aksi kasir (Tunai/QRIS/Simpan); pelanggan → lanjut ke pembayaran.
+class _SideCart extends ConsumerWidget {
+  const _SideCart({required this.isAdmin});
+  final bool isAdmin;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final items = ref.watch(cartControllerProvider);
+    final total = ref.watch(cartTotalProvider);
+    final cart = ref.read(cartControllerProvider.notifier);
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        border: Border(left: BorderSide(color: AppColors.border)),
+      ),
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+            child: Row(
+              children: [
+                Icon(Icons.receipt_long_rounded,
+                    size: 18, color: AppColors.amberDark),
+                const SizedBox(width: 8),
+                Text('Pesanan', style: AppTextStyles.titleMedium),
+                const Spacer(),
+                Text('${items.length} item', style: AppTextStyles.bodySmall),
+              ],
+            ),
+          ),
+          Expanded(
+            child: items.isEmpty
+                ? Center(
+                    child: Text('Belum ada item.\nPilih menu di sebelah kiri.',
+                        textAlign: TextAlign.center,
+                        style: AppTextStyles.bodyMedium
+                            .copyWith(color: AppColors.textSecondary)),
+                  )
+                : ListView.separated(
+                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                    itemCount: items.length,
+                    separatorBuilder: (_, __) => const Divider(height: 16),
+                    itemBuilder: (context, i) {
+                      final line = items[i];
+                      return Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(line.item.name,
+                                    style: AppTextStyles.bodyMedium,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis),
+                                const SizedBox(height: 2),
+                                Text(Formatters.rupiah(line.subtotal),
+                                    style: AppTextStyles.bodySmall
+                                        .copyWith(color: AppColors.amberDark)),
+                              ],
+                            ),
+                          ),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              InkWell(
+                                onTap: () => cart.decrement(line.lineId),
+                                child: Icon(
+                                    Icons.remove_circle_outline_rounded,
+                                    size: 22, color: AppColors.textSecondary),
+                              ),
+                              Padding(
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 8),
+                                child: Text('${line.quantity}',
+                                    style: AppTextStyles.label),
+                              ),
+                              InkWell(
+                                onTap: () => cart.increment(line.lineId),
+                                child: Icon(Icons.add_circle_rounded,
+                                    size: 22, color: AppColors.amberDark),
+                              ),
+                            ],
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+          ),
+          if (items.isNotEmpty)
+            Container(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                border: Border(top: BorderSide(color: AppColors.border)),
+              ),
+              child: isAdmin
+                  ? const CashierActions()
+                  : Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Row(
+                          children: [
+                            Text('Total', style: AppTextStyles.bodyMedium),
+                            const Spacer(),
+                            Text(Formatters.rupiah(total),
+                                style: AppTextStyles.titleLarge
+                                    .copyWith(color: AppColors.amberDark)),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        NeuButton(
+                          expand: true,
+                          accent: true,
+                          onPressed: () =>
+                              context.pushNamed(RouteNames.checkout),
+                          child: Text('Lanjut ke Pembayaran',
+                              style: AppTextStyles.button
+                                  .copyWith(color: Colors.white)),
+                        ),
+                      ],
+                    ),
+            ),
         ],
       ),
     );
@@ -294,7 +437,8 @@ class _GuestBanner extends StatelessWidget {
               size: 18, color: AppColors.amberDark),
           const SizedBox(width: 10),
           Expanded(
-            child: Text('Kamu menjelajah sebagai tamu — masuk untuk memesan.',
+            child: Text(
+                'Memesan sebagai tamu — voucher & poin tidak berlaku. Masuk untuk keuntungan lebih.',
                 style: AppTextStyles.bodySmall),
           ),
           const SizedBox(width: 8),
