@@ -20,8 +20,10 @@ NeumorphicThemeData neuLightTheme() => const NeumorphicThemeData(
       shadowLightColorEmboss: Color(0xFFFFFDF6),
       shadowDarkColorEmboss: Color(0xFFB2A78C),
       defaultTextColor: _kInkLight,
-      depth: 9,
-      intensity: 0.85,
+      // Depth diturunkan (blur shadow lebih kecil) → render jauh lebih ringan
+      // saat pindah halaman/scroll, tampilan tetap timbul.
+      depth: 6,
+      intensity: 0.8,
       lightSource: LightSource.topLeft,
     );
 
@@ -34,8 +36,8 @@ NeumorphicThemeData neuDarkTheme() => const NeumorphicThemeData(
       shadowLightColorEmboss: Color(0xFF3C362C),
       shadowDarkColorEmboss: Color(0xFF0A0805),
       defaultTextColor: _kInkDark,
-      depth: 7,
-      intensity: 0.8,
+      depth: 5,
+      intensity: 0.75,
       lightSource: LightSource.topLeft,
     );
 
@@ -65,7 +67,7 @@ class NeuCard extends StatelessWidget {
     required this.child,
     this.padding = const EdgeInsets.all(16),
     this.radius = 20,
-    this.depth = 8,
+    this.depth = 5,
     this.color,
     this.onTap,
   });
@@ -107,7 +109,7 @@ class NeuInset extends StatelessWidget {
     required this.child,
     this.padding = const EdgeInsets.all(14),
     this.radius = 16,
-    this.depth = 7,
+    this.depth = 5,
     this.color,
   });
 
@@ -157,7 +159,7 @@ class NeuButton extends StatelessWidget {
       onPressed: onPressed,
       padding: padding,
       style: NeumorphicStyle(
-        depth: accent ? 5 : 7,
+        depth: accent ? 4 : 5,
         intensity: 0.82,
         color: accent ? _kAccent : null,
         boxShape: NeumorphicBoxShape.roundRect(BorderRadius.circular(radius)),
@@ -187,7 +189,7 @@ class NeuBottomBar extends StatelessWidget {
     final bottom = MediaQuery.of(context).padding.bottom;
     return Neumorphic(
       style: NeumorphicStyle(
-        depth: 14,
+        depth: 8,
         intensity: 0.82,
         boxShape: NeumorphicBoxShape.roundRect(
           const BorderRadius.vertical(top: Radius.circular(24)),
@@ -225,7 +227,7 @@ class NeuCircleButton extends StatelessWidget {
         onPressed: onPressed,
         padding: EdgeInsets.zero,
         style: const NeumorphicStyle(
-          depth: 7,
+          depth: 5,
           intensity: 0.82,
           boxShape: NeumorphicBoxShape.circle(),
         ),

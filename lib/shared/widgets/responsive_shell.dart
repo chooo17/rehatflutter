@@ -12,7 +12,7 @@ import '../../core/constants/app_colors.dart';
 /// dan snackbar ikut terpusat. MediaQuery di dalam juga di-override ke [maxWidth]
 /// agar widget yang menghitung dari lebar layar tetap konsisten.
 class ResponsiveShell extends StatelessWidget {
-  const ResponsiveShell({super.key, required this.child, this.maxWidth = 900});
+  const ResponsiveShell({super.key, required this.child, this.maxWidth = 1000});
 
   final Widget child;
   final double maxWidth;

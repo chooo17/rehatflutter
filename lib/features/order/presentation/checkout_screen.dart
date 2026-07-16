@@ -7,14 +7,15 @@ import '../../../core/constants/app_text_styles.dart';
 import '../../../core/router/route_names.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../shared/models/order_model.dart';
+import '../../../shared/models/voucher_model.dart';
 import '../../../shared/widgets/neu.dart';
 import '../../auth/application/auth_controller.dart';
+import '../../loyalty/data/loyalty_repository.dart';
 import '../../menu/application/cart_controller.dart';
 import '../application/checkout_controller.dart';
 
-/// Metode pembayaran yang tampil untuk pelanggan (tanpa 'cash' = kasir saja).
-final _customerMethods =
-    PaymentMethod.values.where((m) => m != PaymentMethod.cash).toList();
+/// Pelanggan hanya membayar via QRIS (metode lain dinonaktifkan).
+const _customerMethods = [PaymentMethod.qris];
 
 /// Checkout: pilih metode pembayaran, terapkan voucher, lalu buat pesanan.
 class CheckoutScreen extends ConsumerStatefulWidget {
@@ -25,14 +26,12 @@ class CheckoutScreen extends ConsumerStatefulWidget {
 }
 
 class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
-  final _voucherCtrl = TextEditingController();
   final _notesCtrl = TextEditingController();
   final _guestNameCtrl = TextEditingController();
   final _guestPhoneCtrl = TextEditingController();
 
   @override
   void dispose() {
-    _voucherCtrl.dispose();
     _notesCtrl.dispose();
     _guestNameCtrl.dispose();
     _guestPhoneCtrl.dispose();
@@ -56,20 +55,6 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(SnackBar(content: Text(msg)));
-    }
-  }
-
-  Future<void> _applyVoucher() async {
-    FocusScope.of(context).unfocus();
-    await ref
-        .read(checkoutControllerProvider.notifier)
-        .applyVoucher(_voucherCtrl.text);
-    if (!mounted) return;
-    final st = ref.read(checkoutControllerProvider);
-    if (st.errorMessage != null) {
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(content: Text(st.errorMessage!)));
     }
   }
 
@@ -143,18 +128,9 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                 const SizedBox(height: 24),
                 // Voucher tak berlaku untuk tamu (butuh akun).
                 if (!isGuest) ...[
-                  const _SectionLabel('Kode voucher'),
+                  const _SectionLabel('Voucher'),
                   const SizedBox(height: 10),
-                  _VoucherField(
-                    controller: _voucherCtrl,
-                    applied: state.voucher?.isValid == true,
-                    isLoading: state.isValidatingVoucher,
-                    onApply: _applyVoucher,
-                    onClear: () {
-                      _voucherCtrl.clear();
-                      notifier.clearVoucher();
-                    },
-                  ),
+                  const _VoucherPicker(),
                   const SizedBox(height: 24),
                 ],
                 const _SectionLabel('Catatan untuk barista'),
@@ -379,69 +355,173 @@ class _OrderTypeCard extends StatelessWidget {
   }
 }
 
-class _VoucherField extends StatelessWidget {
-  const _VoucherField({
-    required this.controller,
-    required this.applied,
-    required this.isLoading,
-    required this.onApply,
-    required this.onClear,
-  });
+/// Pemilih voucher: pelanggan memilih dari voucher yang DIMILIKI (dropdown /
+/// bottom sheet), tanpa perlu menyalin kode.
+class _VoucherPicker extends ConsumerWidget {
+  const _VoucherPicker();
 
-  final TextEditingController controller;
-  final bool applied;
-  final bool isLoading;
-  final VoidCallback onApply;
-  final VoidCallback onClear;
+  Widget _shell({required Widget child}) => Container(
+        height: 54,
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: child,
+      );
+
+  Future<void> _pick(
+      BuildContext context, WidgetRef ref, List<VoucherModel> vouchers) async {
+    final chosen = await showModalBottomSheet<VoucherModel>(
+      context: context,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (_) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 18, 20, 8),
+              child: Text('Pilih Voucher', style: AppTextStyles.titleLarge),
+            ),
+            for (final v in vouchers)
+              ListTile(
+                leading: Icon(Icons.local_offer_rounded,
+                    color: AppColors.amberDark),
+                title: Text('Diskon ${v.discountPct}%',
+                    style: AppTextStyles.bodyLarge),
+                subtitle: Text(
+                    v.expiresAt != null
+                        ? 'Berlaku s/d ${Formatters.tanggal(v.expiresAt!)}'
+                        : v.sourceLabel,
+                    style: AppTextStyles.caption),
+                onTap: () => Navigator.pop(context, v),
+              ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+    if (chosen == null) return;
+    await ref.read(checkoutControllerProvider.notifier).applyVoucher(chosen.code);
+    if (!context.mounted) return;
+    final st = ref.read(checkoutControllerProvider);
+    if (st.errorMessage != null) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text(st.errorMessage!)));
+    }
+  }
 
   @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: TextField(
-            controller: controller,
-            enabled: !applied,
-            textCapitalization: TextCapitalization.characters,
-            decoration: InputDecoration(
-              hintText: 'Mis. REHAT-10OFF-ABC123',
-              prefixIcon: Icon(Icons.local_offer_outlined,
-                  color: AppColors.textSecondary, size: 20),
-              suffixIcon: applied
-                  ? const Icon(Icons.check_circle_rounded,
-                      color: AppColors.success, size: 20)
-                  : null,
-            ),
-          ),
-        ),
-        const SizedBox(width: 10),
-        SizedBox(
-          width: 96,
-          height: 52,
-          child: applied
-              ? OutlinedButton(
-                  onPressed: onClear,
-                  style: OutlinedButton.styleFrom(minimumSize: const Size(0, 52)),
-                  child: const Text('Hapus'))
-              : ElevatedButton(
-                  onPressed: isLoading ? null : onApply,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.espresso,
-                    minimumSize: const Size(0, 52),
-                  ),
-                  child: isLoading
-                      ? SizedBox(
-                          width: 18,
-                          height: 18,
+  Widget build(BuildContext context, WidgetRef ref) {
+    final async = ref.watch(vouchersProvider);
+    final state = ref.watch(checkoutControllerProvider);
+    final notifier = ref.read(checkoutControllerProvider.notifier);
+    final applied = state.voucher?.isValid == true;
+
+    return async.when(
+      loading: () => _shell(
+        child: Row(children: [
+          const SizedBox(
+              width: 16,
+              height: 16,
+              child:
+                  CircularProgressIndicator(strokeWidth: 2, color: AppColors.amber)),
+          const SizedBox(width: 10),
+          Text('Memuat voucher…',
+              style: AppTextStyles.bodyMedium
+                  .copyWith(color: AppColors.textSecondary)),
+        ]),
+      ),
+      error: (_, __) => _shell(
+        child: Center(
+            child: Text('Gagal memuat voucher.',
+                style: AppTextStyles.bodySmall
+                    .copyWith(color: AppColors.textSecondary))),
+      ),
+      data: (vouchers) {
+        final usable = vouchers.where((v) => v.isUsable).toList();
+        if (usable.isEmpty) {
+          return _shell(
+            child: Row(children: [
+              Icon(Icons.local_offer_outlined,
+                  size: 20, color: AppColors.textSecondary),
+              const SizedBox(width: 10),
+              Text('Belum ada voucher',
+                  style: AppTextStyles.bodyMedium
+                      .copyWith(color: AppColors.textSecondary)),
+            ]),
+          );
+        }
+        return Row(
+          children: [
+            Expanded(
+              child: InkWell(
+                borderRadius: BorderRadius.circular(14),
+                onTap: state.isValidatingVoucher
+                    ? null
+                    : () => _pick(context, ref, usable),
+                child: _shell(
+                  child: Row(children: [
+                    Icon(Icons.local_offer_outlined,
+                        size: 20,
+                        color: applied
+                            ? AppColors.amberDark
+                            : AppColors.textSecondary),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        applied
+                            ? 'Diskon ${state.voucher!.discountPct}% diterapkan'
+                            : 'Pilih voucher (${usable.length} tersedia)',
+                        style: AppTextStyles.bodyMedium.copyWith(
+                            color: applied
+                                ? AppColors.textPrimary
+                                : AppColors.textSecondary),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (state.isValidatingVoucher)
+                      const SizedBox(
+                          width: 16,
+                          height: 16,
                           child: CircularProgressIndicator(
-                              strokeWidth: 2.2,
-                              valueColor:
-                                  AlwaysStoppedAnimation(AppColors.crema)),
-                        )
-                      : const Text('Pakai'),
+                              strokeWidth: 2, color: AppColors.amber))
+                    else
+                      Icon(
+                          applied
+                              ? Icons.check_circle_rounded
+                              : Icons.arrow_drop_down_rounded,
+                          color: applied
+                              ? AppColors.success
+                              : AppColors.textSecondary),
+                  ]),
                 ),
-        ),
-      ],
+              ),
+            ),
+            if (applied) ...[
+              const SizedBox(width: 10),
+              SizedBox(
+                height: 54,
+                child: OutlinedButton(
+                  onPressed: notifier.clearVoucher,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.error,
+                    side: BorderSide(color: AppColors.border),
+                  ),
+                  child: const Text('Hapus'),
+                ),
+              ),
+            ],
+          ],
+        );
+      },
     );
   }
 }

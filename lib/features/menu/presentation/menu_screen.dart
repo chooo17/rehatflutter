@@ -279,7 +279,7 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
               ],
             ),
           ),
-          if (wide) SizedBox(width: 340, child: _SideCart(isAdmin: isAdmin)),
+          if (wide) SizedBox(width: 300, child: _SideCart(isAdmin: isAdmin)),
         ],
       ),
     );
