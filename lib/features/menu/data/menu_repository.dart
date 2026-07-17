@@ -15,12 +15,19 @@ class MenuRepository {
 
   /// Mengambil daftar menu, opsional difilter [categoryId] (UUID) & [query],
   /// serta diurutkan [sort] (`sort_order`/`price_asc`/`price_desc`/`rating`).
+  ///
+  /// [limit] menaikkan batas item per halaman (default backend hanya 20 → item
+  /// ke-21 dst. tak muncul). [includeUnavailable] menyertakan item "Habis"
+  /// (default backend hanya mengembalikan yang tersedia).
   Future<List<MenuItemModel>> fetchMenu({
     String? categoryId,
     String? query,
     String? sort,
+    int limit = 100,
+    bool includeUnavailable = false,
   }) async {
-    final params = <String, dynamic>{};
+    final params = <String, dynamic>{'limit': limit.toString()};
+    if (includeUnavailable) params['available_only'] = 'false';
     if (categoryId != null && categoryId.isNotEmpty) {
       params['category_id'] = categoryId;
     }
@@ -134,6 +141,9 @@ final menuDetailProvider =
 });
 
 /// Semua item menu tanpa filter (untuk panel admin gambar menu).
+/// Sertakan item "Habis" & naikkan limit agar seluruh katalog bisa dikelola.
 final allMenuItemsProvider = FutureProvider<List<MenuItemModel>>((ref) {
-  return ref.watch(menuRepositoryProvider).fetchMenu();
+  return ref
+      .watch(menuRepositoryProvider)
+      .fetchMenu(limit: 500, includeUnavailable: true);
 });

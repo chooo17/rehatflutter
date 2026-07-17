@@ -22,13 +22,16 @@ class OrderConfirmationScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final isGuest = ref.watch(authControllerProvider).isGuest;
-    // Polling status pembayaran → nomor antrian muncul otomatis saat lunas.
-    final liveQueue = ref
-            .watch(orderStatusPollProvider(result.orderId))
-            .valueOrNull
-            ?.queueNumber ??
-        '';
+    // Polling status pembayaran (tiap 5 dtk) → status, nomor antrian, dan
+    // hilangnya tombol bayar terjadi otomatis begitu pembayaran terkonfirmasi.
+    final live = ref.watch(orderStatusPollProvider(result.orderId)).valueOrNull;
+    final liveQueue = live?.queueNumber ?? '';
     final queueNumber = liveQueue.isNotEmpty ? liveQueue : result.queueNumber;
+    // Lunas bila polling melaporkan paid, atau nomor antrian sudah keluar,
+    // atau status awal pesanan memang sudah lunas (mis. bayar di kasir).
+    final isPaid = (live?.isPaid ?? false) ||
+        queueNumber.isNotEmpty ||
+        _isPaidStatus(result.paymentStatus);
     return Scaffold(
       body: SafeArea(
         child: Column(
@@ -59,7 +62,9 @@ class OrderConfirmationScreen extends ConsumerWidget {
                         .fadeIn(delay: 200.ms),
                     const SizedBox(height: 8),
                     Text(
-                      'Selesaikan pembayaran untuk mulai diproses.',
+                      isPaid
+                          ? 'Pembayaran diterima — pesanan sedang diproses.'
+                          : 'Selesaikan pembayaran untuk mulai diproses.',
                       textAlign: TextAlign.center,
                       style: AppTextStyles.bodyMedium
                           .copyWith(color: AppColors.textSecondary),
@@ -116,8 +121,10 @@ class OrderConfirmationScreen extends ConsumerWidget {
                           _row('Metode', result.paymentMethod.label),
                           const Divider(height: 24),
                           _row('Status pembayaran',
-                              _statusLabel(result.paymentStatus),
-                              valueColor: AppColors.warning),
+                              isPaid ? 'Lunas' : 'Menunggu pembayaran',
+                              valueColor: isPaid
+                                  ? AppColors.success
+                                  : AppColors.warning),
                           if (result.discountAmount > 0) ...[
                             const Divider(height: 24),
                             _row('Diskon',
@@ -130,10 +137,14 @@ class OrderConfirmationScreen extends ConsumerWidget {
                         ],
                       ),
                     ).animate().fadeIn(delay: 450.ms).slideY(begin: 0.08, end: 0),
-                    const SizedBox(height: 20),
-                    QrisPaymentCard(orderId: result.orderId, amount: result.total)
-                        .animate()
-                        .fadeIn(delay: 550.ms),
+                    // Tombol pembayaran hanya bila BELUM lunas.
+                    if (!isPaid) ...[
+                      const SizedBox(height: 20),
+                      QrisPaymentCard(
+                              orderId: result.orderId, amount: result.total)
+                          .animate()
+                          .fadeIn(delay: 550.ms),
+                    ],
                   ],
                 ),
               ),
@@ -175,16 +186,10 @@ class OrderConfirmationScreen extends ConsumerWidget {
     );
   }
 
-  String _statusLabel(String status) {
-    switch (status.toLowerCase()) {
-      case 'pending':
-        return 'Menunggu pembayaran';
-      case 'paid':
-      case 'settlement':
-        return 'Lunas';
-      default:
-        return status;
-    }
+  /// Status awal pesanan (dari pembuatan) yang menandakan sudah lunas.
+  bool _isPaidStatus(String status) {
+    const paid = {'paid', 'settlement', 'success', 'processing', 'completed'};
+    return paid.contains(status.toLowerCase());
   }
 
   Widget _row(String label, String value,

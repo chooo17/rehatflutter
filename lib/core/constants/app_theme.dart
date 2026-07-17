@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import 'app_colors.dart';
+import 'app_fonts.dart';
 import 'app_text_styles.dart';
 
 /// Tema Material 3 untuk Rehat Coffeehouse.
@@ -33,8 +33,18 @@ class AppTheme {
       useMaterial3: true,
       brightness: brightness,
       colorScheme: colorScheme,
+      fontFamily: AppFonts.body,
       scaffoldBackgroundColor: AppColors.backgroundLight,
       textTheme: _textTheme,
+      // Transisi halaman ringan. Default M3 (ZoomPageTransitionsBuilder)
+      // melakukan scale+fade+clip tiap frame → berat saat pindah halaman.
+      // FadeUpwards hanya fade + geser tipis → jauh lebih murah, tetap mulus.
+      pageTransitionsTheme: const PageTransitionsTheme(
+        builders: {
+          TargetPlatform.android: FadeUpwardsPageTransitionsBuilder(),
+          TargetPlatform.iOS: FadeUpwardsPageTransitionsBuilder(),
+        },
+      ),
       appBarTheme: AppBarTheme(
         backgroundColor: AppColors.backgroundLight,
         foregroundColor: AppColors.textPrimary,
@@ -129,7 +139,11 @@ class AppTheme {
   }
 
   static TextTheme get _textTheme {
-    final base = GoogleFonts.interTextTheme();
+    // Basis tipografi Material dengan family Inter (aset lokal) diterapkan ke
+    // semua gaya, lalu gaya kunci ditimpa oleh token AppTextStyles.
+    final base = Typography.material2021()
+        .black
+        .apply(fontFamily: AppFonts.body);
     return base.copyWith(
       displayLarge: AppTextStyles.displayLarge,
       displayMedium: AppTextStyles.displayMedium,

@@ -2,22 +2,13 @@
     <!-- Push notification (FCM) — izin runtime untuk Android 13+ (Tiramisu). -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
 
-    <!-- Printer thermal Bluetooth (cetak struk kasir). -->
-    <!-- Android <= 11: BLUETOOTH + BLUETOOTH_ADMIN. -->
-    <uses-permission android:name="android.permission.BLUETOOTH"
-        android:maxSdkVersion="30"/>
-    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN"
-        android:maxSdkVersion="30"/>
-    <!-- Android 12+ (API 31): izin runtime baru. -->
-    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>
-    <uses-permission android:name="android.permission.BLUETOOTH_SCAN"
-        android:usesPermissionFlags="neverForLocation"/>
-    <uses-feature android:name="android.hardware.bluetooth" android:required="false"/>
+    <!-- Izin printer Bluetooth HANYA ada di flavor "admin" (kasir); lihat
+         src/admin/AndroidManifest.xml. Flavor "customer" tidak memintanya. -->
     <application
         android:label="Rehat"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
-        android:usesCleartextTraffic="true">
+        android:networkSecurityConfig="@xml/network_security_config">
         <activity
             android:name=".MainActivity"
             android:exported="true"

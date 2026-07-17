@@ -1,0 +1,10 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <!-- Flavor PELANGGAN: hapus paksa izin Bluetooth yang di-inject oleh plugin
+         print_bluetooth_thermal (dipakai hanya oleh kasir/admin). Tanpa ini,
+         manifest plugin ikut ter-merge ke app pelanggan. INTERNET tetap ada. -->
+    <uses-permission android:name="android.permission.BLUETOOTH" tools:node="remove"/>
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" tools:node="remove"/>
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" tools:node="remove"/>
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" tools:node="remove"/>
+</manifest>

@@ -33,6 +33,26 @@ android {
             // TODO: Add your own signing config for the release build.
             // Signing with the debug keys for now, so `flutter run --release` works.
             signingConfig = signingConfigs.getByName("debug")
+            // R8: buang kode & resource tak terpakai + obfuscate → APK lebih kecil.
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
+        }
+    }
+
+    // Dua audiens: "customer" (app pelanggan, ramping, tanpa izin Bluetooth) &
+    // "admin" (kasir, dengan printer thermal Bluetooth). applicationId sama
+    // agar cocok dengan google-services.json (Firebase) yang sama.
+    flavorDimensions += "audience"
+    productFlavors {
+        create("customer") {
+            dimension = "audience"
+        }
+        create("admin") {
+            dimension = "audience"
         }
     }
 }

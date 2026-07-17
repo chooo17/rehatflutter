@@ -19,14 +19,21 @@ class MenuGridCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return NeuCard(
-      onTap: onTap,
-      padding: EdgeInsets.zero,
-      radius: 18,
-      // Shadow lebih dangkal → blur lebih kecil → paint lebih murah di grid
-      // padat (terutama web CanvasKit), tampilan tetap neumorphic.
-      depth: 5,
-      child: Column(
+    // Kartu FLAT (border, tanpa shadow neumorphic) → paint jauh lebih ringan di
+    // grid padat & saat pindah halaman. Trade-off: tampilan lebih datar.
+    return RepaintBoundary(
+      child: Material(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(18),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Stack(
@@ -110,6 +117,9 @@ class MenuGridCard extends StatelessWidget {
             ),
           ],
         ),
+          ),
+        ),
+      ),
     );
   }
 }

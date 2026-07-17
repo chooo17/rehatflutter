@@ -1,7 +1,8 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+
+import '../../core/constants/app_fonts.dart';
 
 /// Layar pembuka: "REHAT Coffeehouse Logo Reveal".
 ///
@@ -240,7 +241,8 @@ class _SplashScreenState extends State<SplashScreen>
           scale: scale,
           child: Text(
             ch,
-            style: GoogleFonts.archivoBlack(
+            style: const TextStyle(
+              fontFamily: AppFonts.archivoBlack,
               fontSize: 118,
               height: 0.9,
               letterSpacing: -4,
@@ -259,9 +261,10 @@ class _SplashScreenState extends State<SplashScreen>
       opacity: p.clamp(0.0, 1.0),
       child: Transform.translate(
         offset: Offset(0, ty),
-        child: Text(
+        child: const Text(
           'COFFEEHOUSE',
-          style: GoogleFonts.anton(
+          style: TextStyle(
+            fontFamily: AppFonts.anton,
             fontSize: 50,
             letterSpacing: 2,
             color: _ink,
@@ -283,9 +286,10 @@ class _SplashScreenState extends State<SplashScreen>
           angle: rot,
           child: Transform.scale(
             scale: scale,
-            child: Text(
+            child: const Text(
               '®',
-              style: GoogleFonts.archivo(
+              style: TextStyle(
+                fontFamily: AppFonts.archivo,
                 fontSize: 20,
                 fontWeight: FontWeight.w800,
                 color: _ink,

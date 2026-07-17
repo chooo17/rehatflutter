@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_text_styles.dart';
@@ -83,17 +82,11 @@ class SpinBanner extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 12),
-            // RepaintBoundary: animasi loop ikon tak memaksa repaint beranda.
-            RepaintBoundary(
-              child: Icon(
-                Icons.casino_rounded,
-                color: AppColors.amberLight.withValues(alpha: 0.9),
-                size: 72,
-              )
-                  .animate(onPlay: (c) => c.repeat())
-                  .rotate(duration: 4.seconds, curve: Curves.easeInOut)
-                  .then()
-                  .rotate(begin: 1, end: 0, duration: 4.seconds),
+            // Ikon statis — animasi berputar dihapus agar beranda lebih ringan.
+            Icon(
+              Icons.casino_rounded,
+              color: AppColors.amberLight.withValues(alpha: 0.9),
+              size: 72,
             ),
           ],
         ),

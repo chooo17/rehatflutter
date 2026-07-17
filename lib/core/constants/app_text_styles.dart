@@ -1,20 +1,21 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import 'app_colors.dart';
+import 'app_fonts.dart';
 
 /// Tipografi Rehat Coffeehouse.
 ///
 /// - Display: Cormorant Garamond (serif, weight 600/700)
 /// - Body: Inter (weight 400/500/600)
 ///
-/// Font dimuat runtime via `google_fonts`, jadi tidak perlu mendaftarkan
-/// file font di pubspec.
+/// Font di-bundle sebagai aset lokal (lihat [AppFonts] & pubspec) agar teks
+/// tampil instan, offline, tanpa unduhan runtime.
 class AppTextStyles {
   AppTextStyles._();
 
   static TextStyle _display(double size, FontWeight weight, Color color) {
-    return GoogleFonts.cormorantGaramond(
+    return TextStyle(
+      fontFamily: AppFonts.display,
       fontSize: size,
       fontWeight: weight,
       color: color,
@@ -23,7 +24,8 @@ class AppTextStyles {
   }
 
   static TextStyle _body(double size, FontWeight weight, Color color) {
-    return GoogleFonts.inter(
+    return TextStyle(
+      fontFamily: AppFonts.body,
       fontSize: size,
       fontWeight: weight,
       color: color,

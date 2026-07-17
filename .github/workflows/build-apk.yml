@@ -30,16 +30,25 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Build APK (release)
+      - name: Build APK pelanggan (customer, ramping)
         run: >
           flutter build apk --release
+          --flavor customer --split-per-abi
+          --dart-define=ADMIN_BUILD=false
+          --dart-define=API_BASE_URL=$API_BASE_URL
+
+      - name: Build APK admin/kasir
+        run: >
+          flutter build apk --release
+          --flavor admin --split-per-abi
+          --dart-define=ADMIN_BUILD=true
           --dart-define=API_BASE_URL=$API_BASE_URL
 
       # Catatan: APK ini debug-signed (belum untuk Play Store). Untuk rilis
       # resmi, tambahkan keystore + key.properties lalu build AAB.
-      - name: Upload APK artifact
+      - name: Upload APK artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: rehat-app-release
-          path: build/app/outputs/flutter-apk/app-release.apk
+          name: rehat-apk-release
+          path: build/app/outputs/flutter-apk/app-*-release.apk
           if-no-files-found: error

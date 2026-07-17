@@ -1,3 +1,5 @@
+import '../../core/config/app_config.dart';
+
 /// Model data pengguna Rehat Coffeehouse.
 class UserModel {
   const UserModel({
@@ -23,7 +25,10 @@ class UserModel {
   /// Peran akun: 'customer' atau 'admin'.
   final String role;
 
-  bool get isAdmin => role == 'admin';
+  /// Benar hanya bila akun berperan admin DAN build ini menyertakan fitur
+  /// admin. Pada build "customer" ([AppConfig.isAdminBuild] == false) selalu
+  /// false, sehingga akun admin pun tampil & berperilaku sebagai pelanggan.
+  bool get isAdmin => AppConfig.isAdminBuild && role == 'admin';
 
   /// Tanggal lahir (format 'yyyy-MM-dd'), diisi saat profile setup.
   final String? birthdate;

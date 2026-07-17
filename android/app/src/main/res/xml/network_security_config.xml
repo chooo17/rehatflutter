@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Kebijakan jaringan: trafik HTTP polos (cleartext) DILARANG secara global —
+  seluruh trafik produksi memakai HTTPS (backend Railway). Pengecualian hanya
+  untuk host pengembangan lokal agar `flutter run` ke emulator tetap bisa
+  memakai http://10.0.2.2:3000.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false" />
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">10.0.2.2</domain>
+        <domain includeSubdomains="true">localhost</domain>
+        <domain includeSubdomains="true">127.0.0.1</domain>
+    </domain-config>
+</network-security-config>

@@ -18,13 +18,21 @@ class FeaturedMenuCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return SizedBox(
       width: 168,
-      child: NeuCard(
-        onTap: onTap,
-        padding: EdgeInsets.zero,
-        radius: 18,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+      child: RepaintBoundary(
+        child: Material(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(18),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: onTap,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
             ClipRRect(
               borderRadius: const BorderRadius.vertical(top: Radius.circular(17)),
               child: AspectRatio(
@@ -74,10 +82,13 @@ class FeaturedMenuCard extends StatelessWidget {
                 ],
               ),
             ),
-          ],
+                  ],
+                ),
+              ),
+            ),
+          ),
         ),
-      ),
-    );
+      );
   }
 }
 

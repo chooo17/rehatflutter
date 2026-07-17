@@ -1,9 +1,9 @@
 import 'dart:math';
 
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/constants/app_fonts.dart';
 import '../../../../shared/models/spin_model.dart';
 
 /// Roda putar yang menggambar [prizes] sebagai segmen-segmen berwarna.
@@ -107,7 +107,8 @@ class _WheelPainter extends CustomPainter {
     final tp = TextPainter(
       text: TextSpan(
         text: prize.label,
-        style: GoogleFonts.inter(
+        style: TextStyle(
+          fontFamily: AppFonts.body,
           fontSize: 13,
           height: 1.05,
           fontWeight: FontWeight.w700,

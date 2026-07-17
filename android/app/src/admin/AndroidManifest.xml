@@ -1,0 +1,14 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Izin khusus flavor ADMIN (kasir): printer thermal Bluetooth + ESC/POS.
+         Di-merge hanya ke build admin; app pelanggan tidak memilikinya. -->
+    <!-- Android <= 11: BLUETOOTH + BLUETOOTH_ADMIN. -->
+    <uses-permission android:name="android.permission.BLUETOOTH"
+        android:maxSdkVersion="30"/>
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN"
+        android:maxSdkVersion="30"/>
+    <!-- Android 12+ (API 31): izin runtime baru. -->
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN"
+        android:usesPermissionFlags="neverForLocation"/>
+    <uses-feature android:name="android.hardware.bluetooth" android:required="false"/>
+</manifest>
