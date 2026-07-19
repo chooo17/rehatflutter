@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../shared/models/order_model.dart';
 import '../../auth/application/auth_controller.dart';
+import '../../wallet/data/wallet_repository.dart';
 import '../../menu/application/cart_controller.dart';
 import '../data/order_repository.dart';
 
@@ -146,6 +147,11 @@ class CheckoutController extends Notifier<CheckoutState> {
               voucherCode: state.voucherCode.isEmpty ? null : state.voucherCode,
               notes: state.notes.isEmpty ? null : state.notes,
             );
+      // Bayar pakai Saldo Rehat: langsung potong saldo & tandai lunas.
+      // Jika saldo kurang, pesanan tetap dibuat (pending) & error ditampilkan.
+      if (!isGuest && state.paymentMethod == PaymentMethod.balance) {
+        await ref.read(walletRepositoryProvider).payWithBalance(result.orderId);
+      }
       // Simpan hasil dulu agar layar konfirmasi bisa membacanya meski router refresh.
       ref.read(lastCheckoutResultProvider.notifier).state = result;
       ref.read(cartControllerProvider.notifier).clear();

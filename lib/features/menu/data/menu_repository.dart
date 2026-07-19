@@ -90,6 +90,22 @@ class MenuRepository {
     return url;
   }
 
+  /// (Admin) Perbarui HPP/harga/ketersediaan satu menu (`PATCH /menu/items/:id`).
+  Future<void> updateItem(
+    String itemId, {
+    int? costPrice,
+    int? price,
+    bool? isAvailable,
+  }) async {
+    final body = <String, dynamic>{
+      if (costPrice != null) 'cost_price': costPrice,
+      if (price != null) 'price': price,
+      if (isAvailable != null) 'is_available': isAvailable,
+    };
+    if (body.isEmpty) return;
+    await _client.patch<dynamic>(ApiConstants.menuItemUpdate(itemId), data: body);
+  }
+
   List<MenuItemModel> _parseList(dynamic data) {
     final list =
         data is Map ? (data['data'] ?? data['items'] ?? data['menu']) : data;
@@ -140,9 +156,11 @@ final menuDetailProvider =
   return ref.watch(menuRepositoryProvider).fetchDetail(id);
 });
 
-/// Semua item menu tanpa filter (untuk panel admin gambar menu).
+/// Semua item menu tanpa filter (untuk panel admin gambar/HPP).
 /// Sertakan item "Habis" & naikkan limit agar seluruh katalog bisa dikelola.
-final allMenuItemsProvider = FutureProvider<List<MenuItemModel>>((ref) {
+/// autoDispose: dilepas saat keluar layar admin (data segar tiap masuk).
+final allMenuItemsProvider =
+    FutureProvider.autoDispose<List<MenuItemModel>>((ref) {
   return ref
       .watch(menuRepositoryProvider)
       .fetchMenu(limit: 500, includeUnavailable: true);

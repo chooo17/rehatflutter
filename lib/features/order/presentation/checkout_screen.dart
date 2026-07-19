@@ -115,15 +115,18 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                 const SizedBox(height: 24),
                 const _SectionLabel('Metode pembayaran'),
                 const SizedBox(height: 10),
-                // 'cash' hanya untuk kasir (admin) — sembunyikan dari pelanggan.
-                for (final method in _customerMethods) ...[
+                // 'cash' hanya untuk kasir. Saldo Rehat hanya untuk user login
+                // (tamu tak punya dompet).
+                for (final method in [
+                  ..._customerMethods,
+                  if (!isGuest) PaymentMethod.balance,
+                ]) ...[
                   _PaymentRow(
                     method: method,
                     selected: state.paymentMethod == method,
                     onTap: () => notifier.setPaymentMethod(method),
                   ),
-                  if (method != _customerMethods.last)
-                    const SizedBox(height: 8),
+                  const SizedBox(height: 8),
                 ],
                 const SizedBox(height: 24),
                 // Voucher tak berlaku untuk tamu (butuh akun).

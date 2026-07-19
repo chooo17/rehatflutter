@@ -7,6 +7,12 @@ import '../../features/admin/presentation/admin_dashboard_screen.dart';
 import '../../features/admin/presentation/saved_orders_screen.dart';
 import '../../features/printer/presentation/printer_settings_screen.dart';
 import '../../features/admin/presentation/admin_menu_images_screen.dart';
+import '../../features/admin/presentation/admin_menu_cost_screen.dart';
+import '../../features/admin/presentation/closing_report_screen.dart';
+import '../../features/admin/presentation/customer_segments_screen.dart';
+import '../../features/admin/presentation/admin_analytics_screen.dart';
+import '../../features/wallet/presentation/wallet_screen.dart';
+import '../../features/wallet/presentation/referral_screen.dart';
 import '../../features/admin/presentation/admin_orders_screen.dart';
 import '../../features/auth/application/auth_controller.dart';
 import '../../features/auth/presentation/login_screen.dart';
@@ -254,6 +260,36 @@ final routerProvider = Provider<GoRouter>((ref) {
                     path: 'admin-menu-images',
                     name: RouteNames.adminMenuImages,
                     builder: (context, state) => const AdminMenuImagesScreen(),
+                  ),
+                  GoRoute(
+                    path: 'admin-menu-cost',
+                    name: RouteNames.adminMenuCost,
+                    builder: (context, state) => const AdminMenuCostScreen(),
+                  ),
+                  GoRoute(
+                    path: 'closing-report',
+                    name: RouteNames.closingReport,
+                    builder: (context, state) => const ClosingReportScreen(),
+                  ),
+                  GoRoute(
+                    path: 'customer-segments',
+                    name: RouteNames.customerSegments,
+                    builder: (context, state) => const CustomerSegmentsScreen(),
+                  ),
+                  GoRoute(
+                    path: 'admin-analytics',
+                    name: RouteNames.adminAnalytics,
+                    builder: (context, state) => const AdminAnalyticsScreen(),
+                  ),
+                  GoRoute(
+                    path: 'wallet',
+                    name: RouteNames.wallet,
+                    builder: (context, state) => const WalletScreen(),
+                  ),
+                  GoRoute(
+                    path: 'referral',
+                    name: RouteNames.referral,
+                    builder: (context, state) => const ReferralScreen(),
                   ),
                   GoRoute(
                     path: 'admin-orders',

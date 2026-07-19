@@ -41,10 +41,14 @@ dependencies:
   # Formatting (Rupiah currency, dates)
   intl: ^0.20.2
 
+  # Ekspor & bagikan file (mis. CSV tutup kasir) — Android share sheet / unduhan web.
+  share_plus: ^10.1.2
+
   # Push notification (FCM)
   firebase_core: ^3.8.0
   firebase_messaging: ^15.1.5
-  flutter_neumorphic_plus: ^3.5.0
+  # Pemantau crash produksi (stack trace otomatis ke Firebase Console).
+  firebase_crashlytics: ^4.1.5
 
   # Printer thermal Bluetooth (Android) + ESC/POS. Di-import HANYA pada impl
   # mobile (conditional import) agar build web tidak terpengaruh.
@@ -62,6 +66,9 @@ dev_dependencies:
   # Generator ikon launcher (Android & iOS) dari satu gambar sumber.
   flutter_launcher_icons: ^0.14.1
 
+  # Splash native (tampil instan saat OS memuat app, sebelum Flutter siap).
+  flutter_native_splash: ^2.4.3
+
 # Konfigurasi ikon aplikasi.
 # Sumber: assets/icon/app_icon.png (1024x1024). Jalankan:
 #   dart run flutter_launcher_icons
@@ -74,6 +81,20 @@ flutter_launcher_icons:
   # Ikon adaptif Android: latar kuning brand + logo sebagai foreground.
   adaptive_icon_background: "#FFC400"
   adaptive_icon_foreground: "assets/icon/app_icon.png"
+
+# Splash native — warna latar disamakan dengan background app (E9E3D5 terang /
+# 23201A gelap) agar transisi ke UI Flutter mulus tanpa lompatan warna.
+# Regenerasi: dart run flutter_native_splash:create
+flutter_native_splash:
+  color: "#E9E3D5"
+  image: assets/icon/app_icon.png
+  color_dark: "#23201A"
+  image_dark: assets/icon/app_icon.png
+  android_12:
+    image: assets/icon/app_icon.png
+    color: "#E9E3D5"
+    color_dark: "#23201A"
+    image_dark: assets/icon/app_icon.png
 
 flutter:
   uses-material-design: true

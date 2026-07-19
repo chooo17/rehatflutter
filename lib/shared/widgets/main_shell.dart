@@ -1,4 +1,5 @@
-import 'package:flutter_neumorphic_plus/flutter_neumorphic.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show HapticFeedback;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -44,33 +45,38 @@ class MainShell extends ConsumerWidget {
           const NotificationPoller(),
         ],
       ),
-      bottomNavigationBar: Neumorphic(
-        style: NeumorphicStyle(
-          depth: 14,
-          intensity: 0.82,
-          boxShape: NeumorphicBoxShape.roundRect(
-            const BorderRadius.vertical(top: Radius.circular(26)),
+      // Navbar mengambang: pill dengan margin di kiri/kanan/bawah + bayangan
+      // lembut agar terasa "melayang" di atas konten.
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: Container(
+          margin: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(26),
+            border: Border.all(color: AppColors.border),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.espresso.withValues(alpha: 0.12),
+                blurRadius: 18,
+                offset: const Offset(0, 6),
+              ),
+            ],
           ),
-        ),
-        padding: EdgeInsets.zero,
-        child: SafeArea(
-          top: false,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            child: Row(
-              children: [
-                for (final t in tabs)
-                  Expanded(
-                    child: _NavItem(
-                      icon: t.icon,
-                      selectedIcon: t.selectedIcon,
-                      label: t.label,
-                      selected: navigationShell.currentIndex == t.branch,
-                      onTap: () => _onTap(t.branch),
-                    ),
+          child: Row(
+            children: [
+              for (final t in tabs)
+                Expanded(
+                  child: _NavItem(
+                    icon: t.icon,
+                    selectedIcon: t.selectedIcon,
+                    label: t.label,
+                    selected: navigationShell.currentIndex == t.branch,
+                    onTap: () => _onTap(t.branch),
                   ),
-              ],
-            ),
+                ),
+            ],
           ),
         ),
       ),
@@ -78,7 +84,7 @@ class MainShell extends ConsumerWidget {
   }
 }
 
-class _NavItem extends StatelessWidget {
+class _NavItem extends StatefulWidget {
   const _NavItem({
     required this.icon,
     required this.selectedIcon,
@@ -94,33 +100,72 @@ class _NavItem extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
+  State<_NavItem> createState() => _NavItemState();
+}
+
+class _NavItemState extends State<_NavItem> {
+  bool _pressed = false;
+
+  void _setPressed(bool v) {
+    if (mounted) setState(() => _pressed = v);
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final selected = widget.selected;
     final color = selected ? AppColors.amberDark : AppColors.textSecondary;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap: onTap,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Neumorphic(
-            duration: const Duration(milliseconds: 200),
-            style: NeumorphicStyle(
-              depth: selected ? -6 : 4,
-              intensity: 0.85,
-              boxShape: NeumorphicBoxShape.roundRect(BorderRadius.circular(14)),
+      onTapDown: (_) => _setPressed(true),
+      onTapUp: (_) => _setPressed(false),
+      onTapCancel: () => _setPressed(false),
+      onTap: () {
+        HapticFeedback.selectionClick(); // getar halus saat pindah tab
+        widget.onTap();
+      },
+      // Micro-interaction: seluruh tab mengecil sedikit saat ditekan.
+      child: AnimatedScale(
+        scale: _pressed ? 0.86 : 1.0,
+        duration: const Duration(milliseconds: 120),
+        curve: Curves.easeOut,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // "Pill" aktif membesar mulus; ikon berganti dgn transisi scale+fade.
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 260),
+              curve: Curves.easeOutCubic,
+              padding: EdgeInsets.symmetric(
+                  horizontal: selected ? 22 : 14, vertical: 7),
+              decoration: BoxDecoration(
+                color: selected ? AppColors.crema : Colors.transparent,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 260),
+                transitionBuilder: (child, anim) => ScaleTransition(
+                  scale: anim,
+                  child: FadeTransition(opacity: anim, child: child),
+                ),
+                child: Icon(
+                  selected ? widget.selectedIcon : widget.icon,
+                  key: ValueKey(selected),
+                  size: 22,
+                  color: color,
+                ),
+              ),
             ),
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 7),
-            child: Icon(selected ? selectedIcon : icon, size: 22, color: color),
-          ),
-          const SizedBox(height: 5),
-          Text(
-            label,
-            style: AppTextStyles.caption.copyWith(
-              color: color,
-              fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+            const SizedBox(height: 4),
+            AnimatedDefaultTextStyle(
+              duration: const Duration(milliseconds: 260),
+              style: AppTextStyles.caption.copyWith(
+                color: color,
+                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+              ),
+              child: Text(widget.label),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

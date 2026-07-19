@@ -12,6 +12,7 @@ class WebSafeImage extends StatelessWidget {
     this.fit = BoxFit.cover,
     this.placeholder,
     this.error,
+    this.cacheWidth,
   });
 
   final String url;
@@ -19,12 +20,16 @@ class WebSafeImage extends StatelessWidget {
   final Widget? placeholder;
   final Widget? error;
 
+  /// Batas lebar decode (px) untuk hemat memori. Null = resolusi penuh.
+  final int? cacheWidth;
+
   @override
   Widget build(BuildContext context) {
     if (kIsWeb) {
       return Image.network(
         url,
         fit: fit,
+        cacheWidth: cacheWidth,
         webHtmlElementStrategy: WebHtmlElementStrategy.prefer,
         errorBuilder: (_, __, ___) => error ?? const SizedBox.shrink(),
         loadingBuilder: (context, child, progress) =>
@@ -34,6 +39,7 @@ class WebSafeImage extends StatelessWidget {
     return CachedNetworkImage(
       imageUrl: url,
       fit: fit,
+      memCacheWidth: cacheWidth,
       placeholder: (_, __) => placeholder ?? const SizedBox.shrink(),
       errorWidget: (_, __, ___) => error ?? const SizedBox.shrink(),
     );

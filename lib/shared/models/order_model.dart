@@ -95,7 +95,8 @@ enum PaymentMethod {
   bca('BCA', Icons.account_balance_outlined),
   bni('BNI', Icons.account_balance_outlined),
   mandiri('Mandiri', Icons.account_balance_outlined),
-  cash('Tunai', Icons.payments_outlined);
+  cash('Tunai', Icons.payments_outlined),
+  balance('Saldo Rehat', Icons.account_balance_wallet_rounded);
 
   const PaymentMethod(this.label, this.icon);
 

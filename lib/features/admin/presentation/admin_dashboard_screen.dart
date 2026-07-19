@@ -155,7 +155,7 @@ class _Report extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // KPI utama: omzet & laba bersih (40%).
+        // KPI utama: omzet & laba bersih RIIL (omzet - HPP - pengeluaran).
         Row(
           children: [
             Expanded(
@@ -170,8 +170,29 @@ class _Report extends StatelessWidget {
             Expanded(
               child: _KpiCard(
                 icon: Icons.savings_rounded,
-                label: 'Laba bersih (40%)',
+                label: 'Laba bersih',
                 value: Formatters.rupiah(report.netProfit),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        // HPP (modal) & laba kotor + margin riil berbasis cost_price.
+        Row(
+          children: [
+            Expanded(
+              child: _KpiCard(
+                icon: Icons.inventory_2_rounded,
+                label: 'HPP (modal)',
+                value: Formatters.rupiah(report.cogs),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _KpiCard(
+                icon: Icons.trending_up_rounded,
+                label: 'Laba kotor · ${report.grossMarginPct}%',
+                value: Formatters.rupiah(report.grossProfit),
               ),
             ),
           ],
@@ -449,15 +470,27 @@ class _TopItemRow extends StatelessWidget {
                     style: AppTextStyles.bodyLarge,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis),
-                Text('${item.quantity} terjual',
+                Text(
+                    '${item.quantity} terjual'
+                    '${item.cost > 0 ? ' · margin ${item.marginPct}%' : ''}',
                     style: AppTextStyles.caption
                         .copyWith(color: AppColors.textSecondary)),
               ],
             ),
           ),
           const SizedBox(width: 10),
-          Text(Formatters.rupiah(item.revenue),
-              style: AppTextStyles.label.copyWith(color: AppColors.amberDark)),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(Formatters.rupiah(item.revenue),
+                  style:
+                      AppTextStyles.label.copyWith(color: AppColors.amberDark)),
+              if (item.cost > 0)
+                Text('+${Formatters.rupiah(item.profit)}',
+                    style: AppTextStyles.caption
+                        .copyWith(color: AppColors.success)),
+            ],
+          ),
         ],
       ),
     );

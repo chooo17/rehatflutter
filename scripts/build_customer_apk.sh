@@ -10,6 +10,7 @@ API_BASE_URL="https://rehat-backend-production.up.railway.app/v1"
 "$FLUTTER" build apk --release \
   --flavor customer \
   --split-per-abi \
+  --obfuscate --split-debug-info=build/symbols/customer \
   --dart-define=ADMIN_BUILD=false \
   --dart-define=API_BASE_URL="$API_BASE_URL"
 

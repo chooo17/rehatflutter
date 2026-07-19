@@ -23,6 +23,8 @@ plugins {
     id("org.jetbrains.kotlin.android") version "2.3.20" apply false
     // Firebase (google-services) untuk FCM.
     id("com.google.gms.google-services") version "4.4.2" apply false
+    // Crashlytics: unggah mapping R8 agar stack trace rilis ter-simbolikasi.
+    id("com.google.firebase.crashlytics") version "3.0.2" apply false
 }
 
 include(":app")

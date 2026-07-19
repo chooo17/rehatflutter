@@ -1,4 +1,4 @@
-import 'package:flutter_neumorphic_plus/flutter_neumorphic.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -65,7 +65,10 @@ class _CartIconButtonState extends ConsumerState<CartIconButton>
     });
     final count = ref.watch(cartCountProvider);
 
-    return Padding(
+    return Semantics(
+      button: true,
+      label: count > 0 ? 'Keranjang, $count item' : 'Keranjang',
+      child: Padding(
       padding: const EdgeInsets.only(right: 4),
       child: Stack(
         clipBehavior: Clip.none,
@@ -108,6 +111,7 @@ class _CartIconButtonState extends ConsumerState<CartIconButton>
               ),
             ),
         ],
+      ),
       ),
     );
   }

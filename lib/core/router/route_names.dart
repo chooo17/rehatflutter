@@ -76,6 +76,24 @@ class RouteNames {
   static const String adminMenuImages = 'admin-menu-images';
   static const String adminMenuImagesPath = '/profile/admin-menu-images';
 
+  static const String adminMenuCost = 'admin-menu-cost';
+  static const String adminMenuCostPath = '/profile/admin-menu-cost';
+
+  static const String closingReport = 'closing-report';
+  static const String closingReportPath = '/profile/closing-report';
+
+  static const String customerSegments = 'customer-segments';
+  static const String customerSegmentsPath = '/profile/customer-segments';
+
+  static const String adminAnalytics = 'admin-analytics';
+  static const String adminAnalyticsPath = '/profile/admin-analytics';
+
+  static const String wallet = 'wallet';
+  static const String walletPath = '/profile/wallet';
+
+  static const String referral = 'referral';
+  static const String referralPath = '/profile/referral';
+
   static const String adminOrders = 'admin-orders';
   static const String adminOrdersPath = '/profile/admin-orders';
 

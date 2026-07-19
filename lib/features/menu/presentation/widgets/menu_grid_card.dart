@@ -91,7 +91,10 @@ class MenuGridCard extends StatelessWidget {
                           ),
                         ),
                         Builder(
-                          builder: (btnContext) => NeuButton(
+                          builder: (btnContext) => Semantics(
+                            button: true,
+                            label: 'Tambah ${item.name} ke keranjang',
+                            child: NeuButton(
                             onPressed: item.isAvailable
                                 ? () {
                                     flyToCart(btnContext,
@@ -107,6 +110,7 @@ class MenuGridCard extends StatelessWidget {
                                     ? Colors.white
                                     : AppColors.textSecondary,
                                 size: 18),
+                          ),
                           ),
                         ),
                       ],

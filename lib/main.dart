@@ -1,3 +1,4 @@
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -16,7 +17,16 @@ Future<void> main() async {
   // Inisialisasi data locale untuk format tanggal & mata uang (id_ID).
   await initializeDateFormatting('id_ID');
   // Inisialisasi Firebase Messaging (aman gagal bila konfigurasi belum lengkap).
-  await initFirebaseMessaging();
+  final firebaseReady = await initFirebaseMessaging();
+  // Pemantau crash (mobile saja; web tidak didukung Crashlytics). Semua error
+  // Flutter & async fatal diteruskan ke Firebase Console dengan stack trace.
+  if (firebaseReady) {
+    FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
+    WidgetsBinding.instance.platformDispatcher.onError = (error, stack) {
+      FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+      return true;
+    };
+  }
   runApp(const ProviderScope(child: RehatApp()));
 }
 

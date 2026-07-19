@@ -20,6 +20,12 @@ Thumbs.db
 # Env / secrets
 *.env
 
+# Signing rilis — JANGAN pernah commit keystore & kredensialnya.
+*.jks
+*.keystore
+key.properties
+android/key.properties
+
 .vercel
 
 # Build APK/AAB — jangan commit binari besar ke git

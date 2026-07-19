@@ -356,6 +356,8 @@ class _HeaderImage extends StatelessWidget {
     return CachedNetworkImage(
       imageUrl: url!,
       fit: BoxFit.cover,
+      // Header lebar penuh — batasi decode ~800px (cukup untuk layar terpadat).
+      memCacheWidth: 800,
       placeholder: (_, __) => Container(color: AppColors.crema),
       errorWidget: (_, __, ___) => Container(
         color: AppColors.crema,

@@ -2,6 +2,8 @@ plugins {
     id("com.android.application")
     // Firebase (google-services) — harus sebelum plugin Flutter.
     id("com.google.gms.google-services")
+    // Crashlytics (simbolikasi mapping R8 pada build rilis).
+    id("com.google.firebase.crashlytics")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }

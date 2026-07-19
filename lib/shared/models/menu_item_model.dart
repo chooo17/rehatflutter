@@ -41,6 +41,7 @@ class MenuItemModel {
     required this.id,
     required this.name,
     required this.price,
+    this.costPrice = 0,
     this.description = '',
     this.imageUrl,
     this.category = '',
@@ -54,8 +55,15 @@ class MenuItemModel {
   final String name;
   final String description;
 
-  /// Harga dalam Rupiah (bilangan bulat, tanpa desimal).
+  /// Harga jual dalam Rupiah (bilangan bulat, tanpa desimal).
   final int price;
+
+  /// Harga modal / HPP dalam Rupiah (untuk hitung margin). 0 = belum diisi.
+  final int costPrice;
+
+  /// Margin kotor per unit (%). Null bila harga jual 0.
+  int? get marginPct =>
+      price > 0 ? (((price - costPrice) / price) * 100).round() : null;
 
   final String? imageUrl;
   final String category;
@@ -74,6 +82,7 @@ class MenuItemModel {
       name: (json['name'] ?? '').toString(),
       description: (json['description'] ?? '').toString(),
       price: _asInt(json['price']),
+      costPrice: _asInt(json['cost_price'] ?? json['costPrice']),
       imageUrl: (json['image_url'] ?? json['imageUrl']) as String?,
       // Backend mengirim kategori sebagai objek: `category` (list/detail) atau
       // `menu_categories` (featured). Bisa juga string biasa.

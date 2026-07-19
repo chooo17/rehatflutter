@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_text_styles.dart';
+import '../../../../core/network/api_exception.dart';
 import '../../../../core/router/route_names.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../../../shared/models/order_model.dart';
@@ -11,6 +12,7 @@ import '../../../../shared/widgets/neu.dart';
 import '../../../order/application/checkout_controller.dart';
 import '../../../order/data/order_repository.dart';
 import '../../../printer/application/printer_controller.dart';
+import '../../../wallet/data/wallet_repository.dart';
 import '../../application/cart_controller.dart';
 
 /// Aksi kasir (admin) untuk isi keranjang saat ini: pilih tipe pesanan, nama
@@ -23,7 +25,7 @@ class CashierActions extends ConsumerStatefulWidget {
   ConsumerState<CashierActions> createState() => _CashierActionsState();
 }
 
-enum _Mode { cash, qris, save }
+enum _Mode { cash, qris, balance, save }
 
 class _CashierActionsState extends ConsumerState<CashierActions> {
   final _nameController = TextEditingController();
@@ -50,6 +52,13 @@ class _CashierActionsState extends ConsumerState<CashierActions> {
             paymentMethod:
                 mode == _Mode.qris ? PaymentMethod.qris : PaymentMethod.cash,
           );
+      // Bayar pakai saldo admin: potong saldo & tandai lunas. Bila saldo kurang,
+      // ApiException dilempar → pesanan tetap dibuat (pending), tampilkan pesan.
+      if (mode == _Mode.balance) {
+        await ref
+            .read(walletRepositoryProvider)
+            .adminPayWithBalance(result.orderId);
+      }
       ref.invalidate(adminOrdersProvider);
       ref.invalidate(pendingOrdersProvider);
       ref.read(cartControllerProvider.notifier).clear();
@@ -63,10 +72,17 @@ class _CashierActionsState extends ConsumerState<CashierActions> {
         ref.read(lastCheckoutResultProvider.notifier).state = result;
         context.pushNamed(RouteNames.confirmation, extra: result);
       } else {
-        // Tunai (lunas) → auto-cetak struk bila printer siap (Android).
-        if (mode == _Mode.cash) await _autoPrint(result.orderId);
-        await _showResult(result, paid: mode == _Mode.cash);
+        // Tunai / Saldo (lunas) → auto-cetak struk bila printer siap.
+        final paid = mode == _Mode.cash || mode == _Mode.balance;
+        if (paid) await _autoPrint(result.orderId);
+        await _showResult(result, paid: paid);
       }
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() => _submitting = false);
+      messenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text(e.message)));
     } catch (_) {
       if (!mounted) return;
       setState(() => _submitting = false);
@@ -252,6 +268,22 @@ class _CashierActionsState extends ConsumerState<CashierActions> {
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: 8),
+          NeuButton(
+            expand: true,
+            onPressed: disabled ? null : () => _submit(_Mode.balance),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.account_balance_wallet_rounded,
+                    size: 18, color: AppColors.espresso),
+                const SizedBox(width: 8),
+                Text('Bayar pakai Saldo',
+                    style: AppTextStyles.button
+                        .copyWith(color: AppColors.textPrimary)),
+              ],
+            ),
           ),
           const SizedBox(height: 8),
           NeuButton(

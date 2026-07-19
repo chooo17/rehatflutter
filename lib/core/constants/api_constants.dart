@@ -48,6 +48,7 @@ class ApiConstants {
   static const String menuCategories = '/menu/categories';
   static String menuDetail(String id) => '/menu/items/$id';
   static String menuItemImage(String id) => '/menu/items/$id/image';
+  static String menuItemUpdate(String id) => '/menu/items/$id'; // PATCH (HPP dll)
 
   // Order ---------------------------------------------------------------
   static const String orders = '/orders'; // POST buat, GET riwayat (paginated)
@@ -64,6 +65,18 @@ class ApiConstants {
   static String adminOrderDetail(String id) => '/admin/orders/$id';
   static const String adminSalesReport = '/admin/reports/sales';
   static const String adminReportCalendar = '/admin/reports/calendar';
+  static const String adminClosingReport = '/admin/reports/closing';
+  static const String adminCustomerSegments = '/admin/customers/segments';
+  static const String adminBroadcast = '/admin/broadcast';
+  static const String adminAnalytics = '/admin/reports/analytics';
+
+  // Referral & Wallet -------------------------------------------------
+  static const String referralMe = '/referrals/me';
+  static const String referralApply = '/referrals/apply';
+  static const String wallet = '/wallet';
+  static const String walletTopup = '/wallet/topup';
+  static String orderPayBalance(String id) => '/orders/$id/pay-balance';
+  static String adminOrderPayBalance(String id) => '/admin/orders/$id/pay-balance';
   static const String adminExpenses = '/admin/expenses';
   static String adminExpense(String id) => '/admin/expenses/$id';
 

@@ -8,6 +8,7 @@ import '../../../core/router/route_names.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../shared/widgets/neu.dart';
+import '../../../shared/widgets/skeleton.dart';
 import '../../admin/presentation/widgets/saved_orders_icon_button.dart';
 import '../../auth/application/auth_controller.dart';
 import '../application/cart_controller.dart';
@@ -224,8 +225,7 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
           // Grid ----------------------------------------------------------
           Expanded(
             child: menuAsync.when(
-              loading: () =>
-                  const Center(child: CircularProgressIndicator(color: AppColors.amber)),
+              loading: () => const MenuGridSkeleton(),
               error: (e, _) => _ErrorState(
                 onRetry: () => ref.invalidate(menuListProvider),
               ),

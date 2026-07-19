@@ -1,4 +1,4 @@
-import 'package:flutter_neumorphic_plus/flutter_neumorphic.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -17,7 +17,10 @@ class NotificationIconButton extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final unread = ref.watch(unreadCountProvider);
-    return Padding(
+    return Semantics(
+      button: true,
+      label: unread > 0 ? 'Notifikasi, $unread belum dibaca' : 'Notifikasi',
+      child: Padding(
       padding: const EdgeInsets.only(right: 4),
       child: Stack(
         clipBehavior: Clip.none,
@@ -52,6 +55,7 @@ class NotificationIconButton extends ConsumerWidget {
               ),
             ),
         ],
+      ),
       ),
     );
   }
