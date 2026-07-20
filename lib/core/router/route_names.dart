@@ -76,6 +76,9 @@ class RouteNames {
   static const String adminMenuImages = 'admin-menu-images';
   static const String adminMenuImagesPath = '/profile/admin-menu-images';
 
+  static const String orderTracking = 'order-tracking';
+  static const String orderTrackingPath = '/profile/order-tracking';
+
   static const String adminMenuCost = 'admin-menu-cost';
   static const String adminMenuCostPath = '/profile/admin-menu-cost';
 

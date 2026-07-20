@@ -5,7 +5,7 @@ import '../../../../core/constants/app_text_styles.dart';
 import '../../../../shared/models/order_model.dart';
 
 /// Timeline visual progres pesanan (untuk pelanggan).
-/// Menunggu bayar → Dibayar → Diproses → Siap diambil → Selesai.
+/// Menunggu bayar → Dibayar → Diproses → Selesai.
 class OrderTrackingTimeline extends StatelessWidget {
   const OrderTrackingTimeline({super.key, required this.status});
 
@@ -16,7 +16,6 @@ class OrderTrackingTimeline extends StatelessWidget {
     (OrderStatus.pending, 'Menunggu pembayaran', Icons.schedule_rounded),
     (OrderStatus.paid, 'Pembayaran diterima', Icons.payments_rounded),
     (OrderStatus.preparing, 'Sedang diproses', Icons.local_cafe_rounded),
-    (OrderStatus.ready, 'Siap diambil', Icons.shopping_bag_rounded),
     (OrderStatus.completed, 'Selesai', Icons.done_all_rounded),
   ];
 

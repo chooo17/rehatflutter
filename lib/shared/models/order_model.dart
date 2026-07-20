@@ -20,11 +20,13 @@ enum OrderStatus {
   String get apiValue => this == OrderStatus.preparing ? 'processing' : name;
 
   /// Urutan lifecycle pesanan.
+  /// Alur aktif: Menunggu bayar → Dibayar → Diproses → Selesai.
+  /// (`ready` sudah DIHAPUS dari alur; nilainya tetap dikenali agar pesanan
+  /// lama yang terlanjur berstatus itu masih bisa ditampilkan.)
   static const List<OrderStatus> flow = [
     OrderStatus.pending,
     OrderStatus.paid,
     OrderStatus.preparing,
-    OrderStatus.ready,
     OrderStatus.completed,
   ];
 

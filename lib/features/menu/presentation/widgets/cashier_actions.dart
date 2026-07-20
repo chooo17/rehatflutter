@@ -31,6 +31,7 @@ class _CashierActionsState extends ConsumerState<CashierActions> {
   final _nameController = TextEditingController();
   OrderType _orderType = OrderType.dineIn;
   bool _submitting = false;
+  String? _nameError;
 
   @override
   void dispose() {
@@ -41,8 +42,20 @@ class _CashierActionsState extends ConsumerState<CashierActions> {
   Future<void> _submit(_Mode mode) async {
     final items = ref.read(cartControllerProvider);
     if (items.isEmpty || _submitting) return;
-    setState(() => _submitting = true);
     final messenger = ScaffoldMessenger.of(context);
+    // Nama pelanggan WAJIB — dipakai di struk, notifikasi, & pengumuman grup.
+    if (_nameController.text.trim().length < 2) {
+      setState(() => _nameError = 'Nama pelanggan wajib diisi');
+      messenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+            const SnackBar(content: Text('Isi nama pelanggan dulu ya.')));
+      return;
+    }
+    setState(() {
+      _nameError = null;
+      _submitting = true;
+    });
     try {
       final result = await ref.read(orderRepositoryProvider).createCashierOrder(
             items: items,
@@ -208,8 +221,12 @@ class _CashierActionsState extends ConsumerState<CashierActions> {
         TextField(
           controller: _nameController,
           textCapitalization: TextCapitalization.words,
+          onChanged: (_) {
+            if (_nameError != null) setState(() => _nameError = null);
+          },
           decoration: InputDecoration(
-            hintText: 'Nama pelanggan (opsional)',
+            hintText: 'Nama pelanggan (wajib)',
+            errorText: _nameError,
             isDense: true,
             filled: true,
             fillColor: AppColors.crema,

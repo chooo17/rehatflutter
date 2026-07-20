@@ -90,7 +90,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                   const SizedBox(height: 10),
                   _GuestField(
                       controller: _guestPhoneCtrl,
-                      hint: 'No. HP / WhatsApp (opsional)',
+                      hint: 'No. HP / WhatsApp *',
                       icon: Icons.phone_outlined,
                       keyboardType: TextInputType.phone),
                   const SizedBox(height: 24),

@@ -9,6 +9,7 @@ import '../../../core/utils/formatters.dart';
 import '../../../shared/models/order_model.dart';
 import '../../../shared/widgets/neu.dart';
 import '../../order/data/order_repository.dart';
+import '../../order/presentation/widgets/complete_order_button.dart';
 
 /// (Admin) Pesanan Masuk: lihat semua pesanan, filter status, konfirmasi bayar.
 class AdminOrdersScreen extends ConsumerWidget {
@@ -101,12 +102,11 @@ class _AdminOrderCard extends StatelessWidget {
                         .copyWith(color: AppColors.amberDark)),
               ],
             ),
-            // Pesanan lunas/diproses/siap → tombol maju status langsung di card.
-            if (order.status == OrderStatus.paid ||
-                order.status == OrderStatus.preparing ||
-                order.status == OrderStatus.ready) ...[
+            // Pesanan aktif → langsung "Tandai Selesai" (status Diproses sudah
+            // otomatis saat pembayaran diterima, jadi tak ada tombol antara).
+            if (kActiveOrderStatuses.contains(order.status)) ...[
               const SizedBox(height: 12),
-              _AdvanceButton(order: order),
+              CompleteOrderButton(order: order),
             ] else if (order.status == OrderStatus.completed) ...[
               const SizedBox(height: 12),
               Container(
@@ -132,70 +132,6 @@ class _AdminOrderCard extends StatelessWidget {
             ],
           ],
         ),
-    );
-  }
-}
-
-/// Tombol untuk memajukan status pesanan langsung dari card (tanpa buka detail).
-class _AdvanceButton extends ConsumerStatefulWidget {
-  const _AdvanceButton({required this.order});
-  final OrderModel order;
-
-  @override
-  ConsumerState<_AdvanceButton> createState() => _AdvanceButtonState();
-}
-
-class _AdvanceButtonState extends ConsumerState<_AdvanceButton> {
-  bool _busy = false;
-
-  Future<void> _advance() async {
-    final next = widget.order.status.next;
-    if (next == null || _busy) return;
-    setState(() => _busy = true);
-    final messenger = ScaffoldMessenger.of(context);
-    try {
-      await ref
-          .read(orderRepositoryProvider)
-          .updateStatus(widget.order.id, next);
-      ref.invalidate(adminOrdersProvider);
-      ref.invalidate(adminOrderDetailProvider(widget.order.id));
-      if (!mounted) return;
-      messenger
-        ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(content: Text('Status: ${next.label}')));
-    } catch (_) {
-      if (!mounted) return;
-      messenger
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-            const SnackBar(content: Text('Gagal memperbarui status.')));
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final next = widget.order.status.next;
-    if (next == null) return const SizedBox.shrink();
-    return SizedBox(
-      width: double.infinity,
-      child: ElevatedButton.icon(
-        onPressed: _busy ? null : _advance,
-        icon: _busy
-            ? const SizedBox(
-                width: 16,
-                height: 16,
-                child: CircularProgressIndicator(
-                    strokeWidth: 2, color: Colors.white))
-            : const Icon(Icons.arrow_forward_rounded, size: 18),
-        label: Text(_busy ? 'Memproses…' : 'Tandai ${next.label}'),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.espresso,
-          foregroundColor: AppColors.crema,
-          minimumSize: const Size(0, 44),
-        ),
-      ),
     );
   }
 }

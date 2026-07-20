@@ -9,6 +9,7 @@ import '../../../core/utils/formatters.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../shared/widgets/neu.dart';
 import '../../../shared/widgets/skeleton.dart';
+import '../../order/presentation/widgets/active_order_tracker.dart';
 import '../../admin/presentation/widgets/saved_orders_icon_button.dart';
 import '../../auth/application/auth_controller.dart';
 import '../application/cart_controller.dart';
@@ -119,13 +120,21 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
                   ),
                   const SizedBox(width: 6),
                   SavedOrdersIconButton(color: AppColors.espresso),
-                ] else
-                  // Pelanggan: Favorit (bundar seragam dengan keranjang).
+                ] else ...[
+                  // Pelanggan: Lacak Pesanan + Favorit.
+                  NeuCircleButton(
+                    icon: Icons.receipt_long_outlined,
+                    iconColor: AppColors.espresso,
+                    onPressed: () =>
+                        context.pushNamed(RouteNames.orderTracking),
+                  ),
+                  const SizedBox(width: 6),
                   NeuCircleButton(
                     icon: Icons.favorite_border_rounded,
                     iconColor: AppColors.espresso,
                     onPressed: () => context.pushNamed(RouteNames.favorites),
                   ),
+                ],
                 const SizedBox(width: 6),
                 CartIconButton(color: AppColors.espresso),
                 const SizedBox(width: 12),
@@ -222,18 +231,27 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
             ),
           ),
           const SizedBox(height: 12),
+          // Pelacakan pesanan aktif — otomatis tampil bila ada pesanan berjalan.
+          const ActiveOrderTracker(),
           // Grid ----------------------------------------------------------
           Expanded(
-            child: menuAsync.when(
-              loading: () => const MenuGridSkeleton(),
-              error: (e, _) => _ErrorState(
-                onRetry: () => ref.invalidate(menuListProvider),
-              ),
-              data: (items) {
-                if (items.isEmpty) {
-                  return const _EmptyState();
+            // Skeleton HANYA saat belum ada data sama sekali; saat refresh,
+            // daftar lama tetap tampil supaya tak berkedip "loading".
+            child: Builder(builder: (context) {
+              final cachedItems = menuAsync.valueOrNull;
+              if (cachedItems == null) {
+                if (menuAsync.hasError) {
+                  return _ErrorState(
+                    onRetry: () => ref.invalidate(menuListProvider),
+                  );
                 }
-                return RefreshIndicator(
+                return const MenuGridSkeleton();
+              }
+              final items = cachedItems;
+              if (items.isEmpty) {
+                return const _EmptyState();
+              }
+              return RefreshIndicator(
                   color: AppColors.amber,
                   onRefresh: () async => ref.invalidate(menuListProvider),
                   child: GridView.builder(
@@ -273,8 +291,7 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
                     },
                   ),
                 );
-              },
-            ),
+            }),
           ),
               ],
             ),

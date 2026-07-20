@@ -4,6 +4,7 @@ import '../../../core/constants/api_constants.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../shared/models/cart_item_model.dart';
 import '../../../shared/models/order_model.dart';
+import '../../auth/application/auth_controller.dart';
 
 /// Hasil pembuatan sesi pembayaran (DOKU Checkout).
 /// `configured=false` → app pakai QRIS statis + ACC admin manual.
@@ -340,6 +341,58 @@ final orderStatusPollProvider =
     }
     await Future.delayed(const Duration(seconds: 5));
   }
+});
+
+/// Status yang dianggap "pesanan masih berjalan".
+const kActiveOrderStatuses = {
+  OrderStatus.pending,
+  OrderStatus.paid,
+  OrderStatus.preparing,
+  OrderStatus.ready,
+};
+
+/// Seluruh pesanan pengguna dengan polling CEPAT — sumber data untuk banner
+/// pelacakan di Menu & layar "Lacak Pesanan".
+///
+/// Responsif: 3 dtk saat ada pesanan berjalan (status berubah nyaris seketika
+/// setelah pembayaran), melambat jadi 20 dtk saat tak ada pesanan aktif agar
+/// hemat baterai & kuota. Panggil `ref.invalidate(ordersTrackingProvider)`
+/// untuk refresh SEKETIKA (mis. sesudah bayar / app kembali ke depan).
+final ordersTrackingProvider =
+    StreamProvider.autoDispose<List<OrderModel>>((ref) async* {
+  final repo = ref.watch(orderRepositoryProvider);
+  // ADMIN melacak SEMUA pesanan (selaras dengan layar "Pesanan Masuk"), karena
+  // pesanan kasir adalah pesanan tamu (user_id null) sehingga tak muncul di
+  // `GET /orders` yang hanya mengembalikan pesanan milik akun sendiri.
+  final isAdmin = ref.watch(authControllerProvider).user?.isAdmin ?? false;
+  while (true) {
+    List<OrderModel> list = const [];
+    try {
+      list = isAdmin
+          ? await repo.fetchAllOrders(limit: 50)
+          : await repo.fetchHistory(limit: 20);
+    } catch (_) {
+      // Tamu / belum login / jaringan gagal → daftar kosong.
+    }
+    yield list;
+    final hasActive = list.any((o) => kActiveOrderStatuses.contains(o.status));
+    await Future.delayed(Duration(seconds: hasActive ? 3 : 20));
+  }
+});
+
+/// Pesanan AKTIF yang paling DULU dibuat (FIFO) — untuk banner di Menu.
+///
+/// Sengaja bukan yang terbaru: antrean dikerjakan urut masuk, jadi yang tampil
+/// adalah pesanan terdepan yang harus diselesaikan lebih dulu.
+/// Null bila tak ada pesanan berjalan.
+final activeOrderProvider = Provider.autoDispose<OrderModel?>((ref) {
+  final list = ref.watch(ordersTrackingProvider).valueOrNull ?? const [];
+  OrderModel? oldest;
+  for (final o in list) {
+    if (!kActiveOrderStatuses.contains(o.status)) continue;
+    if (oldest == null || o.createdAt.isBefore(oldest.createdAt)) oldest = o;
+  }
+  return oldest;
 });
 
 /// (Admin) Pesanan Masuk = pesanan yang SUDAH DIBAYAR (paid → selesai),

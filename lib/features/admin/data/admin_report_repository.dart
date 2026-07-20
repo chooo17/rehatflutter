@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/constants/api_constants.dart';
 import '../../../core/network/dio_client.dart';
+import '../../../core/utils/formatters.dart';
 
 /// Satu titik penjualan harian (untuk grafik).
 class SalesPoint {
@@ -380,8 +381,11 @@ final analyticsProvider = FutureProvider.autoDispose<Analytics>((ref) {
 });
 
 /// Tanggal tutup kasir yang dipilih (default hari ini).
+/// Default "hari ini" mengikuti WIB, bukan zona waktu perangkat — supaya
+/// tutup kasir menunjuk hari gerai yang benar meski perangkat/emulator
+/// tidak diset ke WIB.
 final closingDateProvider =
-    StateProvider<DateTime>((ref) => DateTime.now());
+    StateProvider<DateTime>((ref) => Formatters.toWib(DateTime.now()));
 
 /// Laporan tutup kasir untuk tanggal aktif.
 final closingReportProvider = FutureProvider<ClosingReport>((ref) {
@@ -389,9 +393,11 @@ final closingReportProvider = FutureProvider<ClosingReport>((ref) {
   return ref.watch(adminReportRepositoryProvider).fetchClosing(date: _fmtDate(d));
 });
 
-/// Bulan aktif kalender penjualan (default: bulan ini).
-final calendarMonthProvider = StateProvider<DateTime>(
-    (ref) => DateTime(DateTime.now().year, DateTime.now().month));
+/// Bulan aktif kalender penjualan (default: bulan berjalan menurut WIB).
+final calendarMonthProvider = StateProvider<DateTime>((ref) {
+  final now = Formatters.toWib(DateTime.now());
+  return DateTime(now.year, now.month);
+});
 
 /// Omzet harian untuk bulan aktif → {'YYYY-MM-DD': omzet}.
 final salesCalendarProvider = FutureProvider<Map<String, int>>((ref) {

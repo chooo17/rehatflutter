@@ -127,6 +127,13 @@ class CheckoutController extends Notifier<CheckoutState> {
       state = state.copyWith(errorMessage: 'Nama wajib diisi.');
       return null;
     }
+    // No. HP tamu WAJIB — WhatsApp satu-satunya kanal notifikasi bagi tamu.
+    if (isGuest &&
+        (guestPhone ?? '').replaceAll(RegExp(r'[^0-9]'), '').length < 8) {
+      state = state.copyWith(
+          errorMessage: 'No. HP / WhatsApp wajib diisi (min 8 angka).');
+      return null;
+    }
 
     state = state.copyWith(isSubmitting: true, clearError: true);
     try {
@@ -157,6 +164,8 @@ class CheckoutController extends Notifier<CheckoutState> {
       ref.read(cartControllerProvider.notifier).clear();
       if (!isGuest) {
         ref.invalidate(orderHistoryProvider);
+        // Banner & layar pelacakan langsung menampilkan pesanan baru.
+        ref.invalidate(ordersTrackingProvider);
         // Poin/stamp bertambah di sisi server setelah bayar — segarkan profil.
         ref.read(authControllerProvider.notifier).refreshUser();
       }

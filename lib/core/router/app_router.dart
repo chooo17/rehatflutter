@@ -32,6 +32,7 @@ import '../../features/order/presentation/checkout_screen.dart';
 import '../../features/order/presentation/order_confirmation_screen.dart';
 import '../../features/order/presentation/order_detail_screen.dart';
 import '../../features/order/presentation/order_history_screen.dart';
+import '../../features/order/presentation/order_tracking_screen.dart';
 import '../../shared/models/order_model.dart';
 import '../../features/profile/presentation/edit_profile_screen.dart';
 import '../../features/profile/presentation/help_screen.dart';
@@ -260,6 +261,11 @@ final routerProvider = Provider<GoRouter>((ref) {
                     path: 'admin-menu-images',
                     name: RouteNames.adminMenuImages,
                     builder: (context, state) => const AdminMenuImagesScreen(),
+                  ),
+                  GoRoute(
+                    path: 'order-tracking',
+                    name: RouteNames.orderTracking,
+                    builder: (context, state) => const OrderTrackingScreen(),
                   ),
                   GoRoute(
                     path: 'admin-menu-cost',
