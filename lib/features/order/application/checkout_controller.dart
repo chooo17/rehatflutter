@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_exception.dart';
+import '../../../shared/models/cart_item_model.dart';
 import '../../../shared/models/order_model.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../wallet/data/wallet_repository.dart';
@@ -18,6 +19,8 @@ class CheckoutState {
     this.isSubmitting = false,
     this.isValidatingVoucher = false,
     this.errorMessage,
+    this.pendingOrder,
+    this.pendingSignature,
   });
 
   final PaymentMethod paymentMethod;
@@ -34,6 +37,16 @@ class CheckoutState {
   final bool isValidatingVoucher;
   final String? errorMessage;
 
+  /// Pesanan yang SUDAH dibuat di server tetapi pembayarannya gagal (mis.
+  /// saldo kurang). Dipakai ulang saat pengguna menekan "Bayar" lagi supaya
+  /// tidak lahir pesanan kedua untuk keranjang yang sama.
+  final CheckoutResult? pendingOrder;
+
+  /// Sidik jari isi keranjang + pilihan checkout saat [pendingOrder] dibuat.
+  /// [pendingOrder] hanya boleh dipakai ulang bila sidik jarinya masih sama —
+  /// kalau tidak, pengguna bisa membayar pesanan yang bukan isi keranjangnya.
+  final String? pendingSignature;
+
   int get discountAmount => voucher?.isValid == true ? voucher!.discountAmount : 0;
 
   CheckoutState copyWith({
@@ -47,6 +60,8 @@ class CheckoutState {
     bool? isValidatingVoucher,
     String? errorMessage,
     bool clearError = false,
+    CheckoutResult? pendingOrder,
+    String? pendingSignature,
   }) {
     return CheckoutState(
       paymentMethod: paymentMethod ?? this.paymentMethod,
@@ -57,6 +72,8 @@ class CheckoutState {
       isSubmitting: isSubmitting ?? this.isSubmitting,
       isValidatingVoucher: isValidatingVoucher ?? this.isValidatingVoucher,
       errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
+      pendingOrder: pendingOrder ?? this.pendingOrder,
+      pendingSignature: pendingSignature ?? this.pendingSignature,
     );
   }
 }
@@ -113,6 +130,16 @@ class CheckoutController extends Notifier<CheckoutState> {
   void clearVoucher() =>
       state = state.copyWith(voucherCode: '', clearVoucher: true);
 
+  /// Sidik jari isi keranjang + pilihan yang MEMPENGARUHI isi pesanan.
+  /// Catatan dikecualikan: mengubahnya tidak mengubah apa yang dibayar.
+  String _signatureOf(List<CartItemModel> items) {
+    final lines = [for (final e in items) '${e.lineId}x${e.quantity}']..sort();
+    return '${lines.join('|')}'
+        '#${state.paymentMethod.name}'
+        '#${state.orderType.name}'
+        '#${state.voucherCode}';
+  }
+
   /// Mengirim pesanan. Untuk tamu, sertakan [guestName]/[guestPhone].
   /// Mengembalikan [CheckoutResult] jika sukses, atau `null`.
   Future<CheckoutResult?> placeOrder({String? guestName, String? guestPhone}) async {
@@ -135,29 +162,58 @@ class CheckoutController extends Notifier<CheckoutState> {
       return null;
     }
 
+    // Sidik jari isi pesanan: dipakai untuk memutuskan apakah pesanan yang
+    // gagal dibayar tadi masih mewakili keranjang saat ini.
+    final signature = _signatureOf(items);
+
     state = state.copyWith(isSubmitting: true, clearError: true);
     try {
       final repo = ref.read(orderRepositoryProvider);
-      final result = isGuest
-          ? await repo.createGuestOrder(
-              items: items,
-              paymentMethod: state.paymentMethod,
-              orderType: state.orderType,
-              notes: state.notes.isEmpty ? null : state.notes,
-              guestName: guestName!,
-              guestPhone: guestPhone,
-            )
-          : await repo.createOrder(
-              items: items,
-              paymentMethod: state.paymentMethod,
-              orderType: state.orderType,
-              voucherCode: state.voucherCode.isEmpty ? null : state.voucherCode,
-              notes: state.notes.isEmpty ? null : state.notes,
-            );
+      // Pesanan sebelumnya sudah dibuat & isinya belum berubah → JANGAN buat
+      // pesanan baru, cukup ulangi pembayarannya.
+      final reusable = state.pendingSignature == signature
+          ? state.pendingOrder
+          : null;
+      final result = reusable ??
+          (isGuest
+              ? await repo.createGuestOrder(
+                  items: items,
+                  paymentMethod: state.paymentMethod,
+                  orderType: state.orderType,
+                  notes: state.notes.isEmpty ? null : state.notes,
+                  guestName: guestName!,
+                  guestPhone: guestPhone,
+                )
+              : await repo.createOrder(
+                  items: items,
+                  paymentMethod: state.paymentMethod,
+                  orderType: state.orderType,
+                  voucherCode:
+                      state.voucherCode.isEmpty ? null : state.voucherCode,
+                  notes: state.notes.isEmpty ? null : state.notes,
+                ));
       // Bayar pakai Saldo Rehat: langsung potong saldo & tandai lunas.
-      // Jika saldo kurang, pesanan tetap dibuat (pending) & error ditampilkan.
+      //
+      // Bila potong saldo GAGAL (mis. saldo kurang), pesanan sudah terlanjur
+      // ada di server. Simpan sebagai `pendingOrder` supaya penekanan "Bayar"
+      // berikutnya MENGULANG PEMBAYARAN pesanan itu, bukan membuat pesanan
+      // kedua untuk keranjang yang sama.
       if (!isGuest && state.paymentMethod == PaymentMethod.balance) {
-        await ref.read(walletRepositoryProvider).payWithBalance(result.orderId);
+        try {
+          await ref
+              .read(walletRepositoryProvider)
+              .payWithBalance(result.orderId);
+        } catch (e) {
+          state = state.copyWith(
+            isSubmitting: false,
+            errorMessage: e is ApiException
+                ? e.message
+                : 'Gagal membayar dengan saldo. Silakan coba lagi.',
+            pendingOrder: result,
+            pendingSignature: signature,
+          );
+          return null;
+        }
       }
       // Simpan hasil dulu agar layar konfirmasi bisa membacanya meski router refresh.
       ref.read(lastCheckoutResultProvider.notifier).state = result;

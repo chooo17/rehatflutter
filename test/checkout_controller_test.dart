@@ -321,9 +321,6 @@ void main() {
       expect(state().errorMessage, 'Gagal membuat pesanan. Silakan coba lagi.');
     });
 
-    // Perilaku SAAT INI, sengaja dikunci: bila potong saldo gagal (mis. saldo
-    // kurang), pesanan SUDAH terlanjur dibuat di server, tetapi keranjang TIDAK
-    // dikosongkan. Menekan "Bayar" lagi akan membuat pesanan KEDUA.
     test('saldo kurang: pesanan sudah dibuat tapi keranjang tetap terisi',
         () async {
       build();
@@ -340,19 +337,101 @@ void main() {
       expect(container.read(cartControllerProvider), isNotEmpty);
       expect(container.read(lastCheckoutResultProvider), isNull);
     });
+  });
 
-    test('menekan bayar lagi setelah saldo kurang membuat pesanan KEDUA',
-        () async {
-      build();
+  group('ulang bayar setelah saldo kurang (anti pesanan ganda)', () {
+    Future<void> failedBalanceAttempt() async {
       fillCart();
       checkout().setPaymentMethod(PaymentMethod.balance);
       wallet.throwOnPay =
           ApiException('Saldo tidak cukup.', code: 'INSUFFICIENT');
+      await checkout().placeOrder();
+    }
+
+    test('menekan bayar lagi TIDAK membuat pesanan kedua', () async {
+      build();
+      await failedBalanceAttempt();
 
       await checkout().placeOrder();
+
+      expect(orders.createOrderCalls, 1);
+      // Pembayaran diulang pada pesanan yang SAMA.
+      expect(wallet.paidOrderIds, ['ord-1', 'ord-1']);
+    });
+
+    test('percobaan ulang yang berhasil menuntaskan pesanan yang sama',
+        () async {
+      build();
+      await failedBalanceAttempt();
+
+      wallet.throwOnPay = null; // mis. pengguna sudah top-up
+      final result = await checkout().placeOrder();
+
+      expect(result?.orderId, 'ord-1');
+      expect(orders.createOrderCalls, 1);
+      expect(container.read(cartControllerProvider), isEmpty);
+      expect(container.read(lastCheckoutResultProvider)?.orderId, 'ord-1');
+      expect(state().errorMessage, isNull);
+    });
+
+    // PENTING: pesanan tertunda hanya boleh dipakai ulang bila isinya SAMA.
+    // Kalau tidak, pengguna membayar pesanan yang bukan isi keranjangnya.
+    test('menambah item membuat pesanan BARU, bukan memakai yang tertunda',
+        () async {
+      build();
+      await failedBalanceAttempt();
+
+      cart().add(const MenuItemModel(id: 'm2', name: 'Roti', price: 12000));
       await checkout().placeOrder();
 
       expect(orders.createOrderCalls, 2);
+    });
+
+    test('mengubah jumlah item membuat pesanan BARU', () async {
+      build();
+      await failedBalanceAttempt();
+
+      final id = container.read(cartControllerProvider).first.lineId;
+      cart().increment(id);
+      await checkout().placeOrder();
+
+      expect(orders.createOrderCalls, 2);
+    });
+
+    test('mengganti metode bayar membuat pesanan BARU', () async {
+      build();
+      await failedBalanceAttempt();
+
+      checkout().setPaymentMethod(PaymentMethod.qris);
+      await checkout().placeOrder();
+
+      expect(orders.createOrderCalls, 2);
+    });
+
+    test('mengganti tipe pesanan membuat pesanan BARU', () async {
+      build();
+      await failedBalanceAttempt();
+
+      checkout().setOrderType(OrderType.takeaway);
+      await checkout().placeOrder();
+
+      expect(orders.createOrderCalls, 2);
+    });
+
+    test('kegagalan BUKAN karena saldo tidak menyisakan pesanan tertunda',
+        () async {
+      build();
+      fillCart();
+      orders.throwOnCreate = ApiException('Menu sedang habis.', code: 'X');
+
+      await checkout().placeOrder();
+      orders.throwOnCreate = null;
+      await checkout().placeOrder();
+
+      // Percobaan pertama gagal SEBELUM pesanan dibuat, jadi percobaan kedua
+      // memang harus membuat pesanan (total 2 panggilan, 1 gagal 1 sukses).
+      expect(orders.createOrderCalls, 2);
+      expect(container.read(cartControllerProvider), isEmpty);
     });
   });
 }
