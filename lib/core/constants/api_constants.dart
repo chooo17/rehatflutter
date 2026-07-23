@@ -77,6 +77,7 @@ class ApiConstants {
   static const String walletTopup = '/wallet/topup';
   static String orderPayBalance(String id) => '/orders/$id/pay-balance';
   static String adminOrderPayBalance(String id) => '/admin/orders/$id/pay-balance';
+  static String adminOrderRefund(String id) => '/admin/orders/$id/refund'; // POST refund tunai
   static const String adminExpenses = '/admin/expenses';
   static String adminExpense(String id) => '/admin/expenses/$id';
 

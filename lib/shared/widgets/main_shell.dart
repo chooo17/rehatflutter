@@ -27,7 +27,7 @@ class MainShell extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     // isAdmin sudah otomatis false pada build "customer" (lihat UserModel).
-    final isAdmin = ref.watch(authControllerProvider).user?.isAdmin ?? false;
+    final isAdmin = ref.watch(isAdminProvider);
     // Urutan cabang di router: 0 Beranda, 1 Menu, 2 Loyalti, 3 Profil, 4 Laporan.
     final tabs = <_Tab>[
       (branch: 0, icon: Icons.home_outlined, selectedIcon: Icons.home_rounded, label: 'Beranda'),

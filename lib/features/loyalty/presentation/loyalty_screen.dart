@@ -22,7 +22,7 @@ class LoyaltyScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final summaryAsync = ref.watch(loyaltySummaryProvider);
     final vouchersAsync = ref.watch(vouchersProvider);
-    final user = ref.watch(authControllerProvider).user;
+    final user = ref.watch(currentUserProvider);
 
     // Fallback ke data user bila ringkasan loyalti belum termuat.
     final summary = summaryAsync.valueOrNull ??

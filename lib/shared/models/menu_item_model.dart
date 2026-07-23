@@ -45,6 +45,7 @@ class MenuItemModel {
     this.description = '',
     this.imageUrl,
     this.category = '',
+    this.categoryId = '',
     this.isFeatured = false,
     this.isAvailable = true,
     this.rating,
@@ -66,7 +67,14 @@ class MenuItemModel {
       price > 0 ? (((price - costPrice) / price) * 100).round() : null;
 
   final String? imageUrl;
+
+  /// Nama kategori (untuk tampilan).
   final String category;
+
+  /// Id kategori (untuk penyaringan). Selaras dengan [MenuCategory.id] dan
+  /// `selectedCategoryProvider`. Kosong bila backend tak mengirimnya.
+  final String categoryId;
+
   final bool isFeatured;
   final bool isAvailable;
 
@@ -88,12 +96,22 @@ class MenuItemModel {
       // `menu_categories` (featured). Bisa juga string biasa.
       category: _categoryName(
           json['category'] ?? json['menu_categories'] ?? json['category_name']),
+      // `GET /menu/items` memakai `select('*, menu_categories(id, name)')`
+      // sehingga kolom `category_id` ADA di root; objek `category` dipakai
+      // sebagai cadangan (endpoint lain hanya mengirim objeknya).
+      categoryId: (json['category_id'] ?? json['categoryId'])?.toString() ??
+          _categoryId(json['category'] ?? json['menu_categories']),
       isFeatured: (json['is_featured'] ?? json['isFeatured'] ?? false) == true,
       isAvailable: (json['is_available'] ?? json['isAvailable'] ?? true) == true,
       rating: _asDouble(json['avg_rating'] ?? json['rating']),
       options: MenuOptions.fromJson(
           json['options'] is Map ? Map<String, dynamic>.from(json['options']) : null),
     );
+  }
+
+  static String _categoryId(dynamic v) {
+    if (v is Map) return (v['id'] ?? '').toString();
+    return '';
   }
 
   static String _categoryName(dynamic v) {

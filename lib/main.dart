@@ -9,6 +9,7 @@ import 'core/constants/app_theme.dart';
 import 'core/notifications/fcm_service.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/theme_controller.dart';
+import 'core/utils/app_lifecycle.dart';
 import 'shared/widgets/neu.dart';
 import 'shared/widgets/responsive_shell.dart';
 
@@ -97,10 +98,11 @@ class _RehatAppState extends ConsumerState<RehatApp>
     }
     _lastBrightness = brightness;
 
-    return Directionality(
-      textDirection: TextDirection.ltr,
-      child: Stack(
-        children: [
+    return AppLifecycleWatcher(
+      child: Directionality(
+        textDirection: TextDirection.ltr,
+        child: Stack(
+          children: [
           Positioned.fill(
             child: MaterialApp.router(
               // Key mengikuti brightness → paksa rebuild penuh agar SEMUA warna
@@ -140,7 +142,8 @@ class _RehatAppState extends ConsumerState<RehatApp>
               ),
             ),
           ),
-        ],
+          ],
+        ),
       ),
     );
   }

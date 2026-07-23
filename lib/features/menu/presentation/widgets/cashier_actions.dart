@@ -177,7 +177,7 @@ class _CashierActionsState extends ConsumerState<CashierActions> {
   @override
   Widget build(BuildContext context) {
     final total = ref.watch(cartTotalProvider);
-    final empty = ref.watch(cartControllerProvider).isEmpty;
+    final empty = ref.watch(cartIsEmptyProvider);
     final disabled = _submitting || empty;
     return Column(
       mainAxisSize: MainAxisSize.min,

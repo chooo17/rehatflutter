@@ -18,7 +18,7 @@ class OrderHistoryScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isAdmin = ref.watch(authControllerProvider).user?.isAdmin ?? false;
+    final isAdmin = ref.watch(isAdminProvider);
     // Admin: log transaksi selesai/dibatalkan. Pelanggan: pesanan sendiri.
     final provider =
         isAdmin ? adminOrderHistoryProvider : orderHistoryProvider;

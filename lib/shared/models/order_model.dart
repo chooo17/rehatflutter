@@ -9,7 +9,8 @@ enum OrderStatus {
   preparing('Diproses', Color(0xFFB47832)),
   ready('Siap diambil', Color(0xFF3E7C5A)),
   completed('Selesai', Color(0xFF6E5F54)),
-  cancelled('Dibatalkan', Color(0xFFB3261E));
+  cancelled('Dibatalkan', Color(0xFFB3261E)),
+  refunded('Dikembalikan', Color(0xFF9A6A00));
 
   const OrderStatus(this.label, this.color);
 
@@ -56,6 +57,8 @@ enum OrderStatus {
       case 'cancelled':
       case 'canceled':
         return OrderStatus.cancelled;
+      case 'refunded':
+        return OrderStatus.refunded;
       default:
         return OrderStatus.pending;
     }

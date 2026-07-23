@@ -95,7 +95,7 @@ class _DetailBodyState extends ConsumerState<_DetailBody> {
   Widget build(BuildContext context) {
     final item = widget.item;
     final o = item.options;
-    final isGuest = ref.watch(authControllerProvider).isGuest;
+    final isGuest = ref.watch(isGuestProvider);
     return Stack(
       children: [
         CustomScrollView(

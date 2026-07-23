@@ -71,6 +71,15 @@ class CartController extends Notifier<List<CartItemModel>> {
 final cartControllerProvider =
     NotifierProvider<CartController, List<CartItemModel>>(CartController.new);
 
+/// Keranjang kosong atau tidak.
+///
+/// Pakai ini alih-alih `ref.watch(cartControllerProvider).isEmpty` di layar:
+/// yang terakhir membangun ulang widget pada SETIAP perubahan keranjang
+/// (tambah item, ubah jumlah), padahal "kosong/tidak" jarang berubah.
+final cartIsEmptyProvider = Provider<bool>(
+  (ref) => ref.watch(cartControllerProvider).isEmpty,
+);
+
 /// Total jumlah unit di keranjang (untuk badge).
 final cartCountProvider = Provider<int>((ref) {
   final items = ref.watch(cartControllerProvider);

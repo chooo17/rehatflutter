@@ -64,7 +64,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     final subtotal = ref.watch(cartTotalProvider);
     final state = ref.watch(checkoutControllerProvider);
     final notifier = ref.read(checkoutControllerProvider.notifier);
-    final isGuest = ref.watch(authControllerProvider).isGuest;
+    final isGuest = ref.watch(isGuestProvider);
     final discount = state.discountAmount;
     final total = subtotal - discount;
 

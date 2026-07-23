@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/constants/api_constants.dart';
 import '../../../core/network/dio_client.dart';
+import '../../../core/utils/app_lifecycle.dart';
 import '../../../shared/models/cart_item_model.dart';
 import '../../../shared/models/order_model.dart';
 import '../../auth/application/auth_controller.dart';
@@ -254,6 +255,16 @@ class OrderRepository {
     );
   }
 
+  /// (Admin) Refund TUNAI penuh sebuah pesanan (`POST /admin/orders/:id/refund`).
+  /// [reason] wajib (min 3 karakter). Hanya untuk order berpembayaran tunai yang
+  /// sudah dibayar & belum di-refund.
+  Future<void> refundOrder(String id, String reason) async {
+    await _client.post<dynamic>(
+      ApiConstants.adminOrderRefund(id),
+      data: {'reason': reason},
+    );
+  }
+
   /// (Admin/Kasir) Membuat pesanan TUNAI untuk pelanggan walk-in — langsung
   /// lunas & dapat nomor antrian (`POST /admin/orders`).
   Future<CheckoutResult> createCashierOrder({
@@ -364,17 +375,28 @@ final ordersTrackingProvider =
   // ADMIN melacak SEMUA pesanan (selaras dengan layar "Pesanan Masuk"), karena
   // pesanan kasir adalah pesanan tamu (user_id null) sehingga tak muncul di
   // `GET /orders` yang hanya mengembalikan pesanan milik akun sendiri.
-  final isAdmin = ref.watch(authControllerProvider).user?.isAdmin ?? false;
+  //
+  // `select` WAJIB: tanpa itu perubahan APA PUN pada AuthState (mis. pesan
+  // error login, token di-refresh, avatar diganti) membangun ulang provider ini
+  // → loop polling restart & langsung menembak backend lagi.
+  final isAdmin = ref.watch(
+    authControllerProvider.select((s) => s.user?.isAdmin ?? false),
+  );
   while (true) {
     List<OrderModel> list = const [];
-    try {
-      list = isAdmin
-          ? await repo.fetchAllOrders(limit: 50)
-          : await repo.fetchHistory(limit: 20);
-    } catch (_) {
-      // Tamu / belum login / jaringan gagal → daftar kosong.
+    // Saat aplikasi di background JANGAN menembak backend — hemat kuota &
+    // baterai. Kasir bisa membiarkan app terbuka berjam-jam; tanpa jeda ini
+    // `fetchAllOrders` jalan tiap 3 dtk selamanya.
+    if (ref.read(appForegroundProvider)) {
+      try {
+        list = isAdmin
+            ? await repo.fetchAllOrders(limit: 50)
+            : await repo.fetchHistory(limit: 20);
+      } catch (_) {
+        // Tamu / belum login / jaringan gagal → daftar kosong.
+      }
+      yield list;
     }
-    yield list;
     final hasActive = list.any((o) => kActiveOrderStatuses.contains(o.status));
     await Future.delayed(Duration(seconds: hasActive ? 3 : 20));
   }
@@ -434,6 +456,7 @@ final adminOrderHistoryProvider = FutureProvider<List<OrderModel>>((ref) async {
   return all
       .where((o) =>
           o.status == OrderStatus.completed ||
-          o.status == OrderStatus.cancelled)
+          o.status == OrderStatus.cancelled ||
+          o.status == OrderStatus.refunded)
       .toList();
 });

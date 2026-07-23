@@ -16,7 +16,7 @@ class ProfileScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final user = ref.watch(authControllerProvider).user;
+    final user = ref.watch(currentUserProvider);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Profil')),

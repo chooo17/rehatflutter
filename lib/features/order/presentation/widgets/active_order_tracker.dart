@@ -29,6 +29,7 @@ int trackStepIndex(OrderStatus s) {
     case OrderStatus.completed:
       return 3;
     case OrderStatus.cancelled:
+    case OrderStatus.refunded:
       return 0;
   }
 }
@@ -95,7 +96,7 @@ class OrderTrackCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     // Tombol ubah status hanya untuk staf/admin — pelanggan cukup memantau.
-    final isAdmin = ref.watch(authControllerProvider).user?.isAdmin ?? false;
+    final isAdmin = ref.watch(isAdminProvider);
     final idx = trackStepIndex(order.status);
     final color = order.status.color;
     final done = order.status == OrderStatus.completed;

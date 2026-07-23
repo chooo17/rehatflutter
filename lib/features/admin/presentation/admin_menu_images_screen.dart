@@ -41,7 +41,7 @@ class _AdminMenuImagesScreenState extends ConsumerState<AdminMenuImagesScreen> {
           );
       // Segarkan semua tampilan menu.
       ref.invalidate(allMenuItemsProvider);
-      ref.invalidate(menuListProvider);
+      ref.invalidate(menuCatalogProvider);
       ref.invalidate(featuredMenuProvider);
       ref.invalidate(menuDetailProvider(item.id));
       if (!mounted) return;

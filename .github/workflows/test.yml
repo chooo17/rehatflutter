@@ -1,0 +1,37 @@
+name: Test
+
+# Gerbang mutu: analyzer + pengujian. Jalan pada setiap push & pull request,
+# terutama untuk melindungi jalur uang (checkout, pembayaran, saldo, loyalti).
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.4'
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      # `--fatal-infos` menjadikan saran analyzer ikut menggagalkan build,
+      # selaras dengan kebiasaan repo ini yang selalu "No issues found!".
+      - name: Analyze
+        run: flutter analyze --fatal-infos
+
+      # CATATAN: gerbang `dart format` SENGAJA tidak dipasang. Repo ini memakai
+      # gaya tulis tangan; `dart format` akan mengubah 80 dari 128 file dan
+      # merusak riwayat `git blame`. Bila suatu saat ingin diadopsi, lakukan
+      # sebagai SATU commit format tersendiri lalu baru tambahkan gerbangnya.
+
+      - name: Run tests
+        run: flutter test --reporter expanded

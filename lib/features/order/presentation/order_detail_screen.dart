@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
+import '../../../core/network/api_exception.dart';
 import '../../../core/router/route_names.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../shared/models/order_model.dart';
@@ -41,7 +42,7 @@ class OrderDetailScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     // Admin memakai endpoint admin (bisa lihat order pelanggan mana pun).
-    final isAdmin = ref.watch(authControllerProvider).user?.isAdmin ?? false;
+    final isAdmin = ref.watch(isAdminProvider);
     final detailAsync = isAdmin
         ? ref.watch(adminOrderDetailProvider(id))
         : ref.watch(orderDetailProvider(id));
@@ -378,6 +379,98 @@ class _AdminStatusControlsState extends ConsumerState<_AdminStatusControls> {
     }
   }
 
+  /// Refund TUNAI penuh — dialog alasan wajib lalu panggil API.
+  Future<void> _refund() async {
+    final controller = TextEditingController();
+    final reason = await showDialog<String>(
+      context: context,
+      builder: (ctx) {
+        String? errorText;
+        return StatefulBuilder(
+          builder: (ctx, setLocal) => AlertDialog(
+            backgroundColor: AppColors.surface,
+            title: const Text('Refund Tunai'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Kembalikan seluruh uang pesanan ini secara tunai. '
+                  'Tindakan ini tidak bisa dibatalkan.',
+                  style: AppTextStyles.bodySmall
+                      .copyWith(color: AppColors.textSecondary),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: controller,
+                  autofocus: true,
+                  minLines: 1,
+                  maxLines: 3,
+                  textCapitalization: TextCapitalization.sentences,
+                  decoration: InputDecoration(
+                    labelText: 'Alasan refund (wajib)',
+                    hintText: 'mis. pesanan salah, pelanggan batal',
+                    errorText: errorText,
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: const Text('Batal'),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.error,
+                  foregroundColor: Colors.white,
+                ),
+                onPressed: () {
+                  final text = controller.text.trim();
+                  if (text.length < 3) {
+                    setLocal(() => errorText = 'Alasan minimal 3 karakter');
+                    return;
+                  }
+                  Navigator.of(ctx).pop(text);
+                },
+                child: const Text('Refund'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+    if (reason == null || !mounted) return;
+
+    setState(() => _busy = true);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await ref.read(orderRepositoryProvider).refundOrder(widget.order.id, reason);
+      ref.invalidate(orderDetailProvider(widget.order.id));
+      ref.invalidate(adminOrderDetailProvider(widget.order.id));
+      ref.invalidate(adminOrdersProvider);
+      ref.invalidate(ordersTrackingProvider);
+      if (!mounted) return;
+      messenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(const SnackBar(content: Text('Pesanan di-refund.')));
+    } on ApiException catch (e) {
+      if (mounted) {
+        messenger
+          ..hideCurrentSnackBar()
+          ..showSnackBar(SnackBar(content: Text(e.message)));
+      }
+    } catch (_) {
+      if (mounted) {
+        messenger
+          ..hideCurrentSnackBar()
+          ..showSnackBar(const SnackBar(content: Text('Gagal refund pesanan.')));
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   Future<void> _printReceipt() async {
     final messenger = ScaffoldMessenger.of(context);
     final ok = await ref
@@ -426,13 +519,19 @@ class _AdminStatusControlsState extends ConsumerState<_AdminStatusControls> {
 
   @override
   Widget build(BuildContext context) {
-    final isAdmin = ref.watch(authControllerProvider).user?.isAdmin ?? false;
+    final isAdmin = ref.watch(isAdminProvider);
     if (!isAdmin) return const SizedBox.shrink();
 
     final status = widget.order.status;
     final next = status.next;
     final isClosed =
         status == OrderStatus.completed || status == OrderStatus.cancelled;
+    // Refund hanya untuk pesanan TUNAI yang sudah dibayar & belum di-refund/batal.
+    final isCash = (widget.order.paymentMethod ?? '').toLowerCase() == 'cash';
+    final canRefund = isCash &&
+        (status == OrderStatus.paid ||
+            status == OrderStatus.preparing ||
+            status == OrderStatus.completed);
 
     return Container(
       margin: const EdgeInsets.only(top: 16),
@@ -544,6 +643,23 @@ class _AdminStatusControlsState extends ConsumerState<_AdminStatusControls> {
                           .copyWith(color: AppColors.textSecondary)),
               ],
             ),
+            // Refund tunai — pesanan sudah dibayar tunai & belum di-refund.
+            if (canRefund) ...[
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: _refund,
+                  icon: const Icon(Icons.undo_rounded, size: 18),
+                  label: const Text('Refund (Tunai)'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.error,
+                    side: BorderSide(color: AppColors.error.withValues(alpha: 0.5)),
+                    minimumSize: const Size(0, 48),
+                  ),
+                ),
+              ),
+            ],
           ],
         ],
       ),

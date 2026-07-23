@@ -22,7 +22,7 @@ class CartScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final items = ref.watch(cartControllerProvider);
     final total = ref.watch(cartTotalProvider);
-    final isAdmin = ref.watch(authControllerProvider).user?.isAdmin ?? false;
+    final isAdmin = ref.watch(isAdminProvider);
     // Tablet/desktop: tampilan berdampingan (daftar item | ringkasan).
     final wide = !context.isMobile && items.isNotEmpty;
 

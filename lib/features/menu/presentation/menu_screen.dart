@@ -84,9 +84,8 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
     final categoriesAsync = ref.watch(menuCategoriesProvider);
     final menuAsync = ref.watch(menuListProvider);
     final selected = ref.watch(selectedCategoryProvider);
-    final isGuest =
-        ref.watch(authControllerProvider).status == AuthStatus.guest;
-    final isAdmin = ref.watch(authControllerProvider).user?.isAdmin ?? false;
+    final isGuest = ref.watch(isGuestProvider);
+    final isAdmin = ref.watch(isAdminProvider);
     // Tablet/desktop: keranjang tampil sebagai side cart di tab Menu.
     final wide = !context.isMobile;
 
@@ -159,6 +158,9 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
                     child: TextField(
                       controller: _searchCtrl,
                       textInputAction: TextInputAction.search,
+                      // Penyaringan kini lokal (lihat `menuCatalogProvider`),
+                      // jadi tiap ketukan TIDAK menembak backend — tanpa jeda
+                      // supaya hasil muncul seketika.
                       onChanged: (v) => ref
                           .read(menuSearchQueryProvider.notifier)
                           .state = v.trim(),
@@ -242,7 +244,7 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
               if (cachedItems == null) {
                 if (menuAsync.hasError) {
                   return _ErrorState(
-                    onRetry: () => ref.invalidate(menuListProvider),
+                    onRetry: () => ref.invalidate(menuCatalogProvider),
                   );
                 }
                 return const MenuGridSkeleton();
@@ -253,7 +255,7 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
               }
               return RefreshIndicator(
                   color: AppColors.amber,
-                  onRefresh: () async => ref.invalidate(menuListProvider),
+                  onRefresh: () async => ref.invalidate(menuCatalogProvider),
                   child: GridView.builder(
                     padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
                     // Kolom otomatis dari lebar tersedia (memperhitungkan side

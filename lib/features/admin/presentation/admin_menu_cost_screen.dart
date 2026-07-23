@@ -153,7 +153,7 @@ class _CostRowState extends ConsumerState<_CostRow> {
           .updateItem(widget.item.id, costPrice: cost);
       // Segarkan menu & laporan agar margin ikut ter-update.
       ref.invalidate(allMenuItemsProvider);
-      ref.invalidate(menuListProvider);
+      ref.invalidate(menuCatalogProvider);
       ref.invalidate(salesReportProvider);
       if (!mounted) return;
       messenger

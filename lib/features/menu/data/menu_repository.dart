@@ -6,6 +6,7 @@ import '../../../core/network/dio_client.dart';
 import '../../../shared/models/menu_category_model.dart';
 import '../../../shared/models/menu_item_model.dart';
 import '../application/menu_sort.dart';
+import 'menu_query.dart';
 
 /// Akses data katalog menu.
 class MenuRepository {
@@ -138,16 +139,27 @@ final menuCategoriesProvider = FutureProvider<List<MenuCategory>>((ref) async {
   return [MenuCategory.all, ...categories];
 });
 
+/// Katalog MENTAH — seluruh menu tersedia, urut `sort_order` dari backend.
+///
+/// Diambil SEKALI lalu dipakai ulang; penyaringan kategori/pencarian/urutan
+/// dilakukan di perangkat oleh [menuListProvider]. `invalidate` provider ini
+/// untuk memaksa ambil ulang (mis. tarik-untuk-segarkan).
+final menuCatalogProvider = FutureProvider<List<MenuItemModel>>((ref) async {
+  return ref.watch(menuRepositoryProvider).fetchMenu(limit: 200);
+});
+
 /// Daftar menu sesuai kategori, pencarian & pengurutan aktif.
+///
+/// Turunan MURNI dari [menuCatalogProvider] — mengganti filter tidak menembak
+/// backend sama sekali.
 final menuListProvider = FutureProvider<List<MenuItemModel>>((ref) async {
-  final categoryId = ref.watch(selectedCategoryProvider);
-  final query = ref.watch(menuSearchQueryProvider);
-  final sort = ref.watch(menuSortProvider);
-  return ref.watch(menuRepositoryProvider).fetchMenu(
-        categoryId: categoryId,
-        query: query,
-        sort: sort.apiValue,
-      );
+  final catalog = await ref.watch(menuCatalogProvider.future);
+  return applyMenuQuery(
+    catalog,
+    categoryId: ref.watch(selectedCategoryProvider),
+    query: ref.watch(menuSearchQueryProvider),
+    sort: ref.watch(menuSortProvider),
+  );
 });
 
 /// Detail satu item menu berdasarkan id.

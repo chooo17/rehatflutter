@@ -249,3 +249,30 @@ class AuthController extends Notifier<AuthState> {
 
 final authControllerProvider =
     NotifierProvider<AuthController, AuthState>(AuthController.new);
+
+// ---------------------------------------------------------------------------
+// Selektor sempit.
+//
+// JANGAN `ref.watch(authControllerProvider)` di layar hanya untuk mengambil
+// satu boolean: `AuthState` tidak punya `==`, sehingga SETIAP perubahan
+// (pesan error login, token di-refresh, avatar diganti) membangun ulang
+// seluruh layar yang memantaunya. Provider turunan di bawah menyaring dulu,
+// jadi layar hanya dibangun ulang saat nilai yang dipakainya benar-benar
+// berubah.
+// ---------------------------------------------------------------------------
+
+/// Pengguna yang sedang login (null bila tamu / belum login).
+final currentUserProvider = Provider<UserModel?>(
+  (ref) => ref.watch(authControllerProvider.select((s) => s.user)),
+);
+
+/// Sedang menjelajah sebagai tamu (tanpa akun).
+final isGuestProvider = Provider<bool>(
+  (ref) => ref.watch(authControllerProvider.select((s) => s.isGuest)),
+);
+
+/// Akun admin DAN build admin (lihat [UserModel.isAdmin]).
+final isAdminProvider = Provider<bool>(
+  (ref) =>
+      ref.watch(authControllerProvider.select((s) => s.user?.isAdmin ?? false)),
+);

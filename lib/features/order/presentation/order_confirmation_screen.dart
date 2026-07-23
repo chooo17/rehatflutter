@@ -21,7 +21,7 @@ class OrderConfirmationScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isGuest = ref.watch(authControllerProvider).isGuest;
+    final isGuest = ref.watch(isGuestProvider);
     // Polling status pembayaran (tiap 5 dtk) → status, nomor antrian, dan
     // hilangnya tombol bayar terjadi otomatis begitu pembayaran terkonfirmasi.
     final live = ref.watch(orderStatusPollProvider(result.orderId)).valueOrNull;

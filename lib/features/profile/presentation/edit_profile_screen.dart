@@ -26,12 +26,17 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   DateTime? _birthdate;
   bool _uploadingAvatar = false;
 
+  /// Tanggal lahir dikunci bila sudah pernah diisi (anti-kecurangan voucher
+  /// ulang tahun). Backend menegakkan aturan yang sama; ini hanya UX.
+  bool _birthdateLocked = false;
+
   @override
   void initState() {
     super.initState();
     final user = ref.read(authControllerProvider).user;
     _nameCtrl = TextEditingController(text: user?.name ?? '');
     _birthdate = user?.birthdate != null ? DateTime.tryParse(user!.birthdate!) : null;
+    _birthdateLocked = (user?.birthdate ?? '').isNotEmpty;
   }
 
   @override
@@ -68,6 +73,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   }
 
   Future<void> _pickBirthdate() async {
+    if (_birthdateLocked) return; // terkunci setelah terisi
     final now = DateTime.now();
     final picked = await showDatePicker(
       context: context,
@@ -240,10 +246,23 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                                 : AppColors.textPrimary,
                           ),
                         ),
+                        if (_birthdateLocked) ...[
+                          const Spacer(),
+                          Icon(Icons.lock_outline_rounded,
+                              color: AppColors.textSecondary, size: 16),
+                        ],
                       ],
                     ),
                   ),
                 ),
+                if (_birthdateLocked) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    'Tanggal lahir terkunci. Hubungi admin untuk koreksi.',
+                    style: AppTextStyles.caption
+                        .copyWith(color: AppColors.textSecondary),
+                  ),
+                ],
                 const SizedBox(height: 32),
                 PrimaryButton(
                   label: 'Simpan',

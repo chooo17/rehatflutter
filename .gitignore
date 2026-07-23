@@ -28,6 +28,10 @@ android/key.properties
 
 .vercel
 
+# Knowledge graph (graphify) — keluaran hasil generate, bisa dibangun ulang.
+# Watcher menulis ulang isinya tiap kali kode berubah, jadi jangan di-track.
+graphify-out/
+
 # Build APK/AAB — jangan commit binari besar ke git
 *.apk
 *.aab

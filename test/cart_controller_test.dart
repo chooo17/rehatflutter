@@ -66,4 +66,39 @@ void main() {
     cart().add(_item('a', 18000), size: 'large', quantity: 3);
     expect(container.read(cartTotalProvider), 54000);
   });
+
+  group('cartIsEmptyProvider', () {
+    Future<int> countNotifications(void Function() act) async {
+      var n = 0;
+      final sub = container.listen(cartIsEmptyProvider, (_, __) => n++);
+      act();
+      await Future<void>.delayed(Duration.zero);
+      sub.close();
+      return n;
+    }
+
+    test('mengikuti isi keranjang', () {
+      expect(container.read(cartIsEmptyProvider), isTrue);
+      cart().add(_item('a', 10000));
+      expect(container.read(cartIsEmptyProvider), isFalse);
+    });
+
+    test('memberi tahu saat keranjang berubah dari kosong ke terisi', () async {
+      final n = await countNotifications(() => cart().add(_item('a', 10000)));
+      expect(n, 1);
+    });
+
+    test('TIDAK memberi tahu saat jumlah item bertambah', () async {
+      cart().add(_item('a', 10000));
+      final id = container.read(cartControllerProvider).first.lineId;
+
+      // Keranjang tetap "tidak kosong" — panel kasir tak perlu dibangun ulang.
+      final n = await countNotifications(() {
+        cart().increment(id);
+        cart().add(_item('b', 12000));
+      });
+
+      expect(n, 0);
+    });
+  });
 }

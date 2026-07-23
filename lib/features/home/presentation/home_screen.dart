@@ -34,7 +34,7 @@ class HomeScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final user = ref.watch(authControllerProvider).user;
+    final user = ref.watch(currentUserProvider);
     final featuredAsync = ref.watch(featuredMenuProvider);
 
     // Sumber tunggal untuk poin & stamp — sama dengan layar Loyalti agar sinkron.
