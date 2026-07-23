@@ -17,6 +17,7 @@ class _FakeMenuRepository extends MenuRepository {
     String? categoryId,
     String? query,
     String? sort,
+    int page = 1,
     int limit = 100,
     bool includeUnavailable = false,
   }) async {

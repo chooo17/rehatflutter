@@ -24,10 +24,14 @@ class MenuRepository {
     String? categoryId,
     String? query,
     String? sort,
+    int page = 1,
     int limit = 100,
     bool includeUnavailable = false,
   }) async {
-    final params = <String, dynamic>{'limit': limit.toString()};
+    final params = <String, dynamic>{
+      'limit': limit.toString(),
+      'page': page.toString(),
+    };
     if (includeUnavailable) params['available_only'] = 'false';
     if (categoryId != null && categoryId.isNotEmpty) {
       params['category_id'] = categoryId;
@@ -144,8 +148,38 @@ final menuCategoriesProvider = FutureProvider<List<MenuCategory>>((ref) async {
 /// Diambil SEKALI lalu dipakai ulang; penyaringan kategori/pencarian/urutan
 /// dilakukan di perangkat oleh [menuListProvider]. `invalidate` provider ini
 /// untuk memaksa ambil ulang (mis. tarik-untuk-segarkan).
+/// Ukuran halaman saat menarik katalog. Backend memotong dengan
+/// `.range(offset, offset + limit - 1)`, jadi satu permintaan TIDAK PERNAH
+/// mengembalikan lebih dari ini.
+const _catalogPageSize = 200;
+
+/// Batas aman: kalau backend selalu mengembalikan halaman penuh (mis. bug
+/// paginasi), berhenti daripada memutar tanpa henti.
+const _catalogMaxPages = 10;
+
+/// Menarik SELURUH katalog per halaman sampai halaman tidak penuh.
+///
+/// Sebelumnya katalog diambil dengan satu permintaan ber-`limit`; begitu isi
+/// menu melewati batas itu, sisanya hilang DIAM-DIAM tanpa error apa pun.
+Future<List<MenuItemModel>> _fetchAllPages(
+  MenuRepository repo, {
+  bool includeUnavailable = false,
+}) async {
+  final all = <MenuItemModel>[];
+  for (var page = 1; page <= _catalogMaxPages; page++) {
+    final batch = await repo.fetchMenu(
+      page: page,
+      limit: _catalogPageSize,
+      includeUnavailable: includeUnavailable,
+    );
+    all.addAll(batch);
+    if (batch.length < _catalogPageSize) break;
+  }
+  return all;
+}
+
 final menuCatalogProvider = FutureProvider<List<MenuItemModel>>((ref) async {
-  return ref.watch(menuRepositoryProvider).fetchMenu(limit: 200);
+  return _fetchAllPages(ref.watch(menuRepositoryProvider));
 });
 
 /// Daftar menu sesuai kategori, pencarian & pengurutan aktif.
@@ -169,11 +203,12 @@ final menuDetailProvider =
 });
 
 /// Semua item menu tanpa filter (untuk panel admin gambar/HPP).
-/// Sertakan item "Habis" & naikkan limit agar seluruh katalog bisa dikelola.
+/// Sertakan item "Habis"; ditarik per halaman agar katalog sebesar apa pun
+/// bisa dikelola (dulu satu permintaan `limit: 500` — item ke-501 dst. tak
+/// pernah muncul di panel admin).
 /// autoDispose: dilepas saat keluar layar admin (data segar tiap masuk).
 final allMenuItemsProvider =
     FutureProvider.autoDispose<List<MenuItemModel>>((ref) {
-  return ref
-      .watch(menuRepositoryProvider)
-      .fetchMenu(limit: 500, includeUnavailable: true);
+  return _fetchAllPages(ref.watch(menuRepositoryProvider),
+      includeUnavailable: true);
 });
