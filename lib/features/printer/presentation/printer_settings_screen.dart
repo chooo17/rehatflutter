@@ -24,6 +24,17 @@ class _PrinterSettingsScreenState
   bool _templateLoaded = false;
 
   @override
+  void initState() {
+    super.initState();
+    // Status koneksi bisa sudah basi sejak terakhir dilihat — periksa ulang
+    // saat layar dibuka supaya badge "Tersambung" dan tombol "Tes Cetak"
+    // mencerminkan keadaan printer yang sebenarnya.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) ref.read(printerControllerProvider.notifier).refreshConnection();
+    });
+  }
+
+  @override
   void dispose() {
     _templateCtrl.dispose();
     super.dispose();

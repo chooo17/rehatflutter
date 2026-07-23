@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
+import '../../../core/utils/app_lifecycle.dart';
 import '../../../shared/models/order_model.dart';
 import '../data/printer_bridge.dart';
 import '../data/receipt_template.dart';
@@ -35,6 +36,10 @@ class PrinterState {
       );
 }
 
+/// Jembatan printer sebagai provider agar bisa diganti saat pengujian.
+final printerBridgeProvider =
+    Provider<PrinterBridge>((ref) => createPrinterBridge());
+
 class PrinterController extends Notifier<PrinterState> {
   static const _kAddr = 'printer_address';
   static const _kName = 'printer_name';
@@ -43,14 +48,30 @@ class PrinterController extends Notifier<PrinterState> {
 
   @override
   PrinterState build() {
-    _bridge = createPrinterBridge();
-    if (_bridge.supported) _loadSaved();
+    _bridge = ref.watch(printerBridgeProvider);
+    if (_bridge.supported) {
+      _loadSaved();
+      // Koneksi Bluetooth bisa putus diam-diam saat app di background (printer
+      // dimatikan, keluar jangkauan, HP dikunci). Tanpa pemeriksaan ulang saat
+      // kembali ke depan, layar pengaturan terus menampilkan "Tersambung" yang
+      // salah dan tombol "Tes Cetak" bisa aktif padahal printer sudah lepas.
+      ref.listen<bool>(appForegroundProvider, (prev, next) {
+        if (next && prev != true) refreshConnection();
+      });
+    }
     return PrinterState(supported: _bridge.supported);
   }
 
   Future<void> _loadSaved() async {
-    final addr = await _storage.read(key: _kAddr);
-    final name = await _storage.read(key: _kName);
+    // Penyimpanan aman bisa gagal (plugin belum siap / platform tanpa
+    // dukungan). Jangan sampai jadi galat asinkron yang tak tertangani.
+    String? addr, name;
+    try {
+      addr = await _storage.read(key: _kAddr);
+      name = await _storage.read(key: _kName);
+    } catch (_) {
+      return;
+    }
     if (addr != null) {
       final conn = await _bridge.connected();
       state = state.copyWith(address: addr, deviceName: name, connected: conn);
@@ -85,7 +106,10 @@ class PrinterController extends Notifier<PrinterState> {
     state = state.copyWith(connected: false);
   }
 
+  /// Memeriksa ulang status koneksi ke printer. Dipanggil saat aplikasi kembali
+  /// ke depan dan saat layar pengaturan printer dibuka.
   Future<void> refreshConnection() async {
+    if (!_bridge.supported) return;
     state = state.copyWith(connected: await _bridge.connected());
   }
 
