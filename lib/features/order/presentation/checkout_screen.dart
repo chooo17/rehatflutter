@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/app_colors.dart';
+import '../../../core/constants/app_radius.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/router/route_names.dart';
 import '../../../core/utils/formatters.dart';
@@ -13,6 +14,7 @@ import '../../auth/application/auth_controller.dart';
 import '../../loyalty/data/loyalty_repository.dart';
 import '../../menu/application/cart_controller.dart';
 import '../application/checkout_controller.dart';
+import '../application/table_provider.dart';
 
 /// Pelanggan hanya membayar via QRIS (metode lain dinonaktifkan).
 const _customerMethods = [PaymentMethod.qris];
@@ -65,6 +67,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     final state = ref.watch(checkoutControllerProvider);
     final notifier = ref.read(checkoutControllerProvider.notifier);
     final isGuest = ref.watch(isGuestProvider);
+    final tableNumber = ref.watch(tableNumberProvider);
     final discount = state.discountAmount;
     final total = subtotal - discount;
 
@@ -95,24 +98,29 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                       keyboardType: TextInputType.phone),
                   const SizedBox(height: 24),
                 ],
-                const _SectionLabel('Tipe pesanan'),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    for (final type in OrderType.values) ...[
-                      Expanded(
-                        child: _OrderTypeCard(
-                          type: type,
-                          selected: state.orderType == type,
-                          onTap: () => notifier.setOrderType(type),
+                if (tableNumber != null) ...[
+                  _TableBanner(table: tableNumber),
+                  const SizedBox(height: 24),
+                ] else ...[
+                  const _SectionLabel('Tipe pesanan'),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      for (final type in OrderType.values) ...[
+                        Expanded(
+                          child: _OrderTypeCard(
+                            type: type,
+                            selected: state.orderType == type,
+                            onTap: () => notifier.setOrderType(type),
+                          ),
                         ),
-                      ),
-                      if (type != OrderType.values.last)
-                        const SizedBox(width: 10),
+                        if (type != OrderType.values.last)
+                          const SizedBox(width: 10),
+                      ],
                     ],
-                  ],
-                ),
-                const SizedBox(height: 24),
+                  ),
+                  const SizedBox(height: 24),
+                ],
                 const _SectionLabel('Metode pembayaran'),
                 const SizedBox(height: 10),
                 // 'cash' hanya untuk kasir. Saldo Rehat hanya untuk user login
@@ -275,24 +283,81 @@ class _GuestField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return NeuInset(
-      radius: 16,
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      child: TextField(
-        controller: controller,
-        keyboardType: keyboardType,
-        textCapitalization: textCapitalization,
-        style: AppTextStyles.bodyLarge,
-        decoration: InputDecoration(
-          filled: false,
-          border: InputBorder.none,
-          enabledBorder: InputBorder.none,
-          focusedBorder: InputBorder.none,
-          isDense: true,
-          contentPadding: const EdgeInsets.symmetric(vertical: 14),
-          hintText: hint,
-          prefixIcon: Icon(icon, color: AppColors.textSecondary, size: 20),
+    // Label persisten di atas field (tak ikut hilang saat mengetik seperti
+    // hint) — memudahkan verifikasi ulang sebelum submit di jalur uang.
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 6),
+          child: Text(hint,
+              style: AppTextStyles.caption
+                  .copyWith(color: AppColors.textSecondary)),
         ),
+        NeuInset(
+          radius: 16,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: TextField(
+            controller: controller,
+            keyboardType: keyboardType,
+            textCapitalization: textCapitalization,
+            style: AppTextStyles.bodyLarge,
+            decoration: InputDecoration(
+              filled: false,
+              border: InputBorder.none,
+              enabledBorder: InputBorder.none,
+              focusedBorder: InputBorder.none,
+              isDense: true,
+              contentPadding: const EdgeInsets.symmetric(vertical: 14),
+              hintText: hint,
+              prefixIcon: Icon(icon, color: AppColors.textSecondary, size: 20),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Banner nomor meja (dari QR meja) — pesanan otomatis dine-in.
+class _TableBanner extends StatelessWidget {
+  const _TableBanner({required this.table});
+  final String table;
+
+  @override
+  Widget build(BuildContext context) {
+    return NeuCard(
+      radius: AppRadius.md,
+      padding: const EdgeInsets.all(16),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: AppColors.amber.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(Icons.table_restaurant_rounded,
+                color: AppColors.amberDark),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Meja $table',
+                    style: AppTextStyles.titleMedium
+                        .copyWith(color: AppColors.amberDark)),
+                const SizedBox(height: 2),
+                Text('Pesanan diantar ke meja (dine-in)',
+                    style: AppTextStyles.caption
+                        .copyWith(color: AppColors.textSecondary)),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -315,12 +380,17 @@ class _OrderTypeCard extends StatelessWidget {
     // Konvensi state terpilih (samakan dgn bottom nav & baris pembayaran):
     // permukaan CEKUNG + aksen amber pada ikon/teks — bukan isian penuh warna.
     final accent = selected ? AppColors.amberDark : AppColors.textPrimary;
-    return GestureDetector(
-      onTap: onTap,
-      child: NeuCard(
-        depth: selected ? -4 : 5,
-        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
-        radius: 16,
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: '${type.label}. ${type.description}',
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        child: NeuCard(
+          depth: selected ? -4 : 5,
+          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+          radius: AppRadius.md,
         child: Column(
           children: [
             Stack(
@@ -352,6 +422,7 @@ class _OrderTypeCard extends StatelessWidget {
                   .copyWith(color: AppColors.textSecondary),
             ),
           ],
+        ),
         ),
       ),
     );
@@ -541,26 +612,32 @@ class _PaymentRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: NeuCard(
-        depth: selected ? -4 : 4,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        radius: 14,
-        child: Row(
-          children: [
-            Icon(method.icon, color: AppColors.textPrimary, size: 22),
-            const SizedBox(width: 14),
-            Text(method.label, style: AppTextStyles.bodyLarge),
-            const Spacer(),
-            Icon(
-              selected
-                  ? Icons.radio_button_checked_rounded
-                  : Icons.radio_button_off_rounded,
-              color: selected ? AppColors.amber : AppColors.textSecondary,
-              size: 22,
-            ),
-          ],
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: 'Metode bayar ${method.label}',
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppRadius.sm),
+        child: NeuCard(
+          depth: selected ? -4 : 4,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          radius: AppRadius.sm,
+          child: Row(
+            children: [
+              Icon(method.icon, color: AppColors.textPrimary, size: 22),
+              const SizedBox(width: 14),
+              Text(method.label, style: AppTextStyles.bodyLarge),
+              const Spacer(),
+              Icon(
+                selected
+                    ? Icons.radio_button_checked_rounded
+                    : Icons.radio_button_off_rounded,
+                color: selected ? AppColors.amber : AppColors.textSecondary,
+                size: 22,
+              ),
+            ],
+          ),
         ),
       ),
     );

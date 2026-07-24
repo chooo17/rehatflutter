@@ -29,6 +29,11 @@ class ApiConstants {
   static String get baseUrl =>
       _prodBaseUrl.isNotEmpty ? _prodBaseUrl : 'http://$_host:$_port/v1';
 
+  /// URL web app pelanggan (untuk QR meja: `<web>/?table=N`). Bisa di-override
+  /// saat build: `--dart-define=WEB_APP_URL=https://domainmu`.
+  static const String webAppUrl = String.fromEnvironment('WEB_APP_URL',
+      defaultValue: 'https://rehatflutter.vercel.app');
+
   // Auth ----------------------------------------------------------------
   static const String login = '/auth/login';
   static const String register = '/auth/register';
@@ -94,6 +99,12 @@ class ApiConstants {
   static const String spin = '/spin';
   static const String loyalty = '/loyalty';
   static const String loyaltyHistory = '/loyalty/history';
+  static const String loyaltyStampRedeem = '/loyalty/stamps/redeem';
+  static const String loyaltyPointsRedeem = '/loyalty/points/redeem';
+  // Voucher gratis-minuman (kasir): cari via HP+nama, tandai terpakai.
+  static const String freeDrinkVouchers = '/admin/free-drink-vouchers';
+  static String freeDrinkVoucherUse(String id) =>
+      '/admin/free-drink-vouchers/$id/use';
 
   // Favorites -----------------------------------------------------------
   static const String favorites = '/favorites';

@@ -95,20 +95,53 @@ class MenuRepository {
     return url;
   }
 
-  /// (Admin) Perbarui HPP/harga/ketersediaan satu menu (`PATCH /menu/items/:id`).
+  /// (Admin) Perbarui field menu (`PATCH /menu/items/:id`). Kirim yang diubah saja.
   Future<void> updateItem(
     String itemId, {
+    String? name,
+    String? description,
+    String? categoryId,
     int? costPrice,
     int? price,
+    int? sortOrder,
     bool? isAvailable,
+    bool? isFeatured,
   }) async {
     final body = <String, dynamic>{
+      if (name != null) 'name': name,
+      if (description != null) 'description': description,
+      if (categoryId != null) 'category_id': categoryId,
       if (costPrice != null) 'cost_price': costPrice,
       if (price != null) 'price': price,
+      if (sortOrder != null) 'sort_order': sortOrder,
       if (isAvailable != null) 'is_available': isAvailable,
+      if (isFeatured != null) 'is_featured': isFeatured,
     };
     if (body.isEmpty) return;
     await _client.patch<dynamic>(ApiConstants.menuItemUpdate(itemId), data: body);
+  }
+
+  /// (Admin) Buat menu baru (`POST /menu/items`). `name`/`categoryId`/`price` wajib.
+  Future<void> createItem({
+    required String name,
+    required String categoryId,
+    required int price,
+    int costPrice = 0,
+    String? description,
+    int sortOrder = 0,
+    bool isAvailable = true,
+    bool isFeatured = false,
+  }) async {
+    await _client.post<dynamic>(ApiConstants.menu, data: {
+      'name': name,
+      'category_id': categoryId,
+      'price': price,
+      'cost_price': costPrice,
+      if (description != null && description.isNotEmpty) 'description': description,
+      'sort_order': sortOrder,
+      'is_available': isAvailable,
+      'is_featured': isFeatured,
+    });
   }
 
   List<MenuItemModel> _parseList(dynamic data) {

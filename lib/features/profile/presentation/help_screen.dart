@@ -15,11 +15,12 @@ class HelpScreen extends StatelessWidget {
     ),
     (
       'Bagaimana cara mendapat poin?',
-      'Setiap pesanan yang selesai memberi poin loyalitas yang bisa dilihat di tab Loyalti.'
+      'Setiap pesanan yang selesai memberi poin loyalitas yang bisa dilihat di tab Loyalti. '
+          'Poin menentukan tier keanggotaanmu (Bronze–Platinum); untuk saat ini belum bisa ditukar langsung.'
     ),
     (
       'Apa itu stamp card?',
-      'Kumpulkan stamp dari setiap pembelian. Stamp penuh bisa ditukar kopi gratis.'
+      'Kumpulkan stamp dari setiap pembelian. Saat stamp penuh, tunjukkan ke kasir untuk menukar kopi gratis.'
     ),
     (
       'Bagaimana cara pakai voucher?',

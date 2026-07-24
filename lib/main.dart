@@ -4,6 +4,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
+import 'core/analytics/analytics_service.dart';
 import 'core/constants/app_colors.dart';
 import 'core/constants/app_theme.dart';
 import 'core/notifications/fcm_service.dart';
@@ -19,6 +20,9 @@ Future<void> main() async {
   await initializeDateFormatting('id_ID');
   // Inisialisasi Firebase Messaging (aman gagal bila konfigurasi belum lengkap).
   final firebaseReady = await initFirebaseMessaging();
+  // Aktifkan analitik funnel hanya bila Firebase siap (mobile). Di web/atau bila
+  // init gagal, semua panggilan Analytics jadi no-op (aman).
+  if (firebaseReady) Analytics.enable();
   // Pemantau crash (mobile saja; web tidak didukung Crashlytics). Semua error
   // Flutter & async fatal diteruskan ke Firebase Console dengan stack trace.
   if (firebaseReady) {

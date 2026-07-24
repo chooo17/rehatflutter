@@ -94,6 +94,21 @@ class _AdminOrderCard extends StatelessWidget {
             Row(
               children: [
                 _OrderTypeChip(type: order.orderType),
+                if (order.tableNumber != null) ...[
+                  const SizedBox(width: 8),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: AppColors.amber.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text('Meja ${order.tableNumber}',
+                        style: AppTextStyles.caption.copyWith(
+                            color: AppColors.amberDark,
+                            fontWeight: FontWeight.w700)),
+                  ),
+                ],
                 const SizedBox(width: 10),
                 Text('${order.itemCount} item', style: AppTextStyles.bodySmall),
                 const Spacer(),

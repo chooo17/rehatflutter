@@ -44,6 +44,7 @@ class _FakeOrderRepository extends OrderRepository {
     OrderType orderType = OrderType.dineIn,
     String? voucherCode,
     String? notes,
+    String? tableNumber,
   }) async {
     createOrderCalls++;
     lastVoucherCode = voucherCode;
@@ -60,6 +61,7 @@ class _FakeOrderRepository extends OrderRepository {
     String? notes,
     required String guestName,
     String? guestPhone,
+    String? tableNumber,
   }) async {
     createGuestOrderCalls++;
     lastGuestName = guestName;

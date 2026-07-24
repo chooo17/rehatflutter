@@ -43,9 +43,23 @@ class AuthInterceptor extends Interceptor {
     RequestOptions options,
     RequestInterceptorHandler handler,
   ) async {
-    final token = await _storage.readAccessToken();
-    if (token != null && token.isNotEmpty) {
-      options.headers['Authorization'] = 'Bearer $token';
+    // Endpoint pra-auth (login/register/refresh/verify/resend) tak boleh
+    // membawa bearer token lama — secara semantik salah & tak perlu.
+    // `/auth/logout` DIKECUALIKAN dari daftar ini karena butuh token untuk
+    // menutup sesi di server.
+    const preAuthPaths = [
+      '/auth/login',
+      '/auth/register',
+      '/auth/refresh',
+      '/auth/verify-otp',
+      '/auth/resend-otp',
+    ];
+    final isPreAuth = preAuthPaths.any(options.path.contains);
+    if (!isPreAuth) {
+      final token = await _storage.readAccessToken();
+      if (token != null && token.isNotEmpty) {
+        options.headers['Authorization'] = 'Bearer $token';
+      }
     }
     handler.next(options);
   }

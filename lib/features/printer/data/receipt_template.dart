@@ -59,10 +59,14 @@ String renderReceipt(String template, OrderModel order) {
           .map((i) => _row('${i.quantity}x ${i.name}',
               Formatters.rupiah(i.subtotal).replaceAll('Rp', '').trim()))
           .join('\n');
-  final nama = order.customerName.isEmpty ? 'Pelanggan' : order.customerName;
+  var nama = order.customerName.isEmpty ? 'Pelanggan' : order.customerName;
+  // Nomor meja (QR meja) selalu tampil di struk — ditempel ke nama agar muncul
+  // walau template kustom belum punya placeholder khusus.
+  if (order.tableNumber != null) nama = '$nama (Meja ${order.tableNumber})';
   return template
       .replaceAll('{antrian}', order.queueNumber.isEmpty ? '-' : order.queueNumber)
       .replaceAll('{tanggal}', Formatters.tanggalJam(order.createdAt))
+      .replaceAll('{meja}', order.tableNumber ?? '-')
       .replaceAll('{nama}', nama)
       .replaceAll('{metode}', _methodLabel(order.paymentMethod))
       .replaceAll('{items}', itemLines)

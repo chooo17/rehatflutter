@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/analytics/analytics_service.dart';
 import '../../../shared/models/cart_item_model.dart';
 import '../../../shared/models/menu_item_model.dart';
 
@@ -31,6 +32,7 @@ class CartController extends Notifier<List<CartItemModel>> {
     } else {
       state = [...state, newItem];
     }
+    Analytics.addToCart(quantity: quantity);
   }
 
   void setQuantity(String lineId, int quantity) {

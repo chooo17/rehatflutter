@@ -49,6 +49,8 @@ dependencies:
   firebase_messaging: ^15.1.5
   # Pemantau crash produksi (stack trace otomatis ke Firebase Console).
   firebase_crashlytics: ^4.1.5
+  # Analitik funnel (mobile). Aman no-op bila Firebase tak terinisialisasi (web).
+  firebase_analytics: ^11.3.3
 
   # Printer thermal Bluetooth (Android) + ESC/POS. Di-import HANYA pada impl
   # mobile (conditional import) agar build web tidak terpengaruh.

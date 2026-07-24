@@ -259,6 +259,15 @@ class _Report extends StatelessWidget {
             ),
           ],
         ),
+        if (report.stampRedemptions != null) ...[
+          const SizedBox(height: 12),
+          _KpiCard(
+            icon: Icons.card_giftcard_rounded,
+            label: 'Kopi gratis ditukar (stamp)'
+                '${report.stampRedemptionsUsed != null ? ' • ${report.stampRedemptionsUsed} terpakai' : ''}',
+            value: '${report.stampRedemptions}',
+          ),
+        ],
         const SizedBox(height: 24),
         Text('Pendapatan harian', style: AppTextStyles.titleMedium),
         const SizedBox(height: 12),

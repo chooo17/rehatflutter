@@ -43,6 +43,8 @@ Path berikut spesifik mesin dev saat ini — ganti sesuai PC-mu:
 ## 3. Build & Deploy (PENTING — baca sebelum build)
 
 ### ⚠️ Aturan wajib
+- **CI GitHub Actions AKTIF & bisa tabrakan dgn deploy manual.** `.github/workflows/deploy-web.yml` **auto-deploy web ke Vercel setiap push ke `main`** yang menyentuh `lib/**`/`web/**`/`pubspec.yaml`. `build-apk.yml` (dispatch/tag `v*`) build APK **tanpa** `--obfuscate` → jangan dipakai rilis (crash tak bisa di-decode). `test.yml` = gate `analyze --fatal-infos` + `test`.
+  - **Aturan:** sebelum `bash scripts/deploy_web.sh` manual, **cek tab Actions** — kalau run CI sedang jalan, tunggu; jangan deploy dua jalur bersamaan. Untuk rilis APK, **selalu pakai script lokal** (`scripts/build_*_apk.sh`), bukan CI.
 - **Ada Android product flavors `customer` & `admin`** → `flutter build apk` polos **GAGAL**. Selalu `--flavor`.
 - **Selalu sertakan** `--dart-define=API_BASE_URL=https://rehat-backend-production.up.railway.app/v1`, kalau tidak app menunjuk `localhost` (default `api_constants.dart`) & tak bisa konek.
 - `--dart-define=ADMIN_BUILD=true|false` harus cocok dgn flavor (gating `UserModel.isAdmin`).
@@ -88,8 +90,21 @@ Deteksi deploy baru live: endpoint baru balas **401** (route ada) vs **404** (be
 
 ### Migrasi DB (MANUAL)
 `DATABASE_URL` di `.env` adalah **placeholder** → runner `pg`/psql **tidak jalan**. SQL di `src/db/migrations/*.sql` **dijalankan manual di Supabase Dashboard → SQL Editor**. Verifikasi via `supabaseAdmin.from(x).select().limit(1)`.
-Migrasi ada: `001`–`011` (**semua sudah dijalankan & terverifikasi**).
-Terbaru: `008` cost_price (HPP) · `009` referral+wallet · `010` RPC `increment_balance` · `011` `orders.source`.
+**Tabel status migrasi** (perbarui baris ini di commit yang sama saat menambah `.sql` baru):
+
+| # | Isi | Status |
+|---|---|---|
+| 001–007 | skema awal (users, menu, orders, dll.) | ✅ terpasang |
+| 008 | `cost_price` (HPP) | ✅ terpasang |
+| 009 | referral + wallet | ✅ terpasang |
+| 010 | RPC `increment_balance` (saldo atomik) | ✅ terpasang |
+| 011 | `orders.source` | ✅ terpasang |
+| 012 | refund tunai (`refunded_at/by/reason` + enum `'refunded'`) | ✅ terpasang (`node src/db/verify-012.js`) |
+| 013 | voucher stamp (`voucher_source+='stamp'` + `vouchers.reward_type`) | ✅ terpasang (`node src/db/verify-013.js`) — penukaran stamp digital |
+| 014 | belanja poin (`users.lifetime_points` + `voucher_source+='points'`) | ✅ terpasang (`node src/db/verify-014.js`) — belanja poin |
+| 015 | QR meja (`orders.table_number`) | ✅ terpasang (`node src/db/verify-015.js`) |
+
+Pola verifikasi umum: skrip sekali-pakai di folder backend pakai `supabaseAdmin` (contoh §8). `DATABASE_URL` placeholder → `pg`/psql tak jalan.
 
 **Pola WAJIB saat menambah kolom:** buat query-nya **defensif** (coba dengan kolom baru → ulangi tanpa kolom itu bila error menyebut kolom tsb). Tanpa ini, migrasi yang tertinggal bisa **merusak alur pembayaran**. Contoh ada di `getSalesReport` (cost_price), `updateOrderStatus` (source), dan `createGuestOrder` (`optionalCols`).
 
@@ -225,7 +240,7 @@ Detail model & validasi ada di kode (`src/routes/index.js`, `src/services/*`). E
 
 ### 🔴 Kesiapan produksi (paling penting untuk "profesional")
 1. **Keystore rilis + build AAB** — syarat Play Store (kini masih debug-signed).
-2. **Pengujian otomatis** — nyaris nol test; prioritaskan alur uang (checkout/pembayaran/loyalti) + gate `flutter analyze`/test di CI.
+2. **Pengujian otomatis** — sudah ada **~116 unit test** (jalur uang: checkout, **kasir**, cart, loyalti, tracking) + CI gate (`flutter analyze --fatal-infos` + `flutter test`). Utang tersisa: **widget/integration test** layar checkout & kasir, plus test backend.
 
 ### 🟡 Fitur produk
 3. **CRUD Menu di panel admin** — saat ini **belum ada layar "Tambah Menu"**; menu baru harus di-INSERT langsung ke tabel `menu_items` di Supabase (yang tersedia baru edit HPP/harga/ketersediaan via `PATCH /menu/items/:id` + unggah gambar). Perlu: tambah/ubah/arsipkan menu, pilih kategori, atur `sort_order`, deskripsi, & opsi. *(disepakati: nanti)*
@@ -251,7 +266,8 @@ Detail model & validasi ada di kode (`src/routes/index.js`, `src/services/*`). E
 - 👤 **Akun admin saat ini (2):** `irur` (087777601617, device Fonnte) & `irurr` (087864504924).
   Menjadikan admin: `node src/db/set-admin.js <nomor>` di folder backend.
 - ⏳ **Ditunda (permintaan user):** penukaran stamp digital & belanja poin.
-- ⏳ **Belum:** keystore rilis + AAB, pengujian otomatis, manajemen stok.
+- ✅ **Refund tunai** live (backend `POST /admin/orders/:id/refund` + tombol di detail pesanan admin); migrasi 012 terpasang. Masih **tunai-only** (QRIS/Saldo belum).
+- ⏳ **Belum:** keystore rilis + AAB, manajemen stok, refund QRIS/Saldo beraudit.
 
 ### Cara cepat verifikasi skema/DB (tanpa psql)
 Buat skrip sekali pakai **di dalam folder backend** (agar `node_modules` ter-resolve), pakai client yang sudah ada:

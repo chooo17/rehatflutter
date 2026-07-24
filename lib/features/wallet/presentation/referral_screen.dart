@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../../../core/analytics/analytics_service.dart';
+
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/network/api_exception.dart';
@@ -99,8 +101,11 @@ class ReferralScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 16),
             FilledButton.icon(
-              onPressed: () => Share.share(
-                  'Pakai kode ${r.code} di aplikasi Rehat Coffeehouse, kita berdua dapat diskon ${r.rewardPct}%! ☕'),
+              onPressed: () {
+                Analytics.referralShare();
+                Share.share(
+                    'Pakai kode ${r.code} di aplikasi Rehat Coffeehouse, kita berdua dapat diskon ${r.rewardPct}%! ☕');
+              },
               icon: const Icon(Icons.share_rounded, size: 20),
               label: const Text('Bagikan kode'),
               style: FilledButton.styleFrom(

@@ -4,8 +4,10 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/analytics/analytics_service.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
+import '../../../core/network/api_exception.dart';
 import '../../../core/router/route_names.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../shared/models/loyalty_model.dart';
@@ -49,18 +51,32 @@ class LoyaltyScreen extends ConsumerWidget {
                 label: const Text('Riwayat poin'),
               ),
             ),
+            const SizedBox(height: 20),
+            Text('Tukar Poin jadi Voucher', style: AppTextStyles.displaySmall),
+            const SizedBox(height: 4),
+            Text(
+              'Punya ${summary.points} poin. Tukar jadi voucher diskon untuk checkout.',
+              style: AppTextStyles.bodyMedium
+                  .copyWith(color: AppColors.textSecondary),
+            ),
             const SizedBox(height: 12),
+            _RedeemPointsRow(points: summary.points),
+            const SizedBox(height: 20),
             Text('Stamp Card', style: AppTextStyles.displaySmall),
             const SizedBox(height: 4),
             Text(
               summary.stampsToReward == 0
-                  ? 'Stamp penuh! Tukarkan kopi gratismu.'
+                  ? 'Stamp penuh! Tunjukkan ke kasir untuk tukar kopi gratis.'
                   : '${summary.stampsToReward} stamp lagi menuju kopi gratis.',
               style: AppTextStyles.bodyMedium
                   .copyWith(color: AppColors.textSecondary),
             ),
             const SizedBox(height: 12),
             _StampCard(summary: summary),
+            if (summary.redeemableRewards > 0) ...[
+              const SizedBox(height: 14),
+              _RedeemStampButton(count: summary.redeemableRewards),
+            ],
             const SizedBox(height: 28),
             Text('Voucher Saya', style: AppTextStyles.displaySmall),
             const SizedBox(height: 12),
@@ -125,10 +141,209 @@ class _PointsHeader extends StatelessWidget {
           const SizedBox(height: 18),
           Text('${summary.points}',
               style: AppTextStyles.displayLarge.copyWith(color: AppColors.crema)),
-          Text('Poin tersedia',
+          Text('Poin terkumpul • menentukan tier-mu',
               style: AppTextStyles.bodyMedium
                   .copyWith(color: AppColors.crema.withValues(alpha: 0.75))),
         ],
+      ),
+    );
+  }
+}
+
+/// Tombol tukar stamp → voucher gratis 1 minuman. Muncul saat hadiah siap.
+class _RedeemStampButton extends ConsumerStatefulWidget {
+  const _RedeemStampButton({required this.count});
+  final int count;
+
+  @override
+  ConsumerState<_RedeemStampButton> createState() => _RedeemStampButtonState();
+}
+
+class _RedeemStampButtonState extends ConsumerState<_RedeemStampButton> {
+  bool _submitting = false;
+
+  Future<void> _redeem() async {
+    if (_submitting) return;
+    final messenger = ScaffoldMessenger.of(context);
+    setState(() => _submitting = true);
+    try {
+      await ref.read(loyaltyRepositoryProvider).redeemStamp();
+      Analytics.redeemStamp();
+      // Segarkan ringkasan (stamp berkurang) & daftar voucher (voucher baru).
+      ref.invalidate(loyaltySummaryProvider);
+      ref.invalidate(vouchersProvider);
+      ref.read(authControllerProvider.notifier).refreshUser();
+      if (!mounted) return;
+      messenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(const SnackBar(
+            content: Text(
+                'Voucher gratis 1 minuman dibuat! Tunjukkan ke kasir untuk menukar.')));
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      messenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text(e.message)));
+    } catch (_) {
+      if (!mounted) return;
+      messenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+            const SnackBar(content: Text('Gagal menukar stamp. Coba lagi.')));
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return NeuButton(
+      expand: true,
+      accent: true,
+      onPressed: _submitting ? null : _redeem,
+      child: _submitting
+          ? const SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(
+                  strokeWidth: 2.4, color: Colors.white))
+          : Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.local_cafe_rounded,
+                    size: 18, color: Colors.white),
+                const SizedBox(width: 8),
+                Text(
+                  widget.count > 1
+                      ? 'Tukar kopi gratis (${widget.count})'
+                      : 'Tukar kopi gratis',
+                  style: AppTextStyles.button.copyWith(color: Colors.white),
+                ),
+              ],
+            ),
+    );
+  }
+}
+
+/// Baris 3 opsi tukar poin → voucher diskon (10/20/30%).
+class _RedeemPointsRow extends ConsumerStatefulWidget {
+  const _RedeemPointsRow({required this.points});
+  final int points;
+
+  @override
+  ConsumerState<_RedeemPointsRow> createState() => _RedeemPointsRowState();
+}
+
+class _RedeemPointsRowState extends ConsumerState<_RedeemPointsRow> {
+  // pct → biaya poin (samakan dgn backend POINT_COSTS).
+  static const _costs = {10: 200, 20: 400, 30: 600};
+  int? _submittingPct;
+
+  Future<void> _redeem(int pct) async {
+    if (_submittingPct != null) return;
+    final messenger = ScaffoldMessenger.of(context);
+    setState(() => _submittingPct = pct);
+    try {
+      await ref.read(loyaltyRepositoryProvider).redeemPoints(pct);
+      Analytics.redeemPoints(discountPct: pct);
+      ref.invalidate(loyaltySummaryProvider);
+      ref.invalidate(vouchersProvider);
+      ref.read(authControllerProvider.notifier).refreshUser();
+      if (!mounted) return;
+      messenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(
+            content: Text('Voucher diskon $pct% dibuat! Cek "Voucher Saya".')));
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      messenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text(e.message)));
+    } catch (_) {
+      if (!mounted) return;
+      messenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+            const SnackBar(content: Text('Gagal menukar poin. Coba lagi.')));
+    } finally {
+      if (mounted) setState(() => _submittingPct = null);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        for (final pct in _costs.keys) ...[
+          Expanded(
+            child: _RedeemPointsCard(
+              pct: pct,
+              cost: _costs[pct]!,
+              affordable: widget.points >= _costs[pct]!,
+              busy: _submittingPct == pct,
+              disabled: _submittingPct != null,
+              onTap: () => _redeem(pct),
+            ),
+          ),
+          if (pct != _costs.keys.last) const SizedBox(width: 10),
+        ],
+      ],
+    );
+  }
+}
+
+class _RedeemPointsCard extends StatelessWidget {
+  const _RedeemPointsCard({
+    required this.pct,
+    required this.cost,
+    required this.affordable,
+    required this.busy,
+    required this.disabled,
+    required this.onTap,
+  });
+
+  final int pct;
+  final int cost;
+  final bool affordable;
+  final bool busy;
+  final bool disabled;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = affordable && !disabled;
+    return Semantics(
+      button: true,
+      enabled: enabled,
+      label: 'Tukar $cost poin jadi voucher diskon $pct persen',
+      child: InkWell(
+        onTap: enabled ? onTap : null,
+        borderRadius: BorderRadius.circular(16),
+        child: NeuCard(
+          radius: 16,
+          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
+          child: Column(
+            children: [
+              Text('$pct%',
+                  style: AppTextStyles.displaySmall.copyWith(
+                    color: affordable ? AppColors.amberDark : AppColors.textSecondary,
+                  )),
+              const SizedBox(height: 4),
+              busy
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2.2, color: AppColors.amber))
+                  : Text('$cost poin',
+                      style: AppTextStyles.caption.copyWith(
+                        color: affordable
+                            ? AppColors.textSecondary
+                            : AppColors.error,
+                      )),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -300,15 +515,25 @@ class _VoucherCard extends StatelessWidget {
     if (voucher.isUsed) {
       return Padding(
         padding: const EdgeInsets.only(left: 8),
-        child: Text('Terpakai',
-            style: AppTextStyles.caption.copyWith(color: AppColors.textSecondary)),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Icon(Icons.check_circle_outline_rounded,
+              size: 14, color: AppColors.textSecondary),
+          const SizedBox(width: 4),
+          Text('Terpakai',
+              style: AppTextStyles.caption
+                  .copyWith(color: AppColors.textSecondary)),
+        ]),
       );
     }
     if (voucher.isExpired) {
       return Padding(
         padding: const EdgeInsets.only(left: 8),
-        child: Text('Kedaluwarsa',
-            style: AppTextStyles.caption.copyWith(color: AppColors.error)),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          const Icon(Icons.schedule_rounded, size: 14, color: AppColors.error),
+          const SizedBox(width: 4),
+          Text('Kedaluwarsa',
+              style: AppTextStyles.caption.copyWith(color: AppColors.error)),
+        ]),
       );
     }
     return IconButton(

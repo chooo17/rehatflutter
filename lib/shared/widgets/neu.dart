@@ -103,6 +103,7 @@ class NeuButton extends StatelessWidget {
     this.radius = 16,
     this.padding = const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
     this.expand = false,
+    this.minSize,
   });
 
   final Widget child;
@@ -111,6 +112,10 @@ class NeuButton extends StatelessWidget {
   final double radius;
   final EdgeInsets padding;
   final bool expand;
+
+  /// Ukuran sentuh minimum (px) — jaga target tap ≥44 untuk aksesibilitas
+  /// tanpa harus menggemukkan padding visual.
+  final double? minSize;
 
   @override
   Widget build(BuildContext context) {
@@ -130,15 +135,21 @@ class NeuButton extends StatelessWidget {
       child: InkWell(
         onTap: onPressed,
         borderRadius: BorderRadius.circular(radius),
-        child: Padding(
-          padding: padding,
-          // heightFactor 1 → tombol membungkus tinggi isinya (lihat catatan
-          // NeuButton height); widthFactor dilepas saat [expand].
-          child: Align(
-            alignment: Alignment.center,
-            heightFactor: 1,
-            widthFactor: expand ? null : 1,
-            child: child,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            minWidth: minSize ?? 0,
+            minHeight: minSize ?? 0,
+          ),
+          child: Padding(
+            padding: padding,
+            // heightFactor 1 → tombol membungkus tinggi isinya (lihat catatan
+            // NeuButton height); widthFactor dilepas saat [expand].
+            child: Align(
+              alignment: Alignment.center,
+              heightFactor: 1,
+              widthFactor: expand ? null : 1,
+              child: child,
+            ),
           ),
         ),
       ),

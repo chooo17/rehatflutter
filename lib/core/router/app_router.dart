@@ -1,6 +1,9 @@
+import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+
+import '../analytics/analytics_service.dart';
 
 import '../../features/admin/presentation/admin_banners_screen.dart';
 import '../../features/admin/presentation/admin_dashboard_screen.dart';
@@ -8,6 +11,9 @@ import '../../features/admin/presentation/saved_orders_screen.dart';
 import '../../features/printer/presentation/printer_settings_screen.dart';
 import '../../features/admin/presentation/admin_menu_images_screen.dart';
 import '../../features/admin/presentation/admin_menu_cost_screen.dart';
+import '../../features/admin/presentation/admin_menu_manage_screen.dart';
+import '../../features/admin/presentation/admin_qr_tables_screen.dart';
+import '../../features/loyalty/presentation/free_drink_redeem_screen.dart';
 import '../../features/admin/presentation/closing_report_screen.dart';
 import '../../features/admin/presentation/customer_segments_screen.dart';
 import '../../features/admin/presentation/admin_analytics_screen.dart';
@@ -53,6 +59,11 @@ final routerProvider = Provider<GoRouter>((ref) {
     navigatorKey: rootKey,
     initialLocation: RouteNames.splashPath,
     refreshListenable: refresh,
+    // Lacak screen_view otomatis bila analitik aktif (mobile). No-op di web.
+    observers: [
+      if (Analytics.instance != null)
+        FirebaseAnalyticsObserver(analytics: Analytics.instance!),
+    ],
     redirect: (context, state) {
       final auth = ref.read(authControllerProvider);
       final loc = state.matchedLocation;
@@ -271,6 +282,21 @@ final routerProvider = Provider<GoRouter>((ref) {
                     path: 'admin-menu-cost',
                     name: RouteNames.adminMenuCost,
                     builder: (context, state) => const AdminMenuCostScreen(),
+                  ),
+                  GoRoute(
+                    path: 'free-drink-redeem',
+                    name: RouteNames.freeDrinkRedeem,
+                    builder: (context, state) => const FreeDrinkRedeemScreen(),
+                  ),
+                  GoRoute(
+                    path: 'admin-menu-manage',
+                    name: RouteNames.adminMenuManage,
+                    builder: (context, state) => const AdminMenuManageScreen(),
+                  ),
+                  GoRoute(
+                    path: 'admin-qr-tables',
+                    name: RouteNames.adminQrTables,
+                    builder: (context, state) => const AdminQrTablesScreen(),
                   ),
                   GoRoute(
                     path: 'closing-report',

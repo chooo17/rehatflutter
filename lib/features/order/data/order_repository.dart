@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/api_constants.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../core/utils/app_lifecycle.dart';
+import '../../../core/utils/formatters.dart';
 import '../../../shared/models/cart_item_model.dart';
 import '../../../shared/models/order_model.dart';
 import '../../auth/application/auth_controller.dart';
@@ -85,6 +86,7 @@ class OrderRepository {
     OrderType orderType = OrderType.dineIn,
     String? voucherCode,
     String? notes,
+    String? tableNumber,
   }) async {
     final payload = {
       'items': [
@@ -100,6 +102,8 @@ class OrderRepository {
       'order_type': orderType.apiValue,
       if (voucherCode != null && voucherCode.isNotEmpty) 'voucher_code': voucherCode,
       if (notes != null && notes.trim().isNotEmpty) 'notes': notes.trim(),
+      if (tableNumber != null && tableNumber.trim().isNotEmpty)
+        'table_number': tableNumber.trim(),
     };
 
     final res = await _client.post<dynamic>(ApiConstants.orders, data: payload);
@@ -114,6 +118,7 @@ class OrderRepository {
     String? notes,
     required String guestName,
     String? guestPhone,
+    String? tableNumber,
   }) async {
     final payload = {
       'items': [
@@ -131,6 +136,8 @@ class OrderRepository {
       'guest_name': guestName.trim(),
       if (guestPhone != null && guestPhone.trim().isNotEmpty)
         'guest_phone': guestPhone.trim(),
+      if (tableNumber != null && tableNumber.trim().isNotEmpty)
+        'table_number': tableNumber.trim(),
     };
     final res =
         await _client.post<dynamic>(ApiConstants.ordersGuest, data: payload);
@@ -440,7 +447,8 @@ final adminOrderDetailProvider =
 /// (Admin) Pesanan BELUM BAYAR **hari ini** — disimpan/bayar-nanti (tunai) &
 /// QRIS menunggu. Sumber untuk pintasan "Pesanan Belum Bayar" di beranda.
 final pendingOrdersProvider = FutureProvider<List<OrderModel>>((ref) {
-  final now = DateTime.now();
+  // "Hari ini" harus WIB (bukan jam perangkat) — konsisten dgn CLAUDE.md §5d.
+  final now = Formatters.toWib(DateTime.now());
   final today = '${now.year.toString().padLeft(4, '0')}-'
       '${now.month.toString().padLeft(2, '0')}-'
       '${now.day.toString().padLeft(2, '0')}';

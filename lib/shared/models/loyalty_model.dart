@@ -12,6 +12,7 @@ class LoyaltySummary {
     this.nextTier,
     this.pointsToNext = 0,
     this.lifetimeOrders = 0,
+    this.redeemableRewards = 0,
   });
 
   final int points;
@@ -37,6 +38,10 @@ class LoyaltySummary {
   /// Total pesanan selesai sepanjang waktu.
   final int lifetimeOrders;
 
+  /// Jumlah hadiah (kopi gratis) yang siap ditukar sekarang (backend:
+  /// `redeemable_rewards`). > 0 → tombol "Tukar kopi gratis" aktif.
+  final int redeemableRewards;
+
   /// Progres stamp 0.0–1.0 pada kartu berjalan.
   double get stampProgress {
     if (stampTarget <= 0) return 0;
@@ -61,6 +66,7 @@ class LoyaltySummary {
       nextTier: json['next_tier']?.toString(),
       pointsToNext: _asInt(json['points_to_next']),
       lifetimeOrders: _asInt(json['lifetime_orders']),
+      redeemableRewards: _asInt(json['redeemable_rewards']),
     );
   }
 

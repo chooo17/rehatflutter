@@ -82,6 +82,15 @@ class RouteNames {
   static const String adminMenuCost = 'admin-menu-cost';
   static const String adminMenuCostPath = '/profile/admin-menu-cost';
 
+  static const String freeDrinkRedeem = 'free-drink-redeem';
+  static const String freeDrinkRedeemPath = '/profile/free-drink-redeem';
+
+  static const String adminMenuManage = 'admin-menu-manage';
+  static const String adminMenuManagePath = '/profile/admin-menu-manage';
+
+  static const String adminQrTables = 'admin-qr-tables';
+  static const String adminQrTablesPath = '/profile/admin-qr-tables';
+
   static const String closingReport = 'closing-report';
   static const String closingReportPath = '/profile/closing-report';
 

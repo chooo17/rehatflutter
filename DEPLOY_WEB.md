@@ -1,4 +1,12 @@
-# Deploy Web — Rehat (embed di rehat-coffeehouse.my.id)
+> ⚠️ **DOKUMEN LAMA / TIDAK AKTIF (per Juli 2026).**
+> Pendekatan embed-iframe di subdomain `rehat-coffeehouse.my.id` **sudah ditinggalkan**.
+> Web live satu-satunya sekarang: **Vercel** (`rehatflutter.vercel.app`).
+> Prosedur deploy yang benar ada di [`CLAUDE.md` §3](CLAUDE.md) & `scripts/deploy_web.sh`.
+> Disimpan hanya sebagai arsip. **Jangan diikuti.**
+
+---
+
+# Deploy Web — Rehat (embed di rehat-coffeehouse.my.id) — [ARSIP]
 
 App Flutter ini di-host sebagai web statis di subdomain, lalu di-embed lewat
 `<iframe>` pada halaman `/preorder` situs Next.js (var `NEXT_PUBLIC_ORDER_APP_URL`).

@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_text_styles.dart';
-import '../../../../core/network/api_exception.dart';
 import '../../../../core/router/route_names.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../../../shared/models/order_model.dart';
@@ -12,8 +11,8 @@ import '../../../../shared/widgets/neu.dart';
 import '../../../order/application/checkout_controller.dart';
 import '../../../order/data/order_repository.dart';
 import '../../../printer/application/printer_controller.dart';
-import '../../../wallet/data/wallet_repository.dart';
 import '../../application/cart_controller.dart';
+import '../../application/cashier_controller.dart';
 
 /// Aksi kasir (admin) untuk isi keranjang saat ini: pilih tipe pesanan, nama
 /// pelanggan, lalu bayar **Tunai**, **QRIS**, atau **Simpan (Bayar Nanti)**.
@@ -25,12 +24,9 @@ class CashierActions extends ConsumerStatefulWidget {
   ConsumerState<CashierActions> createState() => _CashierActionsState();
 }
 
-enum _Mode { cash, qris, balance, save }
-
 class _CashierActionsState extends ConsumerState<CashierActions> {
   final _nameController = TextEditingController();
   OrderType _orderType = OrderType.dineIn;
-  bool _submitting = false;
   String? _nameError;
 
   @override
@@ -39,9 +35,10 @@ class _CashierActionsState extends ConsumerState<CashierActions> {
     super.dispose();
   }
 
-  Future<void> _submit(_Mode mode) async {
+  Future<void> _submit(CashierPayMode mode) async {
     final items = ref.read(cartControllerProvider);
-    if (items.isEmpty || _submitting) return;
+    final submitting = ref.read(cashierControllerProvider).isSubmitting;
+    if (items.isEmpty || submitting) return;
     final messenger = ScaffoldMessenger.of(context);
     // Nama pelanggan WAJIB — dipakai di struk, notifikasi, & pengumuman grup.
     if (_nameController.text.trim().length < 2) {
@@ -52,57 +49,35 @@ class _CashierActionsState extends ConsumerState<CashierActions> {
             const SnackBar(content: Text('Isi nama pelanggan dulu ya.')));
       return;
     }
-    setState(() {
-      _nameError = null;
-      _submitting = true;
-    });
-    try {
-      final result = await ref.read(orderRepositoryProvider).createCashierOrder(
-            items: items,
-            orderType: _orderType,
-            customerName: _nameController.text,
-            payNow: mode == _Mode.cash,
-            paymentMethod:
-                mode == _Mode.qris ? PaymentMethod.qris : PaymentMethod.cash,
-          );
-      // Bayar pakai saldo admin: potong saldo & tandai lunas. Bila saldo kurang,
-      // ApiException dilempar → pesanan tetap dibuat (pending), tampilkan pesan.
-      if (mode == _Mode.balance) {
-        await ref
-            .read(walletRepositoryProvider)
-            .adminPayWithBalance(result.orderId);
-      }
-      ref.invalidate(adminOrdersProvider);
-      ref.invalidate(pendingOrdersProvider);
-      ref.read(cartControllerProvider.notifier).clear();
-      if (!mounted) return;
-      setState(() {
-        _submitting = false;
-        _nameController.clear();
-      });
-      if (mode == _Mode.qris) {
-        // Tampilkan QR (SNAP) + polling status di layar konfirmasi.
-        ref.read(lastCheckoutResultProvider.notifier).state = result;
-        context.pushNamed(RouteNames.confirmation, extra: result);
-      } else {
-        // Tunai / Saldo (lunas) → auto-cetak struk bila printer siap.
-        final paid = mode == _Mode.cash || mode == _Mode.balance;
-        if (paid) await _autoPrint(result.orderId);
-        await _showResult(result, paid: paid);
-      }
-    } on ApiException catch (e) {
-      if (!mounted) return;
-      setState(() => _submitting = false);
+    setState(() => _nameError = null);
+
+    // Pembuatan pesanan + potong saldo (dgn penjaga anti-pesanan-ganda) hidup
+    // di CashierController agar teruji unit — widget hanya mengurus UI.
+    final result = await ref.read(cashierControllerProvider.notifier).submit(
+          mode: mode,
+          customerName: _nameController.text,
+          orderType: _orderType,
+        );
+    if (!mounted) return;
+    if (result == null) {
+      final err = ref.read(cashierControllerProvider).errorMessage ??
+          'Gagal membuat pesanan. Coba lagi.';
       messenger
         ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(content: Text(e.message)));
-    } catch (_) {
-      if (!mounted) return;
-      setState(() => _submitting = false);
-      messenger
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-            const SnackBar(content: Text('Gagal membuat pesanan. Coba lagi.')));
+        ..showSnackBar(SnackBar(content: Text(err)));
+      return;
+    }
+
+    _nameController.clear();
+    if (mode == CashierPayMode.qris) {
+      // Tampilkan QR (SNAP) + polling status di layar konfirmasi.
+      ref.read(lastCheckoutResultProvider.notifier).state = result;
+      context.pushNamed(RouteNames.confirmation, extra: result);
+    } else {
+      // Tunai / Saldo (lunas) → auto-cetak struk bila printer siap.
+      final paid = mode == CashierPayMode.cash || mode == CashierPayMode.balance;
+      if (paid) await _autoPrint(result.orderId);
+      await _showResult(result, paid: paid);
     }
   }
 
@@ -178,7 +153,9 @@ class _CashierActionsState extends ConsumerState<CashierActions> {
   Widget build(BuildContext context) {
     final total = ref.watch(cartTotalProvider);
     final empty = ref.watch(cartIsEmptyProvider);
-    final disabled = _submitting || empty;
+    final submitting =
+        ref.watch(cashierControllerProvider.select((s) => s.isSubmitting));
+    final disabled = submitting || empty;
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -251,7 +228,7 @@ class _CashierActionsState extends ConsumerState<CashierActions> {
           ],
         ),
         const SizedBox(height: 12),
-        if (_submitting)
+        if (submitting)
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 8),
             child: Center(
@@ -269,7 +246,8 @@ class _CashierActionsState extends ConsumerState<CashierActions> {
                 child: NeuButton(
                   expand: true,
                   accent: true,
-                  onPressed: disabled ? null : () => _submit(_Mode.cash),
+                  onPressed:
+                      disabled ? null : () => _submit(CashierPayMode.cash),
                   child: Text('Tunai',
                       style: AppTextStyles.button.copyWith(color: Colors.white)),
                 ),
@@ -278,7 +256,8 @@ class _CashierActionsState extends ConsumerState<CashierActions> {
               Expanded(
                 child: NeuButton(
                   expand: true,
-                  onPressed: disabled ? null : () => _submit(_Mode.qris),
+                  onPressed:
+                      disabled ? null : () => _submit(CashierPayMode.qris),
                   child: Text('QRIS',
                       style: AppTextStyles.button
                           .copyWith(color: AppColors.textPrimary)),
@@ -289,7 +268,7 @@ class _CashierActionsState extends ConsumerState<CashierActions> {
           const SizedBox(height: 8),
           NeuButton(
             expand: true,
-            onPressed: disabled ? null : () => _submit(_Mode.balance),
+            onPressed: disabled ? null : () => _submit(CashierPayMode.balance),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -305,7 +284,7 @@ class _CashierActionsState extends ConsumerState<CashierActions> {
           const SizedBox(height: 8),
           NeuButton(
             expand: true,
-            onPressed: disabled ? null : () => _submit(_Mode.save),
+            onPressed: disabled ? null : () => _submit(CashierPayMode.save),
             child: Text('Simpan (Bayar Nanti)',
                 style:
                     AppTextStyles.button.copyWith(color: AppColors.textPrimary)),

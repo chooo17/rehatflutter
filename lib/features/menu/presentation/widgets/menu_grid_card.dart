@@ -105,6 +105,7 @@ class MenuGridCard extends StatelessWidget {
                             accent: item.isAvailable,
                             radius: 12,
                             padding: const EdgeInsets.all(7),
+                            minSize: 44, // target sentuh a11y
                             child: Icon(Icons.add_rounded,
                                 color: item.isAvailable
                                     ? Colors.white

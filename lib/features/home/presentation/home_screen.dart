@@ -157,7 +157,7 @@ class _PointsCard extends StatelessWidget {
             child: _stat(
               icon: Icons.stars_rounded,
               value: '$points',
-              label: 'Poin kamu',
+              label: 'Poin terkumpul',
             ),
           ),
           Container(width: 1, height: 40, color: AppColors.border),

@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/analytics/analytics_service.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../core/storage/secure_storage.dart';
@@ -129,6 +130,7 @@ class AuthController extends Notifier<AuthState> {
         user: user,
         isSubmitting: false,
       );
+      Analytics.signUp();
       return true;
     } on ApiException catch (e) {
       state = state.copyWith(isSubmitting: false, errorMessage: e.message);
@@ -164,6 +166,7 @@ class AuthController extends Notifier<AuthState> {
         user: user,
         isSubmitting: false,
       );
+      Analytics.login();
       return true;
     } on ApiException catch (e) {
       state = state.copyWith(isSubmitting: false, errorMessage: e.message);

@@ -203,6 +203,10 @@ class _Body extends StatelessWidget {
           child: Column(
             children: [
               _summaryRow('Tipe pesanan', order.orderType.label),
+              if (order.tableNumber != null) ...[
+                const SizedBox(height: 8),
+                _summaryRow('Meja', order.tableNumber!),
+              ],
               const SizedBox(height: 8),
               if (order.paymentMethod != null)
                 _summaryRow('Pembayaran', order.paymentMethod!.toUpperCase()),

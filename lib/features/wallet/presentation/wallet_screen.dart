@@ -130,17 +130,27 @@ class _TopupChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-        decoration: BoxDecoration(
-          color: AppColors.surface,
+    return Semantics(
+      button: true,
+      label: 'Isi saldo ${Formatters.rupiah(amount)}',
+      child: Material(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          onTap: onTap,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppColors.amber, width: 1.4),
+          child: Container(
+            constraints: const BoxConstraints(minHeight: 44),
+            alignment: Alignment.center,
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.amber, width: 1.4),
+            ),
+            child: Text('+ ${Formatters.rupiah(amount)}',
+                style: AppTextStyles.label.copyWith(color: AppColors.amberDark)),
+          ),
         ),
-        child: Text('+ ${Formatters.rupiah(amount)}',
-            style: AppTextStyles.label.copyWith(color: AppColors.amberDark)),
       ),
     );
   }

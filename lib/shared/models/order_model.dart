@@ -1,21 +1,31 @@
 import 'package:flutter/material.dart';
 
+import '../../core/constants/app_colors.dart';
 import '../../core/utils/customization_labels.dart';
 
 /// Status pesanan beserta label & warna tampilannya.
+///
+/// Warna disimpan berpasangan (terang, gelap). Di mode gelap dipakai varian
+/// yang lebih terang agar kontras tetap memadai di atas latar gelap — status
+/// `completed`/`refunded` yang redup dulunya nyaris tak terbaca di dark mode.
 enum OrderStatus {
-  pending('Menunggu pembayaran', Color(0xFFC9831F)),
-  paid('Dibayar', Color(0xFF3E7C5A)),
-  preparing('Diproses', Color(0xFFB47832)),
-  ready('Siap diambil', Color(0xFF3E7C5A)),
-  completed('Selesai', Color(0xFF6E5F54)),
-  cancelled('Dibatalkan', Color(0xFFB3261E)),
-  refunded('Dikembalikan', Color(0xFF9A6A00));
+  pending('Menunggu pembayaran', Color(0xFFC9831F), Color(0xFFE6A94E)),
+  paid('Dibayar', Color(0xFF3E7C5A), Color(0xFF6FB894)),
+  preparing('Diproses', Color(0xFFB47832), Color(0xFFDAA35A)),
+  ready('Siap diambil', Color(0xFF3E7C5A), Color(0xFF6FB894)),
+  completed('Selesai', Color(0xFF6E5F54), Color(0xFFB3A296)),
+  cancelled('Dibatalkan', Color(0xFFB3261E), Color(0xFFE06A5F)),
+  refunded('Dikembalikan', Color(0xFF9A6A00), Color(0xFFD9A63A));
 
-  const OrderStatus(this.label, this.color);
+  const OrderStatus(this.label, this._light, this._dark);
 
   final String label;
-  final Color color;
+  final Color _light;
+  final Color _dark;
+
+  /// Warna status sesuai tema aktif (baca [AppColors.brightness]).
+  Color get color =>
+      AppColors.brightness == Brightness.dark ? _dark : _light;
 
   /// Nilai yang dikirim ke backend (backend memakai 'processing', bukan 'preparing').
   String get apiValue => this == OrderStatus.preparing ? 'processing' : name;
@@ -187,6 +197,7 @@ class OrderModel {
     this.notes = '',
     this.customerName = '',
     this.customerPhone = '',
+    this.tableNumber,
   });
 
   final String id;
@@ -224,6 +235,9 @@ class OrderModel {
   final String customerName;
   final String customerPhone;
 
+  /// Nomor meja (dari QR meja, dine-in). null bila bukan dari QR meja.
+  final String? tableNumber;
+
   factory OrderModel.fromJson(Map<String, dynamic> json) {
     final rawItems = json['items'];
     return OrderModel(
@@ -250,6 +264,9 @@ class OrderModel {
       notes: (json['notes'] ?? '').toString(),
       customerName: (json['customer_name'] ?? '').toString(),
       customerPhone: (json['customer_phone'] ?? '').toString(),
+      tableNumber: (json['table_number']?.toString().isNotEmpty ?? false)
+          ? json['table_number'].toString()
+          : null,
     );
   }
 

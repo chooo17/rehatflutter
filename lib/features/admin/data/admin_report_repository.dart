@@ -65,6 +65,8 @@ class SalesReport {
     required this.avgOrderValue,
     required this.series,
     required this.topItems,
+    this.stampRedemptions,
+    this.stampRedemptionsUsed,
   });
 
   final String range;
@@ -94,6 +96,11 @@ class SalesReport {
   final List<SalesPoint> series;
   final List<TopItem> topItems;
 
+  /// KPI penukaran stamp (di luar omzet/biaya): kopi gratis diterbitkan &
+  /// berapa yang sudah terpakai. null bila backend belum menyediakan.
+  final int? stampRedemptions;
+  final int? stampRedemptionsUsed;
+
   factory SalesReport.fromJson(Map<String, dynamic> j) {
     final summary = (j['summary'] is Map)
         ? Map<String, dynamic>.from(j['summary'] as Map)
@@ -122,8 +129,18 @@ class SalesReport {
           .whereType<Map>()
           .map((e) => TopItem.fromJson(Map<String, dynamic>.from(e)))
           .toList(),
+      stampRedemptions: _intOrNull(summary['stamp_redemptions']),
+      stampRedemptionsUsed: _intOrNull(summary['stamp_redemptions_used']),
     );
   }
+}
+
+int? _intOrNull(dynamic v) {
+  if (v == null) return null;
+  if (v is int) return v;
+  if (v is num) return v.toInt();
+  if (v is String) return int.tryParse(v);
+  return null;
 }
 
 int _int(dynamic v) {

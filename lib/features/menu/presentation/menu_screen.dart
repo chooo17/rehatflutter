@@ -220,6 +220,7 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
                     radius: 20,
                     padding:
                         const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    minSize: 44, // target sentuh a11y
                     child: Text(
                       cat.name,
                       style: AppTextStyles.caption.copyWith(

@@ -34,6 +34,19 @@ class LoyaltyRepository {
     return const [];
   }
 
+  /// Tukar 9 stamp → voucher gratis 1 minuman (`POST /loyalty/stamps/redeem`).
+  Future<void> redeemStamp() async {
+    await _client.post<dynamic>(ApiConstants.loyaltyStampRedeem);
+  }
+
+  /// Tukar poin → voucher diskon (`POST /loyalty/points/redeem`).
+  Future<void> redeemPoints(int discountPct) async {
+    await _client.post<dynamic>(
+      ApiConstants.loyaltyPointsRedeem,
+      data: {'discountPct': discountPct},
+    );
+  }
+
   /// Riwayat transaksi poin (`GET /loyalty/history`).
   Future<List<LoyaltyHistoryEntry>> fetchHistory() async {
     final res = await _client.get<dynamic>(ApiConstants.loyaltyHistory);

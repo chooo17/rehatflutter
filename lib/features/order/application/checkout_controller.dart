@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/analytics/analytics_service.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../shared/models/cart_item_model.dart';
 import '../../../shared/models/order_model.dart';
@@ -7,6 +8,7 @@ import '../../auth/application/auth_controller.dart';
 import '../../wallet/data/wallet_repository.dart';
 import '../../menu/application/cart_controller.dart';
 import '../data/order_repository.dart';
+import 'table_provider.dart';
 
 /// Pilihan checkout + status pengiriman pesanan.
 class CheckoutState {
@@ -174,23 +176,30 @@ class CheckoutController extends Notifier<CheckoutState> {
       final reusable = state.pendingSignature == signature
           ? state.pendingOrder
           : null;
+      // QR meja: bila pelanggan datang lewat scan QR (?table=N), pesanan
+      // otomatis dine-in & nomor meja ikut terkirim.
+      final table = ref.read(tableNumberProvider);
+      final effectiveType =
+          table != null ? OrderType.dineIn : state.orderType;
       final result = reusable ??
           (isGuest
               ? await repo.createGuestOrder(
                   items: items,
                   paymentMethod: state.paymentMethod,
-                  orderType: state.orderType,
+                  orderType: effectiveType,
                   notes: state.notes.isEmpty ? null : state.notes,
                   guestName: guestName!,
                   guestPhone: guestPhone,
+                  tableNumber: table,
                 )
               : await repo.createOrder(
                   items: items,
                   paymentMethod: state.paymentMethod,
-                  orderType: state.orderType,
+                  orderType: effectiveType,
                   voucherCode:
                       state.voucherCode.isEmpty ? null : state.voucherCode,
                   notes: state.notes.isEmpty ? null : state.notes,
+                  tableNumber: table,
                 ));
       // Bayar pakai Saldo Rehat: langsung potong saldo & tandai lunas.
       //
@@ -215,6 +224,10 @@ class CheckoutController extends Notifier<CheckoutState> {
           return null;
         }
       }
+      Analytics.orderCreated(
+          value: result.total,
+          paymentMethod: state.paymentMethod.name,
+          source: 'app');
       // Simpan hasil dulu agar layar konfirmasi bisa membacanya meski router refresh.
       ref.read(lastCheckoutResultProvider.notifier).state = result;
       ref.read(cartControllerProvider.notifier).clear();
