@@ -389,18 +389,26 @@ final ordersTrackingProvider =
   final isAdmin = ref.watch(
     authControllerProvider.select((s) => s.user?.isAdmin ?? false),
   );
+  // Hanya sesi TERAUTENTIKASI yang punya pesanan di GET /orders. TAMU / belum
+  // login TAK BOLEH menembak endpoint auth: 401-nya memicu interceptor
+  // menghapus sesi & menendang ke login (bug: pelacak di Menu men-trigger ini
+  // untuk tamu). `.select` agar polling tak restart pada perubahan state lain.
+  final isAuthed = ref.watch(
+    authControllerProvider
+        .select((s) => s.status == AuthStatus.authenticated),
+  );
   while (true) {
     List<OrderModel> list = const [];
     // Saat aplikasi di background JANGAN menembak backend — hemat kuota &
     // baterai. Kasir bisa membiarkan app terbuka berjam-jam; tanpa jeda ini
     // `fetchAllOrders` jalan tiap 3 dtk selamanya.
-    if (ref.read(appForegroundProvider)) {
+    if (isAuthed && ref.read(appForegroundProvider)) {
       try {
         list = isAdmin
             ? await repo.fetchAllOrders(limit: 50)
             : await repo.fetchHistory(limit: 20);
       } catch (_) {
-        // Tamu / belum login / jaringan gagal → daftar kosong.
+        // Jaringan gagal → daftar kosong.
       }
       yield list;
     }

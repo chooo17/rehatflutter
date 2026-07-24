@@ -40,6 +40,12 @@ class _FakeAuthController extends AuthController {
   void emit(AuthState next) => state = next;
 }
 
+/// Sesi TAMU (tanpa login).
+class _GuestAuthController extends AuthController {
+  @override
+  AuthState build() => const AuthState(status: AuthStatus.guest);
+}
+
 void main() {
   late _FakeOrderRepository repo;
   late ProviderContainer container;
@@ -72,6 +78,23 @@ void main() {
 
     await Future<void>.delayed(const Duration(milliseconds: 50));
 
+    expect(repo.totalCalls, 0);
+  });
+
+  test('mode TAMU TIDAK menembak /orders (cegah 401 → logout paksa → login)',
+      () async {
+    repo = _FakeOrderRepository();
+    container = ProviderContainer(overrides: [
+      orderRepositoryProvider.overrideWithValue(repo),
+      authControllerProvider.overrideWith(_GuestAuthController.new),
+      appForegroundProvider.overrideWith((ref) => true),
+    ]);
+    container.listen(ordersTrackingProvider, (_, __) {});
+
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+
+    // GET /orders butuh akun; tamu tak punya token → 401 memicu interceptor
+    // menghapus sesi & menendang ke login. Karena itu tamu TAK BOLEH menembaknya.
     expect(repo.totalCalls, 0);
   });
 
