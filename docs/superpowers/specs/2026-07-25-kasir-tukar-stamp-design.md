@@ -46,7 +46,7 @@ Fungsi `redeemStampForCustomer(userId)`:
   `.eq('redeemed_count', current)`. Bila 0 baris → `409 STAMP_REDEEM_CONFLICT` (aman dari
   balapan dengan tap pelanggan sendiri — 9 stamp tak terpotong dua kali).
 - Buat voucher **langsung terpakai**: `source='stamp'`, `reward_type='free_drink'`,
-  `discount_pct=100`, `is_used=true`, `used_at=now()`, `expires_at=+30h` (redundan tapi
+  `discount_pct=100`, `is_used=true`, `used_at=now()`, `expires_at=+30 hari` (redundan tapi
   konsisten skema). Bila insert gagal → rollback `redeemed_count`.
 - Catat `loyalty_history` (best-effort).
 - Kirim notifikasi (best-effort): judul "Kopi gratis ditukar ☕", body "1 kopi gratismu

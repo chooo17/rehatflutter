@@ -105,6 +105,9 @@ class ApiConstants {
   static const String freeDrinkVouchers = '/admin/free-drink-vouchers';
   static String freeDrinkVoucherUse(String id) =>
       '/admin/free-drink-vouchers/$id/use';
+  // Tukar stamp pelanggan dari sisi kasir: cari pelanggan siap-tukar & tukar+serah.
+  static const String stampLookup = '/admin/stamp-lookup';
+  static const String stampRedeem = '/admin/stamp-redeem';
 
   // Favorites -----------------------------------------------------------
   static const String favorites = '/favorites';
