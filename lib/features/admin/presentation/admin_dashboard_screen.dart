@@ -183,7 +183,11 @@ class _Report extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // KPI utama: omzet & laba bersih RIIL (omzet - HPP - pengeluaran).
+        // KPI utama: omzet & "Laba kotor - pengeluaran" (angka legacy dari
+        // endpoint /admin/reports/sales — masih menghitung ganda restock &
+        // belum memotong biaya tetap. Label SENGAJA bukan "Laba bersih" agar
+        // tidak bentrok dengan angka laba rugi modul Keuangan yang lebih
+        // akurat; lihat CLAUDE.md §4).
         Row(
           children: [
             Expanded(
@@ -198,7 +202,7 @@ class _Report extends StatelessWidget {
             Expanded(
               child: _KpiCard(
                 icon: Icons.savings_rounded,
-                label: 'Laba bersih',
+                label: 'Laba kotor − pengeluaran',
                 value: Formatters.rupiah(report.netProfit),
               ),
             ),

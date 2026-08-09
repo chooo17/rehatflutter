@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 
 import '../../../core/router/route_names.dart';
 import '../../../core/constants/app_colors.dart';
@@ -193,7 +194,12 @@ class _MonthPicker extends StatelessWidget {
         children: [
           IconButton(icon: const Icon(Icons.chevron_left), onPressed: () => shift(-1)),
           Text(
-            Formatters.tanggal(month).replaceAll(RegExp(r'^\d+\s'), ''),
+            // Format langsung dari year/month `month` — JANGAN lewat
+            // Formatters.tanggal (yang menerapkan toWib lagi). `month` sudah
+            // berupa DateTime(y, m) hasil field WIB; konversi toWib kedua
+            // kalinya menggeser tanggal mundur di zona timur WIB (WITA/WIT),
+            // membuat header salah bulan padahal datanya benar.
+            DateFormat('MMM yyyy', 'id_ID').format(DateTime(month.year, month.month)),
             style: Theme.of(context).textTheme.titleMedium,
           ),
           IconButton(icon: const Icon(Icons.chevron_right), onPressed: () => shift(1)),
