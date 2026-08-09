@@ -15,7 +15,8 @@ rentang **30 Juni – 9 Agustus 2026**), bukan asumsi.
 | Omzet total | Rp26.106.850 (944 pesanan, 31 hari aktif) |
 | Baseline harian | Rp1.279.198/hari (13 hari penuh terakhir, 27 Jul–8 Agt) |
 | Proyeksi bulanan | ≈ Rp38jt; dipakai konservatif **Rp36jt/bulan** |
-| HPP | Rp10.332.500 → **margin kotor 60%** |
+| HPP | Rp10.826.500 (**41,4%**) → **margin kotor 58,6%** |
+| Biaya tetap bulanan | **Rp8.000.000** (ditetapkan pemilik, 9 Agt 2026) |
 | Pengeluaran tercatat | Rp2.484.000 (**9,5% omzet**), 124 catatan, **0 berkategori** |
 | Komposisi kas | Tunai 59% · QRIS 40% · lainnya 1% |
 | Kanal | Kasir 93% · App 7% |
@@ -36,9 +37,13 @@ rentang **30 Juni – 9 Agustus 2026**), bukan asumsi.
    bersih di dashboard **terlalu tinggi**, dan itu justru angka yang akan dipakai
    untuk memutuskan "berapa boleh diambil untuk pribadi".
 
-3. **5 menu belum punya `cost_price`** — Air Mineral (108 pcs terjual),
-   Hazelnut (48), Beef Pastry (3), Matcha (3), Matcha Latte (5). Margin sedikit
-   di-overstate.
+3. ~~**5 menu belum punya `cost_price`**~~ — **selesai 9 Agt 2026.** Pemilik telah
+   mengisi HPP seluruh menu aktif. Enam menu yang masih kosong
+   (Matcha Latte, Avocado Toast, Banana Bread, Cookies, Lemon Honey Tea,
+   V60 Pour Over) semuanya `is_available = false` alias tidak dijual, sehingga
+   tidak memengaruhi margin ke depan. Satu-satunya jejak historis adalah
+   **Matcha Latte 5 pcs** yang terlanjur terjual tanpa HPP — dampaknya < 0,1%
+   dan sengaja dibiarkan, bukan ditambal dengan angka karangan.
 
 ---
 
@@ -54,21 +59,41 @@ rentang **30 Juni – 9 Agustus 2026**), bukan asumsi.
 
 ### Persentase pos
 
-| Pos | % | Nominal @Rp36jt | Peran |
-|---|---|---|---|
-| Restock | 40% | Rp14,4jt | Amplop belanja bahan (HPP riil 39,6% — cocok) |
-| Operasional | 22%* | Rp7,9jt | Sewa, gaji, listrik, air, wifi |
-| Pribadi | 20% | Rp7,2jt | Gaji owner — dibayar rutin, bukan sisa |
-| Scaling | 10% | Rp3,6jt | Alat baru, outlet, stok awal |
-| Darurat | 8% | Rp2,9jt | Target 3× biaya bulanan |
+Diturunkan dari data riil, bukan dari template Profit First Amerika.
+Basis: target omzet **Rp36jt/bulan**, HPP riil **41,4%**, biaya tetap **Rp8jt**.
 
-\* **22% adalah placeholder tampilan saja, bukan default yang ditanam di kode.**
-Wizard kalibrasi menghitung persentase Operasional sebagai
-`Σ fixed_costs ÷ target_omzet_bulanan`, dibulatkan ke atas ke persen terdekat.
-Sisa (100% − Restock − Operasional) dibagi ke Pribadi/Scaling/Darurat dengan
-rasio bawaan 20:10:8 (dinormalisasi), lalu boleh disunting pemilik.
-Jika perhitungan menghasilkan sisa ≤ 0%, wizard menolak lanjut dan menampilkan
-peringatan bahwa biaya tetap melebihi kapasitas omzet.
+| Pos | % | Nominal @Rp36jt | Kebutuhan riil | Selisih |
+|---|---|---|---|---|
+| Restock | **42%** | Rp15.120.000 | HPP Rp14.902.271 | +Rp217.729 |
+| Operasional | **24%** | Rp8.640.000 | tetap Rp8jt + variabel & fee ±Rp603rb | +Rp37.000 |
+| Pribadi | **18%** | Rp6.480.000 | gaji owner | — |
+| Scaling | **9%** | Rp3.240.000 | alat, outlet, stok awal | — |
+| Darurat | **7%** | Rp2.520.000 | target Rp25,8jt (3× biaya bulanan) | tercapai ±10 bulan |
+| **Total** | **100%** | **Rp36.000.000** | | |
+
+Catatan penting soal dua pos pertama: **surplusnya tipis** (Rp218rb dan Rp37rb
+per bulan). Itu memang disengaja — Restock dan Operasional adalah kewajiban,
+bukan tabungan; kelebihan besar di situ hanya menyembunyikan uang yang
+seharusnya bisa diambil pemilik. Tapi konsekuensinya: **kalau omzet turun di
+bawah Rp36jt/bulan, kedua pos ini yang pertama defisit.** Rambu runway di §6
+ada persis untuk memberi sinyal itu lebih awal.
+
+**Persentase ini adalah hasil kalibrasi, bukan konstanta yang ditanam di kode.**
+Wizard menghitungnya ulang setiap kali biaya tetap atau target omzet berubah:
+
+1. `pct_restock` = HPP riil 12 minggu terakhir, dibulatkan **ke atas** ke persen.
+2. `pct_operational` = `(Σ fixed_costs + rata-rata biaya variabel + fee QRIS) ÷ target omzet`, dibulatkan **ke atas**.
+3. Sisa = `100 − pct_restock − pct_operational`, dibagi ke Pribadi:Scaling:Darurat
+   dengan rasio bawaan **2:1:0,8**, memakai **metode sisa terbesar**
+   (*largest remainder*): bulatkan ke bawah dulu, lalu persen yang belum
+   terbagi diberikan satu per satu ke pos dengan pecahan terbesar.
+   Dengan sisa 34% hasilnya **18 / 9 / 7** — sesuai tabel di atas.
+   (Pembulatan ke bawah polos lalu melempar semua sisa ke Pribadi akan
+   menghasilkan 19/8/7 dan **tidak** cocok dengan tabel; jangan pakai cara itu.)
+4. Semua boleh disunting manual, dengan slider yang dikunci agar total tetap 100.
+5. Jika sisa ≤ 0%, wizard **menolak lanjut** dan menampilkan peringatan bahwa
+   biaya tetap melebihi kapasitas omzet — kondisi itu berarti usaha belum layak
+   ambil gaji owner, dan menyembunyikannya justru berbahaya.
 
 ---
 
@@ -155,14 +180,19 @@ tidak memblokir pencatatan realitas.
 Menggantikan perhitungan `net_profit` yang sekarang keliru.
 
 ```
-Omzet                              Rp36.000.000
-− HPP (Σ cost_price × qty)         Rp14.400.000
-= Laba Kotor                       Rp21.600.000   60%
+Omzet                               Rp36.000.000
+− HPP (Σ cost_price × qty)          Rp14.902.271   41,4%
+= Laba Kotor                        Rp21.097.729   58,6%
 − Biaya tetap (Σ fixed_costs aktif) Rp 8.000.000
 − Biaya variabel non-restock        Rp   500.000
 − Biaya transaksi QRIS (DOKU)       Rp   103.000
-= Laba Bersih                      Rp12.997.000   36%
+= Laba Bersih                       Rp12.494.729   34,7%
 ```
+
+Bandingkan dengan alokasi: Pribadi + Scaling + Darurat = Rp12.240.000, yaitu
+**98% dari laba bersih riil**. Sisa Rp254.729 mengendap sebagai buffer di pos
+Restock dan Operasional. Angka alokasi tidak dikarang — ia memang menghabiskan
+laba yang benar-benar ada.
 
 **Perubahan kritis:** pengeluaran dengan `bucket='restock'` **tidak dikurangkan
 lagi** di sini — sudah terhitung di HPP. Hanya `expenses` dengan bucket selain
@@ -180,11 +210,17 @@ Bagian "manajemen"-nya — yang membedakan modul ini dari sekadar laporan.
 
 | Rambu | Rumus | Nilai Rehat saat ini |
 |---|---|---|
-| **Break-even harian** | biaya tetap ÷ 30 ÷ margin kotor | Rp8jt/30/0,6 = **Rp444.444/hari**; Rehat Rp1,28jt = aman **2,9×** |
-| **Runway operasional** | saldo Operasional ÷ (biaya tetap ÷ 30) | ditampilkan "cukup N hari" |
-| **Rem tarik pribadi** | saldo Operasional < 1× biaya tetap bulanan | tombol tarik Pribadi jadi merah + dialog konfirmasi |
-| **Dana darurat selesai** | saldo ≥ 3× biaya bulanan | sarankan alihkan 8% ke Scaling |
+| **Break-even harian** | biaya bulanan ÷ 30 ÷ margin kotor | Rp8,6jt/30/0,586 = **Rp489.192/hari**; Rehat Rp1.279.198 = aman **2,6×** |
+| **Runway operasional** | saldo Operasional ÷ (biaya bulanan ÷ 30) | ditampilkan "cukup N hari" |
+| **Rem tarik pribadi** | saldo Operasional < 1× biaya bulanan | tombol tarik Pribadi jadi merah + dialog konfirmasi |
+| **Dana darurat selesai** | saldo ≥ **Rp25,8jt** (3× biaya bulanan) | sarankan alihkan 7% ke Scaling |
 | **Alarm HPP** | realisasi restock > alokasi, 3 hari berturut | "HPP naik — cek harga bahan atau harga jual" |
+
+**Definisi "biaya bulanan" di tabel ini = Rp8,6jt** — biaya tetap Rp8jt + biaya
+variabel non-restock ±Rp500rb + fee QRIS ±Rp103rb. **HPP sengaja tidak termasuk**,
+karena saat kedai sepi atau tutup, HPP ikut hilang sendiri sementara sewa dan
+gaji tetap jalan. Itu pula dasar target dana darurat Rp25,8jt: tiga bulan
+bertahan tanpa penjualan sama sekali.
 
 Rambu bersifat **informatif dan tidak memblokir**, kecuali rem tarik pribadi yang
 menambahkan satu langkah konfirmasi.
@@ -241,8 +277,13 @@ lib/features/finance/
 
 Dikerjakan sebagai bagian implementasi, bukan diserahkan ke pemilik:
 
-1. Isi `cost_price` untuk 5 menu yang kosong (butuh input nominal dari pemilik;
-   sediakan layar/skrip, jangan menebak angka).
+1. ~~Isi `cost_price` untuk menu yang kosong.~~ **Selesai 9 Agt 2026** — seluruh
+   menu aktif sudah ber-HPP; sisanya menu nonaktif. Tidak ada pekerjaan tersisa.
+   Yang tetap perlu: **seed `fixed_costs` dengan biaya tetap Rp8.000.000** yang
+   sudah ditetapkan pemilik. Rinciannya (sewa / gaji / listrik / wifi) belum
+   dipecah — implementasi boleh memasukkannya sebagai satu baris
+   "Biaya tetap bulanan" Rp8jt, dan pemilik memecahnya sendiri belakangan lewat
+   layar Biaya Tetap. Memecah tanpa data = mengarang.
 2. Backfill `expenses.bucket = 'restock'` untuk 124 catatan lama — sesuai isi
    catatannya yang memang semuanya bahan. Dapat dikoreksi manual setelahnya.
 3. Migrasi `016` dijalankan **manual di Supabase SQL Editor** (`DATABASE_URL`
@@ -256,7 +297,8 @@ Dikerjakan sebagai bagian implementasi, bukan diserahkan ke pemilik:
 
 | Unit | Yang diuji |
 |---|---|
-| `allocation_calculator` | Σ alokasi == omzet persis di banyak nominal acak; sisa selalu ke Restock; tolak Σ% ≠ 100 |
+| `allocation_calculator` | Σ alokasi == omzet persis di banyak nominal acak; sisa rupiah selalu ke Restock; tolak Σ% ≠ 100 |
+| Kalibrasi persen | metode sisa terbesar: input (HPP 41,4%, biaya Rp8,6jt, omzet Rp36jt) → **42/24/18/9/7**; Σ selalu 100 di berbagai input; tolak bila sisa ≤ 0 |
 | Mesin alokasi (backend) | idempotensi (panggil 2×, ledger tetap 5 baris); hormati `started_on`; batas hari WIB benar |
 | Kalkulator P&L | restock tidak dipotong dua kali; biaya tetap masuk; QRIS fee benar |
 | Rambu | break-even, runway, ambang rem tarik pribadi |
