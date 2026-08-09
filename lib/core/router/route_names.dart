@@ -126,4 +126,9 @@ class RouteNames {
 
   static const String printerSettings = 'printer-settings';
   static const String printerSettingsPath = '/profile/printer-settings';
+
+  /// Biaya tetap bulanan (modul keuangan). Rute ditambahkan di `app_router.dart`
+  /// oleh Task 8 — konstanta ini hanya menyediakan nama/path yang dirujuk.
+  static const String financeFixedCosts = 'finance-fixed-costs';
+  static const String financeFixedCostsPath = '/profile/finance/fixed-costs';
 }
