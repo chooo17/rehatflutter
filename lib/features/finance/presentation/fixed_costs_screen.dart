@@ -114,65 +114,116 @@ class FixedCostsScreen extends ConsumerWidget {
   }
 
   Future<void> _showAddSheet(BuildContext context, WidgetRef ref) async {
-    final nameCtrl = TextEditingController();
-    final amountCtrl = TextEditingController();
-    final categoryCtrl = TextEditingController();
-    final formKey = GlobalKey<FormState>();
-
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      builder: (ctx) => Padding(
-        padding: EdgeInsets.only(
-          left: 16, right: 16, top: 16,
-          bottom: MediaQuery.of(ctx).viewInsets.bottom + 16,
-        ),
-        child: Form(
-          key: formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextFormField(
-                controller: nameCtrl,
-                decoration: const InputDecoration(labelText: 'Nama biaya (mis. Sewa)'),
-                validator: (v) => (v == null || v.trim().isEmpty) ? 'Nama wajib diisi' : null,
+      builder: (ctx) => _AddFixedCostSheet(ref: ref),
+    );
+  }
+}
+
+/// StatefulWidget terpisah supaya controller punya lifecycle jelas dan
+/// dibuang lewat dispose() -- termasuk saat sheet ditutup dengan swipe
+/// (bukan hanya lewat tombol Simpan).
+class _AddFixedCostSheet extends StatefulWidget {
+  const _AddFixedCostSheet({required this.ref});
+
+  final WidgetRef ref;
+
+  @override
+  State<_AddFixedCostSheet> createState() => _AddFixedCostSheetState();
+}
+
+class _AddFixedCostSheetState extends State<_AddFixedCostSheet> {
+  final _nameCtrl = TextEditingController();
+  final _amountCtrl = TextEditingController();
+  final _categoryCtrl = TextEditingController();
+  final _dueDayCtrl = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
+
+  @override
+  void dispose() {
+    _nameCtrl.dispose();
+    _amountCtrl.dispose();
+    _categoryCtrl.dispose();
+    _dueDayCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+    final category = _categoryCtrl.text.trim();
+    final dueDayText = _dueDayCtrl.text.trim();
+    await widget.ref.read(financeRepositoryProvider).addFixedCost(
+          name: _nameCtrl.text,
+          amount: int.parse(_amountCtrl.text.replaceAll(RegExp(r'[^0-9]'), '')),
+          category: category.isEmpty ? null : category,
+          dueDay: dueDayText.isEmpty ? null : int.parse(dueDayText),
+        );
+    widget.ref.invalidate(fixedCostsProvider);
+    if (mounted) Navigator.pop(context);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(
+        left: 16, right: 16, top: 16,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+      ),
+      child: Form(
+        key: _formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextFormField(
+              controller: _nameCtrl,
+              decoration: const InputDecoration(labelText: 'Nama biaya (mis. Sewa)'),
+              validator: (v) => (v == null || v.trim().isEmpty) ? 'Nama wajib diisi' : null,
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _amountCtrl,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(labelText: 'Nominal per bulan (Rp)'),
+              validator: (v) {
+                final n = int.tryParse((v ?? '').replaceAll(RegExp(r'[^0-9]'), ''));
+                if (n == null || n <= 0) return 'Nominal harus lebih dari 0';
+                return null;
+              },
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _categoryCtrl,
+              decoration: const InputDecoration(labelText: 'Kategori (opsional)'),
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _dueDayCtrl,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: 'Tanggal jatuh tempo (opsional)',
+                hintText: '1-31',
               ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: amountCtrl,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Nominal per bulan (Rp)'),
-                validator: (v) {
-                  final n = int.tryParse((v ?? '').replaceAll(RegExp(r'[^0-9]'), ''));
-                  if (n == null || n <= 0) return 'Nominal harus lebih dari 0';
-                  return null;
-                },
+              validator: (v) {
+                final t = (v ?? '').trim();
+                if (t.isEmpty) return null;
+                final n = int.tryParse(t);
+                if (n == null || n < 1 || n > 31) {
+                  return 'Tanggal jatuh tempo harus antara 1-31';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: NeuButton(
+                onPressed: _submit,
+                child: const Text('Simpan'),
               ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: categoryCtrl,
-                decoration: const InputDecoration(labelText: 'Kategori (opsional)'),
-              ),
-              const SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity,
-                child: NeuButton(
-                  onPressed: () async {
-                    if (!formKey.currentState!.validate()) return;
-                    await ref.read(financeRepositoryProvider).addFixedCost(
-                          name: nameCtrl.text,
-                          amount: int.parse(
-                              amountCtrl.text.replaceAll(RegExp(r'[^0-9]'), '')),
-                          category: categoryCtrl.text,
-                        );
-                    ref.invalidate(fixedCostsProvider);
-                    if (ctx.mounted) Navigator.pop(ctx);
-                  },
-                  child: const Text('Simpan'),
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
