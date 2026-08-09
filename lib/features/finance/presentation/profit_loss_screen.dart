@@ -56,7 +56,7 @@ class ProfitLossScreen extends ConsumerWidget {
           IconButton(
             tooltip: 'Biaya tetap',
             icon: const Icon(Icons.receipt_long_outlined),
-            onPressed: () => context.push(RouteNames.financeFixedCosts),
+            onPressed: () => context.pushNamed(RouteNames.financeFixedCosts),
           ),
         ],
       ),

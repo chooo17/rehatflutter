@@ -28,6 +28,8 @@ import '../../features/auth/presentation/profile_setup_screen.dart';
 import '../../features/auth/presentation/register_screen.dart';
 import '../../features/auth/presentation/reset_password_screen.dart';
 import '../../features/favorites/presentation/favorites_screen.dart';
+import '../../features/finance/presentation/fixed_costs_screen.dart';
+import '../../features/finance/presentation/profit_loss_screen.dart';
 import '../../features/home/presentation/home_screen.dart';
 import '../../features/loyalty/presentation/loyalty_history_screen.dart';
 import '../../features/loyalty/presentation/loyalty_screen.dart';
@@ -369,6 +371,16 @@ final routerProvider = Provider<GoRouter>((ref) {
                     path: 'printer-settings',
                     name: RouteNames.printerSettings,
                     builder: (context, state) => const PrinterSettingsScreen(),
+                  ),
+                  GoRoute(
+                    path: 'finance/pnl',
+                    name: RouteNames.financePnl,
+                    builder: (context, state) => const ProfitLossScreen(),
+                  ),
+                  GoRoute(
+                    path: 'finance/fixed-costs',
+                    name: RouteNames.financeFixedCosts,
+                    builder: (context, state) => const FixedCostsScreen(),
                   ),
                 ],
               ),
