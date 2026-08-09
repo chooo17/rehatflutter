@@ -103,6 +103,7 @@ Deteksi deploy baru live: endpoint baru balas **401** (route ada) vs **404** (be
 | 013 | voucher stamp (`voucher_source+='stamp'` + `vouchers.reward_type`) | ✅ terpasang (`node src/db/verify-013.js`) — penukaran stamp digital |
 | 014 | belanja poin (`users.lifetime_points` + `voucher_source+='points'`) | ✅ terpasang (`node src/db/verify-014.js`) — belanja poin |
 | 015 | QR meja (`orders.table_number`) | ✅ terpasang (`node src/db/verify-015.js`) |
+| 016 | modul keuangan (`finance_settings`, `fixed_costs`, `finance_ledger`, `finance_calibration`, `expenses.bucket`, `users.can_access_finance`; backfill `expenses.bucket='restock'`) | ✅ terpasang (`node src/db/verify-016.js`) |
 
 Pola verifikasi umum: skrip sekali-pakai di folder backend pakai `supabaseAdmin` (contoh §8). `DATABASE_URL` placeholder → `pg`/psql tak jalan.
 
@@ -127,6 +128,10 @@ Pola verifikasi umum: skrip sekali-pakai di folder backend pakai `supabaseAdmin`
 - **`GET /orders` HANYA mengembalikan pesanan milik akun yang login** (`.eq('user_id', userId)`). Pesanan kasir adalah pesanan tamu (`user_id = null`) → **tak muncul di sana**. Untuk tampilan admin gunakan `/admin/orders` (`fetchAllOrders`). Ini pernah bikin kartu lacak kosong padahal Pesanan Masuk penuh.
 - **Kolom hasil migrasi baru wajib diambil secara defensif.** Pola di `updateOrderStatus`: coba `select` dengan kolom opsional (`source`, `order_type`) → bila error menyebut kolom itu, ulangi tanpa kolom opsional. Tanpa ini, migrasi yang tertinggal bisa **merusak seluruh alur pembayaran**.
 - **Auth OTP**: register OTP-gated (akun baru ada setelah verify). DEV OTP **tidak** diprint di Railway (produksi) → OTP hanya via WhatsApp.
+- **Modul keuangan hanya untuk pemilik.** Gate-nya kolom `users.can_access_finance` (migrasi 016), BUKAN `role='admin'` — ada dua akun admin dan hanya `irurr` (087864504924) yang boleh; `irur` (087777601617) tidak. Penegakannya di middleware `requireFinanceAccess` (`src/middleware/auth.js`), membalas **404** (bukan 403) supaya keberadaan modul tidak bocor lewat status code. **Jangan pakai `adminAccess` untuk route keuangan** — jalur `x-admin-key`-nya melewati `authenticate`, sehingga `req.user` kosong dan flag `can_access_finance` tak pernah terperiksa. Gating di Flutter (`financeAccessProvider`, kartu di dashboard admin) murni kosmetik; batas nyata satu-satunya adalah middleware backend.
+- **Backend kini punya test** (sebelumnya tidak ada sama sekali). Jest + Supertest: `cd D:\REHAT\rehat-backend\rehat-backend && npx jest` → 23 test lulus, sengaja lulus **tanpa `.env`** (test file `jest.mock` `config/supabase`). Logika keuangan murni ada di `financeCalc.js` (`computePnl`) & `expenseService.js`/`financeService.js` (`splitByBucket`, `sumFixedCosts`) — semua tanpa DB supaya bisa diuji.
+- **`net_profit` di `/admin/reports/sales` masih memotong restock dua kali** (restock sudah masuk HPP). Angka yang benar ada di `/admin/finance/pnl` (`getMonthlyPnl`). Endpoint lama sengaja dibiarkan apa adanya agar dashboard existing tidak pecah — jangan jadikan `net_profit` lama sebagai sumber kebenaran laba.
+- **Biaya tetap tidak punya tanggal berlaku** — `getMonthlyPnl` menjumlah baris `fixed_costs` yang ada **saat ini** untuk **semua** bulan yang diminta. Tambah biaya sewa bulan September → laba rugi Juli yang sudah dilaporkan ikut turun retroaktif; hapus satu baris (`deleteFixedCost` hard delete) → laba naik. Artinya **P&L historis tidak reproducible**: dicetak hari ini vs bulan depan bisa beda angka untuk bulan yang sama. Dapat diterima untuk Tahap 1; Tahap 2 perlu kolom `effective_from`/`effective_to` di `fixed_costs` agar tiap bulan memakai biaya tetap yang berlaku saat itu.
 
 ---
 
@@ -136,7 +141,7 @@ Pola verifikasi umum: skrip sekali-pakai di folder backend pakai `supabaseAdmin`
 Login OTP/tamu · Menu (kategori, cari, urut, opsi size/gula/suhu) · Keranjang & Checkout (dine-in/takeaway) · **Bayar: QRIS (DOKU) + Saldo Rehat** · Nomor antrian + linimasa status live · **Tracker pesanan di halaman Menu** (banner progres 4 tahap, **FIFO** — pesanan paling dulu dibuat; auto-hilang bila tak ada pesanan aktif) · **Layar "Lacak Pesanan"** via ikon struk di app bar (Sedang berjalan FIFO + Riwayat) · Riwayat pesanan · **Pesan Lagi** (reorder) · Loyalti (poin + stamp + tier) · Spin wheel · Favorit · Ulasan menu · Notifikasi push · **Dompet/Saldo (top-up DOKU + riwayat)** · **Referral (ajak teman, voucher 15%)** · Hadiah ulang tahun otomatis · Mode gelap.
 
 ### Admin / Kasir
-Dashboard penjualan (**omzet, HPP, laba kotor & bersih RIIL, margin%**) · Grafik harian + kalender · Item terlaris (dgn margin) · **Analitik** (jam sibuk, hari, AOV, repeat-rate) · **Tutup Kasir + rekonsiliasi DOKU + ekspor CSV** · **Segmen Pelanggan (RFM) + broadcast promo** · Pesanan masuk & pending · POS kasir (Tunai/QRIS/**Saldo**/Simpan) · Ubah status pesanan · **HPP & Margin Menu** (editor modal) · Kelola gambar menu · Kelola banner · Pesanan tersimpan · Printer thermal Bluetooth + auto-struk · Pengeluaran.
+Dashboard penjualan (**omzet, HPP, laba kotor & bersih RIIL, margin%**) · Grafik harian + kalender · Item terlaris (dgn margin) · **Analitik** (jam sibuk, hari, AOV, repeat-rate) · **Tutup Kasir + rekonsiliasi DOKU + ekspor CSV** · **Segmen Pelanggan (RFM) + broadcast promo** · Pesanan masuk & pending · POS kasir (Tunai/QRIS/**Saldo**/Simpan) · Ubah status pesanan · **HPP & Margin Menu** (editor modal) · Kelola gambar menu · Kelola banner · Pesanan tersimpan · Printer thermal Bluetooth + auto-struk · Pengeluaran · **Keuangan (KHUSUS PEMILIK)**: Laba Rugi bulanan yang benar + biaya tetap.
 
 ### Loyalti — mekanisme saat ini
 - **Poin**: 1 poin / Rp 1.000 (`POINTS_PER_RUPIAH = 1/1000`), dihitung saat order dibuat (`points_earned`). Menentukan **TIER**: Bronze(0)/Silver(500)/Gold(1000)/Platinum(1500). **Poin belum bisa dibelanjakan** (hanya status — label "Poin tersedia" di UI agak menyesatkan).
@@ -234,6 +239,7 @@ Default "hari ini" (tutup kasir) & "bulan ini" (kalender) juga memakai `Formatte
 - **Loyalty/Spin/Voucher/Favorites/Notifications**: `GET /loyalty`, `/loyalty/history`, `/spin`, `/spin/status`, `/vouchers`, `/vouchers/validate`, `/favorites`, `/notifications`, `POST /admin/broadcast`.
 - **Referral/Wallet**: `GET /referrals/me`, `POST /referrals/apply`, `GET /wallet`, `POST /wallet/topup`.
 - **Admin reports**: `/admin/reports/{sales,calendar,closing,analytics}`, `/admin/customers/segments`, `/admin/expenses`.
+- **Admin finance** (KHUSUS PEMILIK, lihat §4): `GET /admin/finance/ping`, `GET/POST /admin/finance/fixed-costs`, `DELETE /admin/finance/fixed-costs/:id`, `GET /admin/finance/pnl?month=YYYY-MM`.
 - **Payments webhook**: `POST /payments/doku/notify` (cabang `TOPUP-*` → kredit saldo; selain itu → order paid).
 
 Detail model & validasi ada di kode (`src/routes/index.js`, `src/services/*`). Enum `notif_type` & `voucher_source` ketat — nilai tak dikenal di-coerce/gagal senyap.
@@ -244,7 +250,7 @@ Detail model & validasi ada di kode (`src/routes/index.js`, `src/services/*`). E
 
 ### 🔴 Kesiapan produksi (paling penting untuk "profesional")
 1. **Keystore rilis + build AAB** — syarat Play Store (kini masih debug-signed).
-2. **Pengujian otomatis** — sudah ada **~116 unit test** (jalur uang: checkout, **kasir**, cart, loyalti, tracking) + CI gate (`flutter analyze --fatal-infos` + `flutter test`). Utang tersisa: **widget/integration test** layar checkout & kasir, plus test backend.
+2. **Pengujian otomatis** — Flutter: **150 unit test** (jalur uang: checkout, **kasir**, cart, loyalti, tracking, keuangan) + CI gate (`flutter analyze --fatal-infos` + `flutter test`). Backend: **mulai punya test** (Jest+Supertest, 23 test, cakupan baru modul keuangan — `npx jest` di repo backend). Utang tersisa: **widget/integration test** layar checkout & kasir, plus test backend untuk modul selain keuangan (orders, auth, loyalty, dll. masih tanpa test).
 
 ### 🟡 Fitur produk
 3. **CRUD Menu di panel admin** — saat ini **belum ada layar "Tambah Menu"**; menu baru harus di-INSERT langsung ke tabel `menu_items` di Supabase (yang tersedia baru edit HPP/harga/ketersediaan via `PATCH /menu/items/:id` + unggah gambar). Perlu: tambah/ubah/arsipkan menu, pilih kategori, atur `sort_order`, deskripsi, & opsi. *(disepakati: nanti)*
@@ -271,6 +277,7 @@ Detail model & validasi ada di kode (`src/routes/index.js`, `src/services/*`). E
   Menjadikan admin: `node src/db/set-admin.js <nomor>` di folder backend.
 - ⏳ **Ditunda (permintaan user):** penukaran stamp digital & belanja poin.
 - ✅ **Refund tunai** live (backend `POST /admin/orders/:id/refund` + tombol di detail pesanan admin); migrasi 012 terpasang. Masih **tunai-only** (QRIS/Saldo belum).
+- ✅ **Modul Keuangan Tahap 1** live (layar Laba Rugi bulanan + Biaya Tetap, khusus pemilik `irurr`); migrasi 016 terpasang. Margin kotor produksi **58,6%** (HPP 41,4%), biaya tetap **Rp8.000.000/bulan**, P&L Juli 2026: omzet Rp15.055.400 → laba bersih **Rp742.877 (5%)**. Tahap 2 (amplop alokasi/ledger) & Tahap 3 (auto-kalibrasi) **belum dikerjakan**.
 - ⏳ **Belum:** keystore rilis + AAB, manajemen stok, refund QRIS/Saldo beraudit.
 
 ### Cara cepat verifikasi skema/DB (tanpa psql)

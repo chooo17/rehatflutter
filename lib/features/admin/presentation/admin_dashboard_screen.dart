@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
+import '../../../core/router/route_names.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../shared/widgets/neu.dart';
+import '../../finance/data/finance_repository.dart';
 import '../data/admin_report_repository.dart';
 
 /// (Admin) Dashboard laporan penjualan: ringkasan, grafik harian, item terlaris.
@@ -125,6 +128,31 @@ class AdminDashboardScreen extends ConsumerWidget {
               ],
             ),
             const SizedBox(height: 20),
+            // Kartu Keuangan — hanya tampil untuk pemilik. Ini kosmetik;
+            // batas nyata ada di middleware requireFinanceAccess di backend.
+            // Saat memuat/error, kartu disembunyikan (bukan urusan kasir).
+            ref.watch(financeAccessProvider).maybeWhen(
+                  data: (allowed) => allowed
+                      ? Padding(
+                          padding: const EdgeInsets.only(bottom: 20),
+                          child: NeuCard(
+                            padding: EdgeInsets.zero,
+                            radius: 18,
+                            child: ListTile(
+                              leading: Icon(
+                                  Icons.account_balance_wallet_outlined,
+                                  color: AppColors.espresso),
+                              title: const Text('Keuangan'),
+                              subtitle: const Text('Laba rugi & biaya tetap'),
+                              trailing: const Icon(Icons.chevron_right_rounded),
+                              onTap: () =>
+                                  context.pushNamed(RouteNames.financePnl),
+                            ),
+                          ),
+                        )
+                      : const SizedBox.shrink(),
+                  orElse: () => const SizedBox.shrink(),
+                ),
             async.when(
               loading: () => const Padding(
                 padding: EdgeInsets.only(top: 60),
@@ -155,7 +183,11 @@ class _Report extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // KPI utama: omzet & laba bersih RIIL (omzet - HPP - pengeluaran).
+        // KPI utama: omzet & "Laba kotor - pengeluaran" (angka legacy dari
+        // endpoint /admin/reports/sales — masih menghitung ganda restock &
+        // belum memotong biaya tetap. Label SENGAJA bukan "Laba bersih" agar
+        // tidak bentrok dengan angka laba rugi modul Keuangan yang lebih
+        // akurat; lihat CLAUDE.md §4).
         Row(
           children: [
             Expanded(
@@ -170,7 +202,7 @@ class _Report extends StatelessWidget {
             Expanded(
               child: _KpiCard(
                 icon: Icons.savings_rounded,
-                label: 'Laba bersih',
+                label: 'Laba kotor − pengeluaran',
                 value: Formatters.rupiah(report.netProfit),
               ),
             ),

@@ -71,7 +71,10 @@ class ClosingReportScreen extends ConsumerWidget {
                 _line('Pengeluaran', r.summary.expenses,
                     color: AppColors.error),
                 const Divider(height: 22),
-                _line('Laba bersih', r.summary.netProfit,
+                // Label SENGAJA bukan "Laba bersih" — ini angka legacy
+                // (menghitung ganda restock, belum memotong biaya tetap).
+                // Angka laba bersih yang akurat ada di modul Keuangan.
+                _line('Laba kotor − pengeluaran', r.summary.netProfit,
                     emphasize: true, color: AppColors.success),
                 const SizedBox(height: 6),
                 _plain('Pesanan', '${r.summary.orders}'),
@@ -170,7 +173,7 @@ class ClosingReportScreen extends ConsumerWidget {
       '"Ringkasan","Laba kotor",${s.grossProfit}',
       '"Ringkasan","Margin kotor (%)",${s.grossMarginPct}',
       '"Ringkasan","Pengeluaran",${s.expenses}',
-      '"Ringkasan","Laba bersih",${s.netProfit}',
+      '"Ringkasan","Laba kotor - pengeluaran",${s.netProfit}',
       '"Ringkasan","Jumlah pesanan",${s.orders}',
       '"Ringkasan","Item terjual",${s.itemsSold}',
       '',

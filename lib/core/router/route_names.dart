@@ -126,4 +126,12 @@ class RouteNames {
 
   static const String printerSettings = 'printer-settings';
   static const String printerSettingsPath = '/profile/printer-settings';
+
+  /// Biaya tetap bulanan (modul keuangan). Rute didaftarkan di `app_router.dart`.
+  static const String financeFixedCosts = 'finance-fixed-costs';
+  static const String financeFixedCostsPath = '/profile/finance/fixed-costs';
+
+  /// Laba rugi bulanan (modul keuangan). Rute didaftarkan di `app_router.dart`.
+  static const String financePnl = 'finance-pnl';
+  static const String financePnlPath = '/profile/finance/pnl';
 }
