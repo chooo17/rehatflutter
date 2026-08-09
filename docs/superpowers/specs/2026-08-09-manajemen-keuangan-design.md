@@ -97,7 +97,7 @@ Darurat Rp1,85jt.
 ### Titik kritis
 
 Sisa menjadi nol saat omzet **≈ Rp14,83jt/bulan** (`0,58 × omzet = Rp8,6jt`) —
-sejalan dengan break-even harian Rp489.192 di §7. Di bawah itu:
+sejalan dengan break-even harian Rp489.192 di §8. Di bawah itu:
 
 - Pribadi, Scaling, Darurat dialokasi **Rp0** (bukan negatif);
 - Operasional menerima sisa yang ada dan **kekurangannya dicatat** sebagai
@@ -123,20 +123,86 @@ Hanya ada **tiga angka** yang perlu ditetapkan, sisanya turunan:
 | rasio sisa | 2 : 1 : 0,8 | kebijakan pemilik, dapat disunting |
 
 Ketiganya **bukan konstanta yang ditanam di kode**. `pct_restock` dan
-`operational_daily` diperbarui oleh mesin auto-kalibrasi (§4), rasio sisa hanya
+`operational_daily` diperbarui oleh mesin auto-kalibrasi (§5), rasio sisa hanya
 berubah bila pemilik menyuntingnya. Wizard menolak konfigurasi yang membuat
 titik kritis melampaui baseline omzet terobservasi — artinya usaha belum layak
 ambil gaji owner, dan menyembunyikannya justru berbahaya.
 
 ---
 
-## 3. Model data — buku besar amplop (event-sourced)
+## 3. Kontrol akses — khusus pemilik
+
+Modul ini menampilkan penghasilan pribadi pemilik. Ia **tidak boleh** terbuka
+untuk seluruh admin — hanya untuk **087864504924 (`irurr`)**.
+
+Ini lebih ketat daripada gating admin yang sudah ada di proyek. Saat ini ada
+**dua** akun ber-`role: admin`:
+
+| Nomor | Nama | Akses keuangan |
+|---|---|---|
+| 087864504924 | `irurr` | ✅ **ya** |
+| 087777601617 | `irur` | ❌ **tidak** |
+
+### Mekanisme: flag di database, bukan nomor di kode
+
+Tambahkan kolom **`users.can_access_finance`** (boolean, default `false`),
+di-seed `true` hanya untuk id `649a989c-e9c2-45d4-815d-f95b7df158bc`
+(= 087864504924).
+
+Nomor telepon **tidak di-hardcode di source code**. Tiga alasan:
+
+1. **Ganti nomor = ganti satu baris SQL**, bukan rebuild + deploy ulang APK dan
+   web. Nomor HP bisa berubah; kode yang sudah ter-obfuscate di APK pelanggan
+   tidak bisa ditarik kembali.
+2. **Nomor pribadi tidak masuk git history.** Sekali ter-commit, ia permanen di
+   repo — dan repo ini punya CI publik.
+3. Perbandingan nomor rawan salah format (`08…` vs `628…` vs spasi/strip).
+   Perbandingan `boolean` tidak.
+
+Hasil akhirnya persis seperti yang diminta: hanya akun 087864504924 yang bisa
+masuk. Yang berbeda hanya cara menyatakannya.
+
+### Penegakan di backend — ini yang sesungguhnya mengamankan
+
+Middleware **`requireFinanceAccess`** dipasang pada **seluruh** route
+`/admin/finance/*` **dan** pada endpoint P&L. Menolak dengan **404**, bukan 403,
+supaya keberadaan modul ini tidak bocor ke admin lain.
+
+> **Menyembunyikan menu di Flutter tidak mengamankan apa pun.** Endpoint tetap
+> bisa dipanggil langsung dengan token admin mana pun memakai `curl`. Gating
+> frontend murni kosmetik; middleware backend adalah satu-satunya batas nyata.
+> Karena itu urutan implementasinya: **middleware dulu, layar belakangan.**
+
+### Cakupan yang ikut terkunci
+
+Mudah terlewat, dan tiap satu di antaranya membocorkan angka yang sama:
+
+- `GET /users/me` **tidak** mengembalikan `can_access_finance` kepada
+  pengguna lain — hanya kepada dirinya sendiri.
+- Kartu "Keuangan" di dashboard admin hanya dirender bila flag `true`.
+- Rute go_router `/admin/finance/*` memakai `redirect` guard, sehingga
+  deep-link langsung tetap tertolak.
+- **Notifikasi & push** dari modul ini (usulan kalibrasi, alarm HPP, rem tarik
+  pribadi) hanya dikirim ke pemilik — jangan lewat broadcast admin yang ada.
+- **Struk & laporan cetak** dari printer thermal tidak boleh memuat angka pos
+  atau laba bersih.
+
+### Batasan yang jujur
+
+Flag ini melindungi dari **admin lain**, bukan dari seseorang yang menguasai
+akun pemilik atau service key Supabase. Service role key melewati semua
+pemeriksaan ini — jadi kerahasiaan `.env` backend tetap syarat utama.
+
+---
+
+## 4. Model data — buku besar amplop (event-sourced)
 
 Saldo pos **tidak disimpan** sebagai kolom angka; ia dijumlah dari buku besar.
 Alasannya: auditable, tidak bisa melenceng diam-diam, dan bebas dari race
 condition penulisan bersamaan.
 
-**Migrasi `016_add_finance_module.sql`** — 3 tabel baru + 1 kolom.
+**Migrasi `016_add_finance_module.sql`** — 4 tabel baru + 2 kolom
+(`expenses.bucket`, `users.can_access_finance`).
 
 ### `finance_settings` (baris tunggal)
 
@@ -163,7 +229,7 @@ antara 0–100 dan `operational_daily` ≥ 0.
 | `observed_at` | date | tanggal observasi |
 | `metric` | text | `hpp_pct` \| `operational_daily` \| `revenue_baseline` |
 | `observed_value` | numeric | hasil observasi mentah |
-| `smoothed_value` | numeric | setelah shrinkage (§4) |
+| `smoothed_value` | numeric | setelah shrinkage (§5) |
 | `sample_days` | int | n hari bersih yang dipakai |
 | `status` | text | `observed` \| `proposed` \| `accepted` \| `dismissed` |
 | `applied_at`, `created_at` | | |
@@ -205,7 +271,7 @@ pembayaran.
 
 ---
 
-## 4. Mesin auto-kalibrasi
+## 5. Mesin auto-kalibrasi
 
 Tujuannya: **semakin banyak data, semakin dapat dipercaya — tanpa menjadi
 gelisah.** Dua sifat itu bertentangan kalau parameter langsung mengikuti data
@@ -310,7 +376,7 @@ memberi peluang ±50% meleset ke atas; P40 menggeser risiko itu ke sisi yang ama
 
 ---
 
-## 5. Mesin alokasi
+## 6. Mesin alokasi
 
 Dipicu saat tutup kasir (`GET /admin/reports/closing` sudah ada) dan juga bisa
 dipanggil manual.
@@ -339,7 +405,7 @@ dipanggil manual.
 Catatan: `operational_daily` adalah nominal **per hari kalender**, bukan per hari
 buka. Bila kedai tutup, hari itu tidak menghasilkan alokasi sama sekali —
 sehingga pos Operasional secara alami akan tertinggal dari kebutuhan bulanannya.
-Rambu runway di §7 yang menangkap kondisi ini.
+Rambu runway di §8 yang menangkap kondisi ini.
 
 **Pengurangan pos** terjadi saat:
 - pengeluaran dicatat → `direction='out'` pada `expenses.bucket`
@@ -351,7 +417,7 @@ tidak memblokir pencatatan realitas.
 
 ---
 
-## 6. Laporan Laba Rugi
+## 7. Laporan Laba Rugi
 
 Menggantikan perhitungan `net_profit` yang sekarang keliru.
 
@@ -381,7 +447,7 @@ baru dan menjadi sumber kebenaran.
 
 ---
 
-## 7. Rambu keputusan
+## 8. Rambu keputusan
 
 Bagian "manajemen"-nya — yang membedakan modul ini dari sekadar laporan.
 
@@ -404,9 +470,10 @@ menambahkan satu langkah konfirmasi.
 
 ---
 
-## 8. Endpoint backend
+## 9. Endpoint backend
 
-Semua di bawah guard admin yang sudah ada.
+Semua di bawah middleware **`requireFinanceAccess`** (§3) — bukan sekadar guard
+admin. Akses tanpa flag dijawab **404**, bukan 403.
 
 | Method | Path | Fungsi |
 |---|---|---|
@@ -425,7 +492,7 @@ Mengikuti envelope proyek: `{ success, data, message }`.
 
 ---
 
-## 9. Frontend
+## 10. Frontend
 
 Fitur baru `lib/features/finance/` mengikuti pola feature-first proyek
 (`data` / `application` / `presentation`).
@@ -454,7 +521,7 @@ lib/features/finance/
 
 ---
 
-## 10. Prasyarat data
+## 11. Prasyarat data
 
 Dikerjakan sebagai bagian implementasi, bukan diserahkan ke pemilik:
 
@@ -465,6 +532,9 @@ Dikerjakan sebagai bagian implementasi, bukan diserahkan ke pemilik:
    dipecah — implementasi boleh memasukkannya sebagai satu baris
    "Biaya tetap bulanan" Rp8jt, dan pemilik memecahnya sendiri belakangan lewat
    layar Biaya Tetap. Memecah tanpa data = mengarang.
+1b. **Seed `can_access_finance = true`** hanya untuk
+   `649a989c-e9c2-45d4-815d-f95b7df158bc` (087864504924, `irurr`). Verifikasi
+   bahwa `irur` tetap `false`.
 2. Backfill `expenses.bucket = 'restock'` untuk 124 catatan lama — sesuai isi
    catatannya yang memang semuanya bahan. Dapat dikoreksi manual setelahnya.
 3. Migrasi `016` dijalankan **manual di Supabase SQL Editor** (`DATABASE_URL`
@@ -474,7 +544,7 @@ Dikerjakan sebagai bagian implementasi, bukan diserahkan ke pemilik:
 
 ---
 
-## 11. Pengujian
+## 12. Pengujian
 
 | Unit | Yang diuji |
 |---|---|
@@ -486,6 +556,8 @@ Dikerjakan sebagai bagian implementasi, bukan diserahkan ke pemilik:
 | Deadband | selisih 1,5 poin persen → tidak ada usulan; 2,5 poin selama 10 hari → belum; 14 hari → baru muncul |
 | Batas gerak | usulan tidak pernah menggeser parameter > 3 poin persen dalam sebulan |
 | Baseline omzet | P40 dari sampel bersih; data Rehat tidak menghasilkan baseline > median |
+| **Kontrol akses** | tiap route `/admin/finance/*` + P&L membalas **404** untuk token admin `irur`; **200** untuk `irurr`; 401 tanpa token. Tes ini wajib menutup **semua** route, bukan sampel |
+| Kebocoran akses | `GET /users/me` admin lain tidak memuat `can_access_finance`; guard go_router menolak deep-link |
 | Mesin alokasi (backend) | idempotensi (panggil 2×, ledger tetap 5 baris); hormati `started_on`; batas hari WIB benar |
 | Kalkulator P&L | restock tidak dipotong dua kali; biaya tetap masuk; QRIS fee benar |
 | Rambu | break-even, runway, ambang rem tarik pribadi |
@@ -494,7 +566,7 @@ Gate CI yang berlaku: `flutter analyze --fatal-infos` + `flutter test`.
 
 ---
 
-## 12. Batasan yang dinyatakan terbuka
+## 13. Batasan yang dinyatakan terbuka
 
 - **Saldo pos adalah saldo buku, bukan saldo bank.** QRIS (40% omzet) baru cair
   setelah DOKU settle, jadi pos bisa menunjukkan uang yang belum sepenuhnya ada
