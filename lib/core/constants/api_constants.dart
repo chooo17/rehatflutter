@@ -122,6 +122,12 @@ class ApiConstants {
   static const String adminBannerUpload = '/admin/banners/upload';
   static String banner(String id) => '/banners/$id';
 
+  // Finance (khusus pemilik) ---------------------------------------------
+  static const String financePing = '/admin/finance/ping';
+  static const String financeFixedCosts = '/admin/finance/fixed-costs';
+  static String financeFixedCost(String id) => '/admin/finance/fixed-costs/$id';
+  static const String financePnl = '/admin/finance/pnl';
+
   // Notifications -------------------------------------------------------
   static const String notifications = '/notifications';
   static const String notificationsReadAll = '/notifications/read-all';
