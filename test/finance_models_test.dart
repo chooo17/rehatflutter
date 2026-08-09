@@ -62,5 +62,19 @@ void main() {
       expect(p.netProfit, 0);
       expect(p.fixedCostItems, isEmpty);
     });
+
+    test('variable_expenses_unavailable: true terbaca sebagai flag aktif', () {
+      final p = ProfitLoss.fromJson({
+        'month': '2026-08',
+        'variableExpenses': 0,
+        'variable_expenses_unavailable': true,
+      });
+      expect(p.variableExpensesUnavailable, isTrue);
+    });
+
+    test('variable_expenses_unavailable tidak dikirim → default false', () {
+      final p = ProfitLoss.fromJson({'month': '2026-08', 'variableExpenses': 500000});
+      expect(p.variableExpensesUnavailable, isFalse);
+    });
   });
 }

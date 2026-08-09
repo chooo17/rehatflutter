@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/constants/api_constants.dart';
+import '../../../core/network/api_exception.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../core/utils/formatters.dart';
 
@@ -53,6 +54,7 @@ class ProfitLoss {
     required this.netProfit,
     required this.netMarginPct,
     required this.fixedCostItems,
+    this.variableExpensesUnavailable = false,
   });
 
   final String month;
@@ -66,6 +68,11 @@ class ProfitLoss {
   final int netProfit;
   final int netMarginPct;
   final List<FixedCost> fixedCostItems;
+
+  /// True bila query pengeluaran variabel (non-restock) gagal di backend —
+  /// artinya [variableExpenses] (dan angka turunannya) DEFAULT 0, bukan
+  /// data nyata. Layar wajib memperingatkan, bukan menampilkan Rp0 diam-diam.
+  final bool variableExpensesUnavailable;
 
   factory ProfitLoss.fromJson(Map<String, dynamic> j) => ProfitLoss(
         month: (j['month'] ?? '').toString(),
@@ -82,6 +89,7 @@ class ProfitLoss {
             .whereType<Map>()
             .map((e) => FixedCost.fromJson(Map<String, dynamic>.from(e)))
             .toList(),
+        variableExpensesUnavailable: j['variable_expenses_unavailable'] == true,
       );
 }
 
@@ -90,7 +98,10 @@ Map<String, dynamic> _unwrap(dynamic body) => (body is Map && body['data'] is Ma
     : Map<String, dynamic>.from(body as Map);
 
 /// Akses modul keuangan (khusus pemilik). Endpoint membalas 404 untuk akun
-/// lain, jadi kegagalan apa pun diperlakukan sebagai "tidak punya akses".
+/// lain — HANYA itu yang berarti "tidak punya akses". Kegagalan lain
+/// (jaringan mati, timeout, sesi kedaluwarsa, server error) dilempar ulang
+/// supaya pemanggil (FutureProvider) bisa membedakannya, alih-alih diam-diam
+/// menyembunyikan menu Keuangan seolah pengguna memang tak berhak.
 class FinanceRepository {
   FinanceRepository({required DioClient client}) : _client = client;
   final DioClient _client;
@@ -99,8 +110,9 @@ class FinanceRepository {
     try {
       await _client.get<dynamic>(ApiConstants.financePing);
       return true;
-    } catch (_) {
-      return false;
+    } on ApiException catch (e) {
+      if (e.statusCode == 404) return false;
+      rethrow;
     }
   }
 
