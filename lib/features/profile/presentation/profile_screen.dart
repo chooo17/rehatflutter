@@ -73,8 +73,12 @@ class ProfileScreen extends ConsumerWidget {
               onTap: () => context.pushNamed(RouteNames.wallet)),
           _tile(Icons.card_giftcard_outlined, 'Ajak Teman',
               onTap: () => context.pushNamed(RouteNames.referral)),
-          _tile(Icons.receipt_long_outlined, 'Riwayat pesanan',
-              onTap: () => context.pushNamed(RouteNames.orderHistory)),
+          // Satu pintu "Pesanan": admin → halaman pesanan terpadu (semua pesanan
+          // toko); pelanggan → riwayat pesanannya sendiri.
+          _tile(Icons.receipt_long_outlined, 'Pesanan',
+              onTap: () => context.pushNamed(user?.isAdmin == true
+                  ? RouteNames.adminOrders
+                  : RouteNames.orderHistory)),
           _tile(Icons.local_offer_outlined, 'Voucher saya',
               onTap: () => context.goNamed(RouteNames.loyalty)),
           _tile(Icons.notifications_none_rounded, 'Notifikasi',
@@ -88,8 +92,6 @@ class ProfileScreen extends ConsumerWidget {
                 onTap: () => context.pushNamed(RouteNames.adminAnalytics)),
             _tile(Icons.point_of_sale_rounded, 'Tutup Kasir',
                 onTap: () => context.pushNamed(RouteNames.closingReport)),
-            _tile(Icons.receipt_long_rounded, 'Pesanan Masuk (Admin)',
-                onTap: () => context.pushNamed(RouteNames.adminOrders)),
             _tile(Icons.groups_rounded, 'Segmen Pelanggan',
                 onTap: () => context.pushNamed(RouteNames.customerSegments)),
             _tile(Icons.restaurant_menu_rounded, 'Kelola Menu',
@@ -98,8 +100,6 @@ class ProfileScreen extends ConsumerWidget {
                 onTap: () => context.pushNamed(RouteNames.adminQrTables)),
             _tile(Icons.inventory_2_outlined, 'HPP & Margin Menu',
                 onTap: () => context.pushNamed(RouteNames.adminMenuCost)),
-            _tile(Icons.local_cafe_outlined, 'Tukar Voucher Gratis',
-                onTap: () => context.pushNamed(RouteNames.freeDrinkRedeem)),
             _tile(Icons.admin_panel_settings_outlined, 'Kelola Gambar Menu',
                 onTap: () => context.pushNamed(RouteNames.adminMenuImages)),
             _tile(Icons.campaign_outlined, 'Kelola Banner',

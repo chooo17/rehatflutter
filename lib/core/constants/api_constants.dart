@@ -39,6 +39,8 @@ class ApiConstants {
   static const String register = '/auth/register';
   static const String verifyOtp = '/auth/verify-otp';
   static const String resendOtp = '/auth/resend-otp';
+  static const String forgotPassword = '/auth/forgot-password';
+  static const String resetPassword = '/auth/reset-password';
   static const String refreshToken = '/auth/refresh';
   static const String logout = '/auth/logout';
 
@@ -83,6 +85,7 @@ class ApiConstants {
   static String orderPayBalance(String id) => '/orders/$id/pay-balance';
   static String adminOrderPayBalance(String id) => '/admin/orders/$id/pay-balance';
   static String adminOrderRefund(String id) => '/admin/orders/$id/refund'; // POST refund tunai
+  static String adminOrderItems(String id) => '/admin/orders/$id/items'; // PATCH ubah item pesanan tersimpan
   static const String adminExpenses = '/admin/expenses';
   static String adminExpense(String id) => '/admin/expenses/$id';
 

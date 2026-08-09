@@ -148,7 +148,11 @@ Dashboard penjualan (**omzet, HPP, laba kotor & bersih RIIL, margin%**) · Grafi
 
 ## 5b. Notifikasi WhatsApp (Fonnte) — ATURAN PENTING
 
-Gateway: **Fonnte**, device pengirim **`087777601617`** (paket Free, kuota ~950/bulan). `sendWhatsapp` sudah mendukung target grup (ID `…@g.us` diteruskan apa adanya, tidak dinormalkan).
+Gateway: **Fonnte**, device pengirim **`087777601617`** (paket Free, kuota 1000/bulan). `sendWhatsapp` sudah mendukung target grup (ID `…@g.us` diteruskan apa adanya, tidak dinormalkan).
+
+> ⚠️ **Riwayat & jebakan (Juli 2026):** device `087777601617` **di-soft-ban WhatsApp** untuk *cold-outbound* — OTP 1-lawan-1 ke nomor baru **tak terkirim** (status Fonnte "connect" & "queued" tapi tak sampai), **sementara pesan ke grup tetap jalan** (device anggota grup = tepercaya; OTP ke banyak orang asing = sidik jari spam). Sempat dicoba `087864504924` (nomor admin — berisiko membakar WA pribadi), lalu dipindah ke **nomor `087864504924`**. Token pengirim = `FONNTE_TOKEN` (Railway + `.env` lokal); ganti device = ganti token itu. **Ini solusi sementara** — nomor unofficial baru pun berisiko kena flag yang sama seiring volume OTP. Solusi andal jangka panjang: **WhatsApp Business API resmi** atau OTP via **email/SMS provider transaksional**. Kode `sendOtp` kini **tak pernah 500** saat gagal (kembalikan `otpSent`), layar OTP menampilkan peringatan + tombol kirim ulang.
+> **Update terbaru (permintaan user):** device pengirim **dikembalikan ke `087777601617`** (token `FONNTE_TOKEN` diganti di Railway + `.env`). ⚠️ Ini nomor yang **dulu kena soft-ban** (lihat riwayat di atas) & merupakan **nomor admin `irur`** — pantau ketat apakah OTP ke nomor baru benar-benar sampai; bila "queued" tapi tak terkirim, itu gejala flag berulang.
+> **Saat ganti device Fonnte:** pastikan nomor baru juga **anggota (admin) grup** `WA_ANNOUNCE_GROUP`, kalau tidak pengumuman grup berhenti.
 
 **Siapa dapat WA otomatis:**
 | Jenis pesanan | `source` | WA ke pelanggan | Pengumuman grup |
@@ -263,7 +267,7 @@ Detail model & validasi ada di kode (`src/routes/index.js`, `src/services/*`). E
 - ✅ Notifikasi WA grup aktif; WA admin per-nomor dihentikan; kasir tanpa WA otomatis.
 - ✅ Waktu seluruh sistem konsisten **WIB** (penyimpanan UTC → perhitungan WIB → tampilan WIB).
 - ✅ Alur status disederhanakan (tanpa "Siap diambil"), auto-proses setelah bayar, tracking FIFO.
-- 👤 **Akun admin saat ini (2):** `irur` (087777601617, device Fonnte) & `irurr` (087864504924).
+- 👤 **Akun admin saat ini (2):** `irur` (087777601617) & `irurr` (087864504924). **Device Fonnte pengirim OTP kini nomor `087777601617`** (= nomor admin `irur`; perhatikan riwayat soft-ban di §5b).
   Menjadikan admin: `node src/db/set-admin.js <nomor>` di folder backend.
 - ⏳ **Ditunda (permintaan user):** penukaran stamp digital & belanja poin.
 - ✅ **Refund tunai** live (backend `POST /admin/orders/:id/refund` + tombol di detail pesanan admin); migrasi 012 terpasang. Masih **tunai-only** (QRIS/Saldo belum).

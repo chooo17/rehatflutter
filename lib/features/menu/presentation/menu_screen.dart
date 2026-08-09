@@ -12,6 +12,7 @@ import '../../../shared/widgets/skeleton.dart';
 import '../../order/presentation/widgets/active_order_tracker.dart';
 import '../../admin/presentation/widgets/saved_orders_icon_button.dart';
 import '../../auth/application/auth_controller.dart';
+import '../../loyalty/presentation/free_drink_redeem_screen.dart';
 import '../application/cart_controller.dart';
 import '../application/menu_sort.dart';
 import '../data/menu_repository.dart';
@@ -111,7 +112,14 @@ class _MenuScreenState extends ConsumerState<MenuScreen> {
               ]
             : [
                 if (isAdmin) ...[
-                  // Admin: pintasan Pesanan Masuk & pesanan belum bayar.
+                  // Admin: tukar voucher gratis pelanggan (langsung dari POS),
+                  // pintasan Pesanan Masuk & pesanan belum bayar.
+                  NeuCircleButton(
+                    icon: Icons.card_giftcard_rounded,
+                    iconColor: AppColors.espresso,
+                    onPressed: () => showFreeDrinkRedeemSheet(context),
+                  ),
+                  const SizedBox(width: 6),
                   NeuCircleButton(
                     icon: Icons.receipt_long_rounded,
                     iconColor: AppColors.espresso,

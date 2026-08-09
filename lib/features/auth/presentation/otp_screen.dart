@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -9,15 +8,23 @@ import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/router/route_names.dart';
+import '../../../shared/widgets/otp_boxes.dart';
 import '../../../shared/widgets/primary_button.dart';
 import '../application/auth_controller.dart';
 
 /// Layar verifikasi OTP 6 digit setelah register.
 class OtpScreen extends ConsumerStatefulWidget {
-  const OtpScreen({super.key, required this.otpToken, required this.phone});
+  const OtpScreen(
+      {super.key,
+      required this.otpToken,
+      required this.phone,
+      this.otpSent = true});
 
   final String otpToken;
   final String phone;
+
+  /// `false` bila server gagal mengirim OTP otomatis — tampilkan peringatan.
+  final bool otpSent;
 
   @override
   ConsumerState<OtpScreen> createState() => _OtpScreenState();
@@ -27,6 +34,7 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
   final _codeCtrl = TextEditingController();
   final _focus = FocusNode();
   late String _otpToken;
+  late bool _otpSent;
   Timer? _timer;
   int _secondsLeft = 60;
 
@@ -36,6 +44,7 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
   void initState() {
     super.initState();
     _otpToken = widget.otpToken;
+    _otpSent = widget.otpSent;
     _startCountdown();
     WidgetsBinding.instance.addPostFrameCallback((_) => _focus.requestFocus());
   }
@@ -88,16 +97,22 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
   }
 
   Future<void> _resend() async {
-    final newToken =
+    final result =
         await ref.read(authControllerProvider.notifier).resendOtp(_otpToken);
     if (!mounted) return;
-    if (newToken != null) {
-      _otpToken = newToken;
+    if (result != null) {
+      setState(() {
+        _otpToken = result.otpToken;
+        _otpSent = result.otpSent;
+      });
       _codeCtrl.clear();
       _startCountdown();
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
-        ..showSnackBar(const SnackBar(content: Text('Kode OTP baru telah dikirim.')));
+        ..showSnackBar(SnackBar(
+            content: Text(result.otpSent
+                ? 'Kode OTP baru telah dikirim.'
+                : 'OTP masih gagal terkirim. Coba lagi sebentar atau hubungi admin.')));
     } else {
       final msg = ref.read(authControllerProvider).errorMessage ??
           'Gagal mengirim ulang OTP.';
@@ -142,8 +157,36 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
                   ],
                 ),
               ),
+              if (!_otpSent) ...[
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.warning.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                        color: AppColors.warning.withValues(alpha: 0.4)),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(Icons.warning_amber_rounded,
+                          color: AppColors.warning, size: 20),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Kode OTP gagal terkirim otomatis. Tekan "Kirim ulang '
+                          'kode OTP" di bawah, atau hubungi admin bila tetap tak masuk.',
+                          style: AppTextStyles.bodySmall
+                              .copyWith(color: AppColors.textPrimary),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
               const SizedBox(height: 32),
-              _OtpBoxes(
+              OtpBoxes(
                 controller: _codeCtrl,
                 focusNode: _focus,
                 length: _codeLength,
@@ -173,80 +216,6 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
           ).animate().fadeIn(duration: 350.ms),
         ),
       ),
-    );
-  }
-}
-
-/// Enam kotak digit dengan satu [TextField] tersembunyi sebagai input.
-class _OtpBoxes extends StatelessWidget {
-  const _OtpBoxes({
-    required this.controller,
-    required this.focusNode,
-    required this.length,
-    required this.onCompleted,
-    required this.onChanged,
-  });
-
-  final TextEditingController controller;
-  final FocusNode focusNode;
-  final int length;
-  final ValueChanged<String> onCompleted;
-  final ValueChanged<String> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final code = controller.text;
-    return Stack(
-      children: [
-        // Input tak terlihat namun menangkap ketikan & keyboard.
-        Opacity(
-          opacity: 0,
-          child: TextField(
-            controller: controller,
-            focusNode: focusNode,
-            autofocus: true,
-            keyboardType: TextInputType.number,
-            maxLength: length,
-            inputFormatters: [
-              FilteringTextInputFormatter.digitsOnly,
-              LengthLimitingTextInputFormatter(length),
-            ],
-            onChanged: (v) {
-              onChanged(v);
-              if (v.length == length) onCompleted(v);
-            },
-          ),
-        ),
-        GestureDetector(
-          onTap: () => focusNode.requestFocus(),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: List.generate(length, (i) {
-              final filled = i < code.length;
-              final isActive = i == code.length;
-              return Container(
-                width: 48,
-                height: 56,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: AppColors.surface,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: isActive
-                        ? AppColors.amber
-                        : filled
-                            ? AppColors.espresso
-                            : AppColors.border,
-                    width: isActive ? 1.8 : 1,
-                  ),
-                ),
-                child: Text(filled ? code[i] : '',
-                    style: AppTextStyles.displaySmall),
-              );
-            }),
-          ),
-        ),
-      ],
     );
   }
 }

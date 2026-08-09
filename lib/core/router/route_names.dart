@@ -14,6 +14,12 @@ class RouteNames {
   static const String otp = 'otp';
   static const String otpPath = '/otp';
 
+  static const String forgotPassword = 'forgot-password';
+  static const String forgotPasswordPath = '/forgot-password';
+
+  static const String resetPassword = 'reset-password';
+  static const String resetPasswordPath = '/reset-password';
+
   static const String profileSetup = 'profile-setup';
   static const String profileSetupPath = '/profile-setup';
 

@@ -8,13 +8,25 @@ import '../../../shared/models/user_model.dart';
 
 /// Hasil register: backend mengirim OTP, belum membuat akun.
 class RegisterResult {
-  const RegisterResult({required this.otpToken, this.expiresIn = 300});
+  const RegisterResult(
+      {required this.otpToken, this.expiresIn = 300, this.otpSent = true});
 
   /// Token sementara untuk memverifikasi OTP.
   final String otpToken;
 
   /// Masa berlaku OTP dalam detik.
   final int expiresIn;
+
+  /// `false` bila server GAGAL mengirim OTP otomatis (gateway rapuh) — UI perlu
+  /// memberi tahu pengguna & mengarahkan ke "Kirim ulang".
+  final bool otpSent;
+}
+
+/// Hasil kirim-ulang OTP.
+class ResendResult {
+  const ResendResult({required this.otpToken, this.otpSent = true});
+  final String otpToken;
+  final bool otpSent;
 }
 
 /// Hasil autentikasi (verify-otp / login): token tersimpan + status profil.
@@ -58,6 +70,8 @@ class AuthRepository {
     return RegisterResult(
       otpToken: otpToken,
       expiresIn: _asInt(data['expiresIn'] ?? data['expires_in'], 300),
+      // Default true agar kompatibel dgn backend lama yang tak mengirim flag.
+      otpSent: (data['otpSent'] ?? data['otp_sent'] ?? true) == true,
     );
   }
 
@@ -78,15 +92,54 @@ class AuthRepository {
     );
   }
 
-  /// Meminta kode OTP baru. Mengembalikan `otpToken` baru.
-  Future<String> resendOtp(String otpToken) async {
+  /// Meminta kode OTP baru. Mengembalikan token baru + status kirim.
+  Future<ResendResult> resendOtp(String otpToken) async {
     final res = await _client.post<Map<String, dynamic>>(
       ApiConstants.resendOtp,
       data: {'otp_token': otpToken},
     );
     final data = _unwrap(res.data);
     final newToken = (data['otpToken'] ?? data['otp_token'] ?? otpToken).toString();
-    return newToken;
+    return ResendResult(
+      otpToken: newToken,
+      otpSent: (data['otpSent'] ?? data['otp_sent'] ?? true) == true,
+    );
+  }
+
+  /// Minta reset password: backend mengirim OTP ke nomor terdaftar.
+  /// Mengembalikan `otpToken` untuk layar reset. `USER_NOT_FOUND` (404) bila
+  /// nomor tak terdaftar (di-surface sebagai ApiException oleh DioClient).
+  Future<RegisterResult> requestPasswordReset({required String phone}) async {
+    final res = await _client.post<Map<String, dynamic>>(
+      ApiConstants.forgotPassword,
+      data: {'identifier': phone, 'identifier_type': 'phone'},
+    );
+    final data = _unwrap(res.data);
+    final otpToken = (data['otpToken'] ?? data['otp_token'])?.toString();
+    if (otpToken == null || otpToken.isEmpty) {
+      throw Exception('otpToken tidak ditemukan pada respons server.');
+    }
+    return RegisterResult(
+      otpToken: otpToken,
+      expiresIn: _asInt(data['expiresIn'] ?? data['expires_in'], 300),
+      otpSent: (data['otpSent'] ?? data['otp_sent'] ?? true) == true,
+    );
+  }
+
+  /// Set password baru setelah OTP reset terverifikasi.
+  Future<void> resetPassword({
+    required String otpToken,
+    required String otpCode,
+    required String newPassword,
+  }) async {
+    await _client.post<Map<String, dynamic>>(
+      ApiConstants.resetPassword,
+      data: {
+        'otp_token': otpToken,
+        'otp_code': otpCode,
+        'new_password': newPassword,
+      },
+    );
   }
 
   /// Masuk dengan nomor HP (atau email) sebagai identifier.

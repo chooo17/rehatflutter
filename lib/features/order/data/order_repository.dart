@@ -8,6 +8,25 @@ import '../../../shared/models/cart_item_model.dart';
 import '../../../shared/models/order_model.dart';
 import '../../auth/application/auth_controller.dart';
 
+/// Satu item saat mengubah pesanan tersimpan (dikirim ke `PATCH .../items`).
+class EditOrderItem {
+  const EditOrderItem({
+    required this.menuItemId,
+    required this.quantity,
+    this.customization = const {},
+  });
+
+  final String menuItemId;
+  final int quantity;
+  final Map<String, dynamic> customization;
+
+  Map<String, dynamic> toJson() => {
+        'menu_item_id': menuItemId,
+        'quantity': quantity,
+        if (customization.isNotEmpty) 'customization': customization,
+      };
+}
+
 /// Hasil pembuatan sesi pembayaran (DOKU Checkout).
 /// `configured=false` → app pakai QRIS statis + ACC admin manual.
 class PaymentSession {
@@ -262,6 +281,15 @@ class OrderRepository {
     );
   }
 
+  /// (Admin/Kasir) Ubah item pesanan tersimpan (belum bayar) — tambah/hapus/ubah
+  /// jumlah. Backend menghitung ulang total (`PATCH /admin/orders/:id/items`).
+  Future<void> updateOrderItems(String id, List<EditOrderItem> items) async {
+    await _client.patch<dynamic>(
+      ApiConstants.adminOrderItems(id),
+      data: {'items': [for (final it in items) it.toJson()]},
+    );
+  }
+
   /// (Admin) Refund TUNAI penuh sebuah pesanan (`POST /admin/orders/:id/refund`).
   /// [reason] wajib (min 3 karakter). Hanya untuk order berpembayaran tunai yang
   /// sudah dibayar & belum di-refund.
@@ -434,6 +462,10 @@ final activeOrderProvider = Provider.autoDispose<OrderModel?>((ref) {
 
 /// (Admin) Pesanan Masuk = pesanan yang SUDAH DIBAYAR (paid → selesai),
 /// terbaru dulu. Pesanan belum bayar ada di [pendingOrdersProvider].
+/// (Admin) Halaman "Pesanan" terpadu: SEMUA pesanan berbayar ke atas — aktif
+/// (paid/preparing/ready) maupun riwayat (completed/cancelled/refunded), dari
+/// sumber mana pun (app pelanggan & kasir). Terbaru dulu. Pesanan BELUM BAYAR
+/// (pending) tetap dipisah di [pendingOrdersProvider] agar tak jadi noise.
 final adminOrdersProvider = FutureProvider<List<OrderModel>>((ref) async {
   final all =
       await ref.watch(orderRepositoryProvider).fetchAllOrders(limit: 100);
@@ -442,8 +474,12 @@ final adminOrdersProvider = FutureProvider<List<OrderModel>>((ref) async {
     OrderStatus.preparing,
     OrderStatus.ready,
     OrderStatus.completed,
+    OrderStatus.cancelled,
+    OrderStatus.refunded,
   };
-  return all.where((o) => shown.contains(o.status)).toList();
+  final list = all.where((o) => shown.contains(o.status)).toList()
+    ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+  return list;
 });
 
 /// (Admin) Detail pesanan mana pun.
@@ -465,14 +501,3 @@ final pendingOrdersProvider = FutureProvider<List<OrderModel>>((ref) {
       .fetchAllOrders(status: 'pending_payment', date: today, limit: 100);
 });
 
-/// (Admin) Riwayat transaksi = pesanan yang sudah SELESAI atau DIBATALKAN
-/// (log lampau, read-only). Berbeda dari "Pesanan Masuk" (pesanan aktif).
-final adminOrderHistoryProvider = FutureProvider<List<OrderModel>>((ref) async {
-  final all = await ref.watch(orderRepositoryProvider).fetchAllOrders(limit: 100);
-  return all
-      .where((o) =>
-          o.status == OrderStatus.completed ||
-          o.status == OrderStatus.cancelled ||
-          o.status == OrderStatus.refunded)
-      .toList();
-});

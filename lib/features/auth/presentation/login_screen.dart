@@ -128,13 +128,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 Align(
                   alignment: Alignment.centerRight,
                   child: TextButton(
-                    onPressed: () {
-                      ScaffoldMessenger.of(context)
-                        ..hideCurrentSnackBar()
-                        ..showSnackBar(const SnackBar(
-                            content: Text(
-                                'Reset kata sandi belum tersedia. Hubungi admin di halo@rehat.coffee')));
-                    },
+                    onPressed: () =>
+                        context.pushNamed(RouteNames.forgotPassword),
                     child: const Text('Lupa kata sandi?'),
                   ),
                 ),

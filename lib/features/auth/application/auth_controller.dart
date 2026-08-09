@@ -95,9 +95,9 @@ class AuthController extends Notifier<AuthState> {
     state = next;
   }
 
-  /// Mendaftar. Mengembalikan `otpToken` bila sukses (untuk layar OTP),
-  /// atau `null` bila gagal (pesan tersimpan di state).
-  Future<String?> register({
+  /// Mendaftar. Mengembalikan [RegisterResult] (otpToken + status kirim OTP)
+  /// bila sukses, atau `null` bila gagal (pesan tersimpan di state).
+  Future<RegisterResult?> register({
     required String phone,
     required String password,
   }) async {
@@ -105,7 +105,7 @@ class AuthController extends Notifier<AuthState> {
     try {
       final result = await _repo.register(phone: phone, password: password);
       state = state.copyWith(isSubmitting: false);
-      return result.otpToken;
+      return result;
     } on ApiException catch (e) {
       state = state.copyWith(isSubmitting: false, errorMessage: e.message);
       return null;
@@ -142,8 +142,9 @@ class AuthController extends Notifier<AuthState> {
     }
   }
 
-  /// Meminta OTP baru. Mengembalikan token OTP baru atau `null`.
-  Future<String?> resendOtp(String otpToken) async {
+  /// Meminta OTP baru. Mengembalikan [ResendResult] (token + status kirim) atau
+  /// `null` bila error.
+  Future<ResendResult?> resendOtp(String otpToken) async {
     try {
       return await _repo.resendOtp(otpToken);
     } on ApiException catch (e) {
@@ -151,6 +152,47 @@ class AuthController extends Notifier<AuthState> {
       return null;
     } catch (_) {
       return null;
+    }
+  }
+
+  /// Minta reset password. Mengembalikan [RegisterResult] (otpToken + status
+  /// kirim OTP) bila sukses, atau `null` bila gagal (pesan tersimpan di state —
+  /// mis. "Nomor tidak terdaftar").
+  Future<RegisterResult?> requestPasswordReset({required String phone}) async {
+    state = state.copyWith(isSubmitting: true, clearError: true);
+    try {
+      final result = await _repo.requestPasswordReset(phone: phone);
+      state = state.copyWith(isSubmitting: false);
+      return result;
+    } on ApiException catch (e) {
+      state = state.copyWith(isSubmitting: false, errorMessage: e.message);
+      return null;
+    } catch (_) {
+      state = state.copyWith(
+          isSubmitting: false, errorMessage: 'Gagal memproses. Coba lagi.');
+      return null;
+    }
+  }
+
+  /// Set password baru setelah OTP reset terverifikasi. `true` bila sukses.
+  Future<bool> resetPassword({
+    required String otpToken,
+    required String otpCode,
+    required String newPassword,
+  }) async {
+    state = state.copyWith(isSubmitting: true, clearError: true);
+    try {
+      await _repo.resetPassword(
+          otpToken: otpToken, otpCode: otpCode, newPassword: newPassword);
+      state = state.copyWith(isSubmitting: false);
+      return true;
+    } on ApiException catch (e) {
+      state = state.copyWith(isSubmitting: false, errorMessage: e.message);
+      return false;
+    } catch (_) {
+      state = state.copyWith(
+          isSubmitting: false, errorMessage: 'Gagal reset kata sandi. Coba lagi.');
+      return false;
     }
   }
 

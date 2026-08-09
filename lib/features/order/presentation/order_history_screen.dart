@@ -8,43 +8,37 @@ import '../../../core/router/route_names.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../shared/models/order_model.dart';
 import '../../../shared/widgets/neu.dart';
-import '../../auth/application/auth_controller.dart';
 import '../data/order_repository.dart';
 import 'widgets/reorder_button.dart';
 
-/// Riwayat pesanan pengguna.
+/// Riwayat pesanan pelanggan (pesanan miliknya sendiri). Admin memakai halaman
+/// "Pesanan" terpadu (`AdminOrdersScreen`), bukan layar ini.
 class OrderHistoryScreen extends ConsumerWidget {
   const OrderHistoryScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isAdmin = ref.watch(isAdminProvider);
-    // Admin: log transaksi selesai/dibatalkan. Pelanggan: pesanan sendiri.
-    final provider =
-        isAdmin ? adminOrderHistoryProvider : orderHistoryProvider;
-    final historyAsync = ref.watch(provider);
+    final historyAsync = ref.watch(orderHistoryProvider);
 
     return Scaffold(
-      appBar: AppBar(
-          title: Text(isAdmin ? 'Riwayat Transaksi' : 'Pesanan Saya')),
+      appBar: AppBar(title: const Text('Pesanan Saya')),
       body: historyAsync.when(
         loading: () =>
             const Center(child: CircularProgressIndicator(color: AppColors.amber)),
         error: (e, _) => _ErrorState(
-          onRetry: () => ref.invalidate(provider),
+          onRetry: () => ref.invalidate(orderHistoryProvider),
         ),
         data: (orders) {
-          if (orders.isEmpty) return _EmptyState(isAdmin: isAdmin);
+          if (orders.isEmpty) return const _EmptyState();
           return RefreshIndicator(
             color: AppColors.amber,
-            onRefresh: () async => ref.invalidate(provider),
+            onRefresh: () async => ref.invalidate(orderHistoryProvider),
             child: ListView.separated(
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
               itemCount: orders.length,
               separatorBuilder: (_, __) => const SizedBox(height: 12),
               itemBuilder: (context, i) => _OrderCard(
                 order: orders[i],
-                admin: isAdmin,
                 onTap: () => context.pushNamed(
                   RouteNames.orderDetail,
                   pathParameters: {'id': orders[i].id},
@@ -59,12 +53,9 @@ class OrderHistoryScreen extends ConsumerWidget {
 }
 
 class _OrderCard extends StatelessWidget {
-  const _OrderCard({required this.order, this.onTap, this.admin = false});
+  const _OrderCard({required this.order, this.onTap});
   final OrderModel order;
   final VoidCallback? onTap;
-
-  /// Mode admin: tampilkan nama pelanggan, sembunyikan tombol "Pesan Lagi".
-  final bool admin;
 
   @override
   Widget build(BuildContext context) {
@@ -96,22 +87,6 @@ class _OrderCard extends StatelessWidget {
               _StatusBadge(status: order.status),
             ],
           ),
-          if (admin) ...[
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Icon(Icons.person_outline_rounded,
-                    size: 14, color: AppColors.textSecondary),
-                const SizedBox(width: 4),
-                Expanded(
-                  child: Text(order.customerName,
-                      style: AppTextStyles.bodySmall,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis),
-                ),
-              ],
-            ),
-          ],
           const SizedBox(height: 10),
           Text(Formatters.tanggalJam(order.createdAt),
               style: AppTextStyles.bodySmall),
@@ -135,9 +110,8 @@ class _OrderCard extends StatelessWidget {
                       .copyWith(color: AppColors.amberDark)),
             ],
           ),
-          if (!admin &&
-              (order.status == OrderStatus.completed ||
-                  order.status == OrderStatus.cancelled)) ...[
+          if (order.status == OrderStatus.completed ||
+              order.status == OrderStatus.cancelled) ...[
             const SizedBox(height: 12),
             Align(
               alignment: Alignment.centerRight,
@@ -172,8 +146,7 @@ class _StatusBadge extends StatelessWidget {
 }
 
 class _EmptyState extends StatelessWidget {
-  const _EmptyState({this.isAdmin = false});
-  final bool isAdmin;
+  const _EmptyState();
 
   @override
   Widget build(BuildContext context) {
@@ -192,22 +165,16 @@ class _EmptyState extends StatelessWidget {
                 color: AppColors.amberDark, size: 36),
           ),
           const SizedBox(height: 16),
-          Text(isAdmin ? 'Belum ada transaksi' : 'Belum ada pesanan',
-              style: AppTextStyles.titleLarge),
+          Text('Belum ada pesanan', style: AppTextStyles.titleLarge),
           const SizedBox(height: 6),
-          Text(
-              isAdmin
-                  ? 'Transaksi selesai akan tercatat di sini.'
-                  : 'Pesananmu akan muncul di sini.',
+          Text('Pesananmu akan muncul di sini.',
               style: AppTextStyles.bodyMedium
                   .copyWith(color: AppColors.textSecondary)),
-          if (!isAdmin) ...[
-            const SizedBox(height: 20),
-            OutlinedButton(
-              onPressed: () => context.goNamed(RouteNames.menu),
-              child: const Text('Pesan Sekarang'),
-            ),
-          ],
+          const SizedBox(height: 20),
+          OutlinedButton(
+            onPressed: () => context.goNamed(RouteNames.menu),
+            child: const Text('Pesan Sekarang'),
+          ),
         ],
       ),
     );

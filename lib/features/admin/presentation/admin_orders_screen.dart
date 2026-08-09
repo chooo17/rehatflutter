@@ -11,18 +11,18 @@ import '../../../shared/widgets/neu.dart';
 import '../../order/data/order_repository.dart';
 import '../../order/presentation/widgets/complete_order_button.dart';
 
-/// (Admin) Pesanan Masuk: lihat semua pesanan, filter status, konfirmasi bayar.
+/// (Admin) Halaman "Pesanan": SEMUA pesanan (app pelanggan & kasir) dalam satu
+/// layar, dipisah dua seksi — "Perlu tindakan" (aktif, ada tombol Tandai Selesai)
+/// dan "Riwayat" (selesai/batal/refund, read-only). Terbaru dulu.
 class AdminOrdersScreen extends ConsumerWidget {
   const AdminOrdersScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Hanya pesanan yang SUDAH DIBAYAR (paid → selesai). Tombol progres di tiap
-    // kartu otomatis mengikuti status terkini — tanpa perlu filter/pill.
     final ordersAsync = ref.watch(adminOrdersProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Pesanan Masuk')),
+      appBar: AppBar(title: const Text('Pesanan')),
       body: ordersAsync.when(
         loading: () => const Center(
             child: CircularProgressIndicator(color: AppColors.amber)),
@@ -30,24 +30,71 @@ class AdminOrdersScreen extends ConsumerWidget {
             _ErrorState(onRetry: () => ref.invalidate(adminOrdersProvider)),
         data: (orders) {
           if (orders.isEmpty) return const _EmptyState();
+          // Pisah aktif vs riwayat (urutan terbaru-dulu dijaga provider).
+          final active = orders
+              .where((o) => kActiveOrderStatuses.contains(o.status))
+              .toList();
+          final history = orders
+              .where((o) => !kActiveOrderStatuses.contains(o.status))
+              .toList();
+
+          Widget card(OrderModel o) => _AdminOrderCard(
+                order: o,
+                onTap: () => context.pushNamed(
+                  RouteNames.orderDetail,
+                  pathParameters: {'id': o.id},
+                ),
+              );
+
           return RefreshIndicator(
             color: AppColors.amber,
             onRefresh: () async => ref.invalidate(adminOrdersProvider),
-            child: ListView.separated(
+            child: ListView(
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-              itemCount: orders.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 10),
-              itemBuilder: (context, i) => _AdminOrderCard(
-                order: orders[i],
-                onTap: () => context.pushNamed(
-                  RouteNames.orderDetail,
-                  pathParameters: {'id': orders[i].id},
-                ),
-              ),
+              children: [
+                if (active.isNotEmpty) ...[
+                  _SectionHeader('Perlu tindakan', count: active.length),
+                  const SizedBox(height: 10),
+                  for (final o in active) ...[card(o), const SizedBox(height: 10)],
+                ],
+                if (history.isNotEmpty) ...[
+                  if (active.isNotEmpty) const SizedBox(height: 14),
+                  _SectionHeader('Riwayat', count: history.length),
+                  const SizedBox(height: 10),
+                  for (final o in history) ...[
+                    card(o),
+                    const SizedBox(height: 10)
+                  ],
+                ],
+              ],
             ),
           );
         },
       ),
+    );
+  }
+}
+
+/// Judul seksi + jumlah, untuk memisah "Perlu tindakan" & "Riwayat".
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader(this.title, {required this.count});
+  final String title;
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Text(title.toUpperCase(),
+            style: AppTextStyles.caption.copyWith(
+                color: AppColors.textSecondary,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.6)),
+        const SizedBox(width: 8),
+        Text('$count',
+            style: AppTextStyles.caption
+                .copyWith(color: AppColors.textSecondary)),
+      ],
     );
   }
 }
@@ -211,7 +258,7 @@ class _EmptyState extends StatelessWidget {
             color: AppColors.textSecondary, size: 40),
         const SizedBox(height: 12),
         Center(
-          child: Text('Tidak ada pesanan untuk filter ini.',
+          child: Text('Belum ada pesanan.',
               style: AppTextStyles.bodyMedium
                   .copyWith(color: AppColors.textSecondary)),
         ),

@@ -21,10 +21,12 @@ import '../../features/wallet/presentation/wallet_screen.dart';
 import '../../features/wallet/presentation/referral_screen.dart';
 import '../../features/admin/presentation/admin_orders_screen.dart';
 import '../../features/auth/application/auth_controller.dart';
+import '../../features/auth/presentation/forgot_password_screen.dart';
 import '../../features/auth/presentation/login_screen.dart';
 import '../../features/auth/presentation/otp_screen.dart';
 import '../../features/auth/presentation/profile_setup_screen.dart';
 import '../../features/auth/presentation/register_screen.dart';
+import '../../features/auth/presentation/reset_password_screen.dart';
 import '../../features/favorites/presentation/favorites_screen.dart';
 import '../../features/home/presentation/home_screen.dart';
 import '../../features/loyalty/presentation/loyalty_history_screen.dart';
@@ -73,7 +75,9 @@ final routerProvider = Provider<GoRouter>((ref) {
       // karena register belum menghasilkan token sampai OTP diverifikasi).
       final onAuthFlow = loc == RouteNames.loginPath ||
           loc == RouteNames.registerPath ||
-          loc == RouteNames.otpPath;
+          loc == RouteNames.otpPath ||
+          loc == RouteNames.forgotPasswordPath ||
+          loc == RouteNames.resetPasswordPath;
 
       // Sesi belum dipulihkan — tahan di splash.
       if (auth.status == AuthStatus.unknown) {
@@ -134,6 +138,24 @@ final routerProvider = Provider<GoRouter>((ref) {
           return OtpScreen(
             otpToken: (args['otpToken'] ?? '').toString(),
             phone: (args['phone'] ?? '').toString(),
+            otpSent: (args['otpSent'] ?? true) == true,
+          );
+        },
+      ),
+      GoRoute(
+        path: RouteNames.forgotPasswordPath,
+        name: RouteNames.forgotPassword,
+        builder: (context, state) => const ForgotPasswordScreen(),
+      ),
+      GoRoute(
+        path: RouteNames.resetPasswordPath,
+        name: RouteNames.resetPassword,
+        builder: (context, state) {
+          final args = (state.extra as Map?) ?? const {};
+          return ResetPasswordScreen(
+            otpToken: (args['otpToken'] ?? '').toString(),
+            phone: (args['phone'] ?? '').toString(),
+            otpSent: (args['otpSent'] ?? true) == true,
           );
         },
       ),

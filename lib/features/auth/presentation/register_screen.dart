@@ -45,15 +45,19 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     }
 
     final phone = _phoneCtrl.text.trim();
-    final otpToken = await ref
+    final result = await ref
         .read(authControllerProvider.notifier)
         .register(phone: phone, password: _passwordCtrl.text);
 
     if (!mounted) return;
-    if (otpToken != null) {
+    if (result != null) {
       context.pushNamed(
         RouteNames.otp,
-        extra: {'otpToken': otpToken, 'phone': phone},
+        extra: {
+          'otpToken': result.otpToken,
+          'phone': phone,
+          'otpSent': result.otpSent,
+        },
       );
     } else {
       final msg = ref.read(authControllerProvider).errorMessage ??

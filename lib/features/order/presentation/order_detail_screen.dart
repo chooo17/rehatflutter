@@ -16,6 +16,7 @@ import '../../../shared/widgets/qris_payment_card.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../review/presentation/review_sheet.dart';
 import '../data/order_repository.dart';
+import 'widgets/edit_order_sheet.dart';
 import 'widgets/order_tracking_timeline.dart';
 import 'widgets/reorder_button.dart';
 
@@ -383,6 +384,16 @@ class _AdminStatusControlsState extends ConsumerState<_AdminStatusControls> {
     }
   }
 
+  /// Edit item pesanan tersimpan (tambah/hapus/ubah jumlah) via bottom sheet.
+  Future<void> _editItems() async {
+    final changed = await showEditOrderSheet(context, widget.order);
+    if (!changed || !mounted) return;
+    ref.invalidate(orderDetailProvider(widget.order.id));
+    ref.invalidate(adminOrderDetailProvider(widget.order.id));
+    ref.invalidate(pendingOrdersProvider);
+    ref.invalidate(adminOrdersProvider);
+  }
+
   /// Refund TUNAI penuh — dialog alasan wajib lalu panggil API.
   Future<void> _refund() async {
     final controller = TextEditingController();
@@ -591,6 +602,20 @@ class _AdminStatusControlsState extends ConsumerState<_AdminStatusControls> {
             // Pesanan menunggu bayar → customer bisa bayar QRIS (berlaku juga
             // untuk pesanan disimpan/bayar-nanti) ATAU kasir tandai lunas tunai.
             if (status == OrderStatus.pending) ...[
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: _editItems,
+                  icon: const Icon(Icons.edit_note_rounded, size: 20),
+                  label: const Text('Edit item'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.espresso,
+                    side: BorderSide(color: AppColors.border),
+                    minimumSize: const Size(0, 48),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton.icon(
