@@ -187,6 +187,69 @@ void main() {
   });
 
   testWidgets(
+      'MUTASI (catch basi) — jaring: GALAT "muat lebih banyak" yang BASI '
+      '(filter sudah berganti sebelum galat tiba) tidak menampilkan pesan '
+      'merah di daftar filter BARU', (tester) async {
+    final repo = _FakeFinanceRepository();
+    final container = ProviderContainer(
+      overrides: [financeRepositoryProvider.overrideWithValue(repo)],
+    );
+    addTearDown(container.dispose);
+
+    await _mountScreen(tester, container);
+    await tester.pump();
+    // Halaman pertama filter "Semua".
+    repo.completers[0].complete(LedgerPage(
+      items: [_entry('a', bucket: 'restock')],
+      hasMore: true,
+      nextBefore: '2026-08-05T03:00:00.000Z',
+      nextBeforeId: 'cur-semua',
+    ));
+    await tester.pump();
+    await tester.pump();
+
+    // Tap "Muat lebih banyak" untuk filter "Semua" — request terkirim,
+    // TAPI dibiarkan menggantung (belum di-complete).
+    await tester.tap(find.text('Muat lebih banyak'));
+    await tester.pump();
+    expect(repo.calls.length, 2);
+    expect(repo.calls[1].beforeId, 'cur-semua');
+
+    // Sementara request itu masih menggantung, user berpindah filter ke
+    // "Restock" — memicu request BARU (halaman pertama restock).
+    await tester.tap(find.widgetWithText(ChoiceChip, 'Restock'));
+    await tester.pump();
+    expect(repo.calls.length, 3);
+    expect(repo.calls[2].bucket, 'restock');
+    // `hasMore: true` SENGAJA — kalau `canLoadMore` sudah false, footer
+    // tak pernah merender `_loadMoreError` sama sekali (lihat
+    // `_LoadMoreFooter`), sehingga test ini tak benar-benar membuktikan
+    // apa-apa soal pemeriksaan basi di `catch`.
+    repo.completers[2].complete(LedgerPage(
+      items: [_entry('r1', bucket: 'restock')],
+      hasMore: true,
+      nextBefore: '2026-08-05T03:00:00.000Z',
+      nextBeforeId: 'cur-restock',
+    ));
+    await tester.pump();
+    await tester.pump();
+
+    // BARU SEKARANG request "muat lebih banyak" filter "Semua" yang lama
+    // (basi) GAGAL.
+    repo.completers[1].completeError(Exception('galat jaringan basi'));
+    await tester.pump();
+    await tester.pump();
+
+    // Pesan galat TIDAK boleh muncul di daftar filter BARU ("Restock") —
+    // galat itu milik request filter LAMA ("Semua") yang sudah tak relevan.
+    // Kalau pemeriksaan basi di blok `catch` `_loadMore` dihapus (`_state =
+    // ...` tanpa syarat menjadi `_loadMoreError = '...'` tanpa syarat), test
+    // ini akan gagal.
+    expect(find.text('Gagal memuat halaman berikutnya. Coba lagi.'), findsNothing);
+    expect(find.text('Muat lebih banyak'), findsOneWidget);
+  });
+
+  testWidgets(
       'MUTASI (d) — jaring: halaman PERTAMA filter baru harus MENGGANTIKAN '
       '(bukan APPEND ke) state filter lama', (tester) async {
     final repo = _FakeFinanceRepository();

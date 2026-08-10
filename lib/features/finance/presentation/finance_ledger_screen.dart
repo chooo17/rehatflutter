@@ -34,7 +34,7 @@ class _FinanceLedgerScreenState extends ConsumerState<FinanceLedgerScreen> {
 
   /// Generasi (epoch) halaman pertama yang SEDANG ditampilkan. Naik setiap
   /// [_onFirstPage] dijalankan (filter berganti ATAU tarik-untuk-refresh
-  /// dengan filter sama) — lihat [nextEpoch] & [isLoadMoreResponseStale].
+  /// dengan filter sama) — lihat [isLoadMoreResponseStale].
   /// Ini satu-satunya cara membedakan "refresh dengan filter sama" dari
   /// "tidak ada perubahan sama sekali" (C-3): perbandingan bucket saja buta
   /// terhadap kasus itu karena bucket-nya identik sebelum & sesudah refresh.
@@ -51,7 +51,7 @@ class _FinanceLedgerScreenState extends ConsumerState<FinanceLedgerScreen> {
       _stateBucket = bucket;
       _state = firstPageState(page);
       _loadMoreError = null;
-      _epoch = nextEpoch(_epoch);
+      _epoch++;
     });
   }
 
@@ -135,10 +135,14 @@ class _FinanceLedgerScreenState extends ConsumerState<FinanceLedgerScreen> {
     // itu bisa berupa data filter LAMA yang bertahan di cache Riverpod,
     // bukan filter yang sedang aktif (`bucket`).
 
-    // Pola keep-previous-data: spinner HANYA saat filter ini belum pernah
-    // punya data sama sekali. Saat berganti filter, daftar lama (filter
-    // sebelumnya) tetap tampil sampai halaman baru datang lewat listener di
-    // atas — supaya layar tak berkedip kosong.
+    // Spinner HANYA saat filter ini belum pernah punya data sama sekali
+    // (`_stateBucket != bucket`, mis. filter baru dipilih). Saat GANTI
+    // FILTER, layar sengaja menampilkan spinner penuh layar (daftar lama
+    // milik filter LAIN, tidak relevan untuk ditampilkan sambil menunggu).
+    // Pola keep-previous-data berlaku untuk kasus REFRESH: filter sama
+    // (`_stateBucket == bucket`) sehingga `hasDataForCurrentFilter` true dan
+    // daftar lama tetap tampil sampai halaman baru datang lewat listener di
+    // atas — layar tak berkedip kosong saat tarik-untuk-refresh.
     final hasDataForCurrentFilter = _stateBucket == bucket;
     final showInitialSpinner = !hasDataForCurrentFilter && async.isLoading;
     final showInitialError = !hasDataForCurrentFilter && async.hasError;

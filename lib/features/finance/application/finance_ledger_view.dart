@@ -64,11 +64,9 @@ LedgerListState appendLedgerPage(LedgerListState state, LedgerPage page) {
   final cursorComplete = page.nextBefore != null && page.nextBeforeId != null;
   final hasMore = page.hasMore && cursorComplete;
   final seenIds = state.items.map((e) => e.id).toSet();
-  // `.toList()` WAJIB — `where(...seenIds.add...)` ber-efek-samping lewat
-  // `Set.add`, dan `Iterable.where` itu LAZY. Tanpa materialisasi ini, iterasi
-  // KEDUA atas `newItems` (mis. debugging, atau pemanggil lain yang membaca
-  // `newItems.length` lalu memakainya lagi) mengembalikan KOSONG karena
-  // `seenIds` sudah terisi penuh dari iterasi pertama.
+  // `.toList()`: `where(...seenIds.add...)` ber-efek-samping lewat `Set.add`
+  // dan `Iterable.where` itu LAZY, jadi dimaterialisasi sekali di sini
+  // supaya hasilnya tak bergantung pada berapa kali `newItems` diiterasi.
   final newItems = page.items.where((e) => seenIds.add(e.id)).toList();
   return LedgerListState(
     items: [...state.items, ...newItems],
@@ -128,19 +126,6 @@ bool isLoadMoreResponseStale({
       requestedBucket != stateBucket ||
       requestedEpoch != currentEpoch;
 }
-
-/// Epoch (generasi) berikutnya setelah sebuah halaman PERTAMA (baru karena
-/// filter berganti, ATAU karena tarik-untuk-refresh dengan filter yang SAMA)
-/// diterima dan menggantikan [LedgerListState] yang sedang ditampilkan.
-///
-/// Dipanggil oleh layar setiap kali `_onFirstPage` dijalankan — tanpa
-/// terkecuali, termasuk saat filter tidak berubah — supaya SETIAP kali
-/// halaman 1 diganti, semua request "muat lebih banyak" yang masih tertunda
-/// dari sebelumnya otomatis basi (lihat [isLoadMoreResponseStale] & C-3).
-/// Sengaja hanya `current + 1` (bukan timestamp/UUID) — cukup sebagai
-/// pembanding urut karena hanya dibaca di proses yang sama, tak pernah
-/// dikirim ke jaringan atau disimpan lintas sesi.
-int nextEpoch(int current) => current + 1;
 
 /// Apakah tombol "Muat lebih banyak" boleh ditampilkan/aktif untuk [state].
 /// Murni membaca `hasMore` dari backend — TIDAK menyimpulkan dari panjang

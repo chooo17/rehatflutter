@@ -264,14 +264,6 @@ void main() {
     });
   });
 
-  group('nextEpoch', () {
-    test('selalu naik satu dari current', () {
-      expect(nextEpoch(0), 1);
-      expect(nextEpoch(1), 2);
-      expect(nextEpoch(41), 42);
-    });
-  });
-
   group('resetLedgerState', () {
     test('mengembalikan state kosong total (items, cursor, hasMore)', () {
       final r = resetLedgerState();

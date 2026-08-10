@@ -562,7 +562,15 @@ final financeOverviewProvider = FutureProvider<FinanceOverview>((ref) {
 });
 
 /// Filter bucket aktif di layar buku besar. `null` = semua bucket.
-final ledgerBucketFilterProvider = StateProvider<String?>((ref) => null);
+///
+/// **`autoDispose` (Task 8 re-review, butir 5):** sejalan dengan
+/// [ledgerProvider] — tanpa ini, filter chip yang dipilih di kunjungan
+/// sebelumnya (mis. "Restock") masih nyangkut saat layar dibuka lagi,
+/// walau niatnya layar ini selalu "mulai bersih". Karena provider ini
+/// hanya punya dua pemakai (widget `build()` & [ledgerProvider], keduanya
+/// hidup-mati bersama layar), `autoDispose` mereset ke `null` begitu
+/// keduanya lepas — tanpa rebuild/refetch ekstra saat layar masih terbuka.
+final ledgerBucketFilterProvider = StateProvider.autoDispose<String?>((ref) => null);
 
 /// Halaman pertama buku besar sesuai [ledgerBucketFilterProvider].
 /// Halaman berikutnya (kursor keyset `next_before`/`next_before_id`)
