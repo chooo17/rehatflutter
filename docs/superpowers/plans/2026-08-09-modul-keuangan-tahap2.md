@@ -237,8 +237,16 @@ const allocateDaily = ({
     emergency = Math.floor((sisa * re) / totalRasio)
   }
 
-  // Sisa rupiah pembulatan dilempar ke Restock supaya Σ alokasi == omzet PERSIS.
-  // Tanpa ini, rupiah menguap diam-diam setiap hari.
+  // Sisa rupiah dari pembagian TIGA ARAH diserap Pribadi -- sisa itu lahir dari
+  // membagi jatah pemilik, jadi ia tetap milik kelompok itu. Melemparnya ke
+  // Restock akan membuat Restock tidak lagi tepat pctRestock% dari omzet.
+  if (sisa > 0 && totalRasio > 0) {
+    personal += sisa - (personal + scaling + emergency)
+  }
+
+  // Jaring pengaman: hanya untuk kasus degenerate (rasio nol/hilang) di mana
+  // sisa tidak terbagi sama sekali. Menjamin Σ alokasi == omzet PERSIS --
+  // tanpa ini, rupiah menguap diam-diam setiap hari.
   const terbagi = restock + operational + personal + scaling + emergency
   const sisaPembulatan = rev - terbagi
 

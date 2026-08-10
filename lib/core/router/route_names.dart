@@ -134,4 +134,15 @@ class RouteNames {
   /// Laba rugi bulanan (modul keuangan). Rute didaftarkan di `app_router.dart`.
   static const String financePnl = 'finance-pnl';
   static const String financePnlPath = '/profile/finance/pnl';
+
+  /// Ringkasan amplop alokasi (modul keuangan, Task 7) — pintu masuk modul
+  /// Keuangan; Laba Rugi & Biaya Tetap dicapai dari sini.
+  /// Rute didaftarkan di `app_router.dart`.
+  static const String financeOverview = 'finance-overview';
+  static const String financeOverviewPath = '/profile/finance/overview';
+
+  /// Buku besar (riwayat mutasi amplop, Task 8) — dijangkau dari Ringkasan.
+  /// Rute didaftarkan di `app_router.dart`.
+  static const String financeLedger = 'finance-ledger';
+  static const String financeLedgerPath = '/profile/finance/ledger';
 }

@@ -123,15 +123,24 @@ class NeuButton extends StatelessWidget {
     final bg = accent
         ? (disabled ? AppColors.amber.withValues(alpha: 0.4) : AppColors.amber)
         : AppColors.surface;
+    // `Material` melarang `shape` DAN `borderRadius` diisi bersamaan (assert
+    // debug-only `!(shape != null && borderRadius != null)`) — sebelumnya
+    // keduanya diisi untuk varian non-accent (borderRadius selalu diisi,
+    // shape hanya untuk non-accent), memicu assert di SETIAP render debug &
+    // mengunci widget test apa pun yang memuat `NeuButton` (23 pemakaian
+    // non-accent). Diperbaiki dengan memakai `shape` SAJA untuk kedua
+    // varian — `RoundedRectangleBorder` sendiri sudah menentukan radius,
+    // jadi `borderRadius` terpisah tak pernah diperlukan. Tampilan
+    // dipertahankan persis: accent tanpa border (`BorderSide.none`, sama
+    // seperti `shape: null` sebelumnya — Material tanpa `shape` eksplisit
+    // pakai `RoundedRectangleBorder` tanpa sisi), non-accent dengan border
+    // tipis seperti semula.
     final btn = Material(
       color: bg,
-      borderRadius: BorderRadius.circular(radius),
-      shape: accent
-          ? null
-          : RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(radius),
-              side: BorderSide(color: AppColors.border),
-            ),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(radius),
+        side: accent ? BorderSide.none : BorderSide(color: AppColors.border),
+      ),
       child: InkWell(
         onTap: onPressed,
         borderRadius: BorderRadius.circular(radius),
