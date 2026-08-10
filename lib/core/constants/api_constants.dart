@@ -127,6 +127,11 @@ class ApiConstants {
   static const String financeFixedCosts = '/admin/finance/fixed-costs';
   static String financeFixedCost(String id) => '/admin/finance/fixed-costs/$id';
   static const String financePnl = '/admin/finance/pnl';
+  // Amplop alokasi (Tahap 2).
+  static const String financeOverview = '/admin/finance/overview';
+  static const String financeLedger = '/admin/finance/ledger';
+  static const String financeWithdraw = '/admin/finance/withdraw';
+  static const String financeAllocate = '/admin/finance/allocate';
 
   // Notifications -------------------------------------------------------
   static const String notifications = '/notifications';
