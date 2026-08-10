@@ -96,10 +96,30 @@ RunwayDisplay runwayDisplay(FinanceOverview overview) {
   if (days < 0) {
     return RunwayDisplay(status: RunwayStatus.deficit, days: days);
   }
-  if (days == 0 && overview.guards.breakEvenDaily == 0) {
+  // Sentinel "biaya belum diketahui" HANYA berlaku bila margin masih
+  // positif (backend menghitung `breakEvenDaily=0` lewat cabang
+  // `margin>0` yang gagal, bukan lewat `margin<=0`). Bila margin ≤ 0,
+  // `breakEvenDaily=0` datang dari cabang margin di `computeGuards`
+  // (financeCalc.js) — bukan sentinel "biaya belum diketahui" — dan
+  // `runwayDays=0` di sana bisa berarti runway sungguhan KURANG DARI 1
+  // HARI (mis. biaya Rp8.000.000/bulan, saldo operasional Rp100.000,
+  // sedang jual rugi). Menganggapnya "unknown" akan menyembunyikan kondisi
+  // yang justru paling gawat.
+  if (days == 0 &&
+      overview.guards.breakEvenDaily == 0 &&
+      !overview.marginNonPositive) {
     return const RunwayDisplay(status: RunwayStatus.unknown);
   }
   return RunwayDisplay(status: RunwayStatus.ok, days: days);
+}
+
+/// Teks untuk [RunwayStatus.ok] — dipisah jadi fungsi murni supaya bisa
+/// diuji tanpa merender widget. `days == 0` sengaja BUKAN "Cukup 0 hari"
+/// (terbaca menenangkan) — itu berarti runway kurang dari 1 hari penuh,
+/// kondisi yang justru butuh perhatian segera.
+String runwayOkLabel(int days) {
+  if (days == 0) return 'Kurang dari 1 hari';
+  return 'Cukup $days hari';
 }
 
 /// Peringatan tambahan untuk runway ketika biaya variabel tidak lengkap di
@@ -300,8 +320,20 @@ class BackfillSummary {
   }
 
   /// Pesan ringkasan Bahasa Indonesia siap ditampilkan (mis. snackbar).
+  ///
+  /// PENTING: pemeriksaan "tak ada yang diproses" TIDAK BOLEH jadi
+  /// early-return sebelum [remainingCount] diperiksa — daftar yang dikirim
+  /// ke aksi bisa kosong (mis. semua tersaring "hari ini") SEMENTARA
+  /// backlog [remainingCount] tetap > 0 (dipotong 60 oleh backend).
+  /// Kalimat "Tidak ada tanggal untuk dialokasikan." akan MENENANGKAN
+  /// padahal pembukuan masih bolong.
   String get message {
     if (allocatedCount == 0 && skippedCount == 0 && failedCount == 0) {
+      if (remainingCount > 0) {
+        return 'Tidak ada tanggal yang diproses kali ini. Masih ada '
+            '$remainingCount tanggal lain yang belum diproses (di luar 60 '
+            'yang ditampilkan).';
+      }
       return 'Tidak ada tanggal untuk dialokasikan.';
     }
     String core;
@@ -328,6 +360,25 @@ class BackfillSummary {
     return core;
   }
 }
+
+/// Hasil sintetis untuk satu tanggal yang GAGAL TERKIRIM (jaringan/server)
+/// saat aksi "Alokasikan tanggal bolong" berjalan. Diekstrak jadi fungsi
+/// murni bernama (bukan literal `AllocateResult(...)` inline di widget)
+/// supaya satu-satunya titik sambung "bedakan gagal dari dilewati" bisa
+/// diuji langsung tanpa merender widget — kalau `failed:true` di sini
+/// hilang, kegagalan jaringan kembali dilaporkan `BackfillSummary` sebagai
+/// "sudah pernah dialokasikan", padahal pembukuan masih bolong.
+AllocateResult failedAllocateResult() =>
+    const AllocateResult(allocated: false, failed: true, reason: 'gagal');
+
+/// `totalMissingCount` untuk [BackfillSummary.fromResults] HARUS berupa
+/// `missingAllocationCount` dari overview SEBELUM aksi backfill dijalankan
+/// — diekstrak jadi fungsi bernama (bukan akses field inline di widget)
+/// supaya titik sambungnya bisa diuji: mengganti nilainya jadi `0` di
+/// widget akan menghilangkan peringatan sisa backlog secara senyap, tapi
+/// mengganti nilainya di SINI langsung ketahuan oleh test.
+int totalMissingCountFor(FinanceOverview overview) =>
+    overview.missingAllocationCount;
 
 /// Menerjemahkan galat penarikan menjadi pesan yang bisa dipahami pemilik.
 /// `DUPLICATE_WITHDRAWAL` (409, penarikan identik dalam 60 detik) BUKAN

@@ -120,6 +120,41 @@ void main() {
       expect(d.status, RunwayStatus.ok);
       expect(d.days, 45);
     });
+
+    test('marginNonPositive true, runwayDays 0 & breakEvenDaily 0 → ok (runway sungguhan <1 hari), BUKAN unknown', () {
+      // Kasus nyata dari computeGuards (financeCalc.js): margin ≤ 0 →
+      // breakEvenDaily=0 lewat cabang margin (bukan sentinel "biaya belum
+      // diketahui"), dan operational < harian → runwayDays=0 lewat
+      // floor(). Ini BUKAN "tak terhitung" — runway benar-benar kurang
+      // dari 1 hari, kondisi paling gawat yang sebelumnya tertelan sentinel
+      // gabungan `runwayDays==0 && breakEvenDaily==0`.
+      final o = _overview(
+        marginNonPositive: true,
+        guards: const FinanceGuards(runwayDays: 0, breakEvenDaily: 0),
+      );
+      final d = runwayDisplay(o);
+      expect(d.status, RunwayStatus.ok);
+      expect(d.days, 0);
+    });
+
+    test('marginNonPositive false, runwayDays 0 & breakEvenDaily 0 → tetap unknown (sentinel biaya belum diketahui)', () {
+      final o = _overview(
+        marginNonPositive: false,
+        guards: const FinanceGuards(runwayDays: 0, breakEvenDaily: 0),
+      );
+      expect(runwayDisplay(o).status, RunwayStatus.unknown);
+    });
+  });
+
+  group('runwayOkLabel', () {
+    test('days 0 → "Kurang dari 1 hari", BUKAN "Cukup 0 hari" yang menenangkan', () {
+      expect(runwayOkLabel(0), 'Kurang dari 1 hari');
+      expect(runwayOkLabel(0), isNot(contains('Cukup')));
+    });
+
+    test('days positif → "Cukup N hari"', () {
+      expect(runwayOkLabel(45), 'Cukup 45 hari');
+    });
   });
 
   group('runwayWarning', () {
@@ -396,6 +431,64 @@ void main() {
           3, (_) => const AllocateResult(allocated: true, revenue: 1000));
       final r = BackfillSummary.fromResults(results, totalMissingCount: 3);
       expect(r.remainingCount, 0);
+      // Kunci mutasi `if (remainingCount > 0)` → `>= 0` (lolos semua test
+      // lain karena remainingCount memang 0 di sini juga): tanpa assert ini,
+      // "0" masih lolos kondisi `>= 0` dan menempelkan kalimat "Masih ada 0
+      // tanggal lain..." yang menyesatkan di SETIAP ringkasan backfill
+      // normal.
+      expect(r.message, isNot(contains('Masih ada')));
+    });
+
+    test('totalMissingCount TIDAK diisi (default 0) & ada hasil → remainingCount TETAP 0, bukan negatif', () {
+      // Kunci mutasi yang menghapus clamp `remaining > 0 ? remaining : 0`:
+      // totalMissingCount default 0 sementara results.length > 0 membuat
+      // `remaining` mentah negatif. Tanpa clamp, remainingCount akan -3
+      // (lolos filter `>0` sehingga TIDAK memicu kalimat "Masih ada", tapi
+      // menyimpan nilai negatif yang salah dan bisa bocor lewat pemanggil
+      // lain di masa depan).
+      final results = List<AllocateResult>.generate(
+          3, (_) => const AllocateResult(allocated: true, revenue: 1000));
+      final r = BackfillSummary.fromResults(results);
+      expect(r.remainingCount, 0);
+    });
+
+    test('daftar hasil kosong TAPI totalMissingCount > 0 → sisa backlog tetap disebut, BUKAN "Tidak ada tanggal"', () {
+      // IMPORTANT (butir 2): daftar yang dikirim ke aksi backfill bisa
+      // kosong (mis. semua tersaring karena "hari ini WIB") SEMENTARA
+      // backlog di luar 60 yang ditampilkan tetap ada. Early-return "Tidak
+      // ada tanggal untuk dialokasikan." akan menenangkan pemilik padahal
+      // pembukuan masih bolong.
+      final r = BackfillSummary.fromResults(const [], totalMissingCount: 15);
+      expect(r.allocatedCount, 0);
+      expect(r.skippedCount, 0);
+      expect(r.failedCount, 0);
+      expect(r.remainingCount, 15);
+      expect(r.message, isNot('Tidak ada tanggal untuk dialokasikan.'));
+      expect(r.message, contains('15'));
+    });
+
+    test('daftar hasil kosong DAN totalMissingCount 0 → tetap "Tidak ada tanggal"', () {
+      final r = BackfillSummary.fromResults(const [], totalMissingCount: 0);
+      expect(r.message, 'Tidak ada tanggal untuk dialokasikan.');
+    });
+  });
+
+  group('failedAllocateResult', () {
+    test('selalu allocated:false & failed:true — satu-satunya titik sambung "gagal ≠ dilewati"', () {
+      final r = failedAllocateResult();
+      expect(r.allocated, isFalse);
+      expect(r.failed, isTrue,
+          reason: 'kalau ini hilang, kegagalan jaringan dilaporkan sebagai '
+              '"sudah pernah dialokasikan" oleh BackfillSummary');
+    });
+  });
+
+  group('totalMissingCountFor', () {
+    test('meneruskan missingAllocationCount overview apa adanya', () {
+      final o = _overview(missingAllocationCount: 42);
+      expect(totalMissingCountFor(o), 42,
+          reason: 'kalau ini diam-diam jadi 0, peringatan sisa backlog '
+              'hilang tanpa satu test pun gagal');
     });
   });
 

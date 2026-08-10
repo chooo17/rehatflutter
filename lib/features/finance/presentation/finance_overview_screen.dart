@@ -114,13 +114,13 @@ class _MissingAllocationsCardState extends ConsumerState<_MissingAllocationsCard
         // Tanggal ini GAGAL TERKIRIM (jaringan/server) — beda dari
         // "dilewati" oleh backend. Tandai `failed:true` supaya
         // BackfillSummary tidak melaporkannya sebagai kondisi aman.
-        results.add(const AllocateResult(allocated: false, failed: true, reason: 'gagal'));
+        results.add(failedAllocateResult());
       }
     }
     if (!mounted) return;
     final summary = BackfillSummary.fromResults(
       results,
-      totalMissingCount: widget.overview.missingAllocationCount,
+      totalMissingCount: totalMissingCountFor(widget.overview),
     );
     setState(() => _running = false);
     ref.invalidate(financeOverviewProvider);
@@ -318,7 +318,7 @@ class _RunwayValue extends StatelessWidget {
         );
       case RunwayStatus.ok:
         return Text(
-          'Cukup ${display.days} hari',
+          runwayOkLabel(display.days),
           style: Theme.of(context).textTheme.bodyLarge?.copyWith(
               fontWeight: FontWeight.bold, color: AppColors.espresso),
         );
