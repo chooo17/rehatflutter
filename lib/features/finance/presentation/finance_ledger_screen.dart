@@ -40,29 +40,42 @@ class _FinanceLedgerScreenState extends ConsumerState<FinanceLedgerScreen> {
     if (!mounted) return;
     setState(() {
       _stateBucket = bucket;
-      _state = appendLedgerPage(resetLedgerState(), page);
+      _state = firstPageState(page);
       _loadMoreError = null;
     });
   }
 
   Future<void> _loadMore() async {
     if (_loadingMore || !canLoadMore(_state)) return;
+    // Dibaca SEBELUM await — filter pos bisa berganti sementara request ini
+    // masih di jalan (lihat isLoadMoreResponseStale).
+    final requestedBucket = ref.read(ledgerBucketFilterProvider);
     setState(() {
       _loadingMore = true;
       _loadMoreError = null;
     });
     try {
-      final bucket = ref.read(ledgerBucketFilterProvider);
       final repo = ref.read(financeRepositoryProvider);
       final page = await repo.fetchLedger(
-        bucket: bucket,
+        bucket: requestedBucket,
         before: _state.nextBefore,
         beforeId: _state.nextBeforeId,
       );
       if (!mounted) return;
+      // Buang respons basi (filter sudah berganti sejak request dikirim) —
+      // JANGAN append. Selain merusak tampilan filter baru dengan baris
+      // filter lama, cursor filter baru juga akan tertimpa cursor posisi
+      // filter lama, membuat baris filter baru terlewat permanen.
+      final stale = isLoadMoreResponseStale(
+        requestedBucket: requestedBucket,
+        currentFilterBucket: ref.read(ledgerBucketFilterProvider),
+        stateBucket: _stateBucket,
+      );
       setState(() {
-        _state = appendLedgerPage(_state, page);
         _loadingMore = false;
+        if (!stale) {
+          _state = appendLedgerPage(_state, page);
+        }
       });
     } catch (_) {
       if (!mounted) return;
@@ -84,6 +97,27 @@ class _FinanceLedgerScreenState extends ConsumerState<FinanceLedgerScreen> {
     ref.listen<AsyncValue<LedgerPage>>(ledgerProvider, (previous, next) {
       next.whenData((page) => _onFirstPage(ref.read(ledgerBucketFilterProvider), page));
     });
+
+    // C2 — cache hangat: `ledgerProvider` adalah FutureProvider BIASA (bukan
+    // autoDispose), jadi kunjungan KEDUA ke layar ini (mis. pop lalu push
+    // lagi) bisa menemukan provider SUDAH `AsyncData` dari kunjungan
+    // sebelumnya. `ref.listen` di atas TIDAK menyala untuk nilai yang sudah
+    // tersedia sebelum listener dipasang (hanya untuk transisi BARU) —
+    // sehingga tanpa baris ini, `_state` tetap kosong (`_stateBucket ==
+    // null`, `initState` baru) walau datanya sudah ada, dan layar tampil
+    // "Belum ada mutasi" padahal data ada. Diseed langsung di sini
+    // (bukan setState — kita masih di tengah build ini, jadi cukup ubah
+    // field lalu lanjutkan build dgn nilai baru) memakai fungsi murni yang
+    // sama dgn `_onFirstPage` supaya perilakunya identik (reset total, tidak
+    // pernah gabung dgn state filter lain).
+    if (_stateBucket != bucket) {
+      final cached = async.valueOrNull;
+      if (cached != null) {
+        _stateBucket = bucket;
+        _state = firstPageState(cached);
+        _loadMoreError = null;
+      }
+    }
 
     // Pola keep-previous-data: spinner HANYA saat filter ini belum pernah
     // punya data sama sekali. Saat berganti filter, daftar lama (filter
@@ -125,6 +159,14 @@ class _FinanceLedgerScreenState extends ConsumerState<FinanceLedgerScreen> {
                         ),
                       )
                     : RefreshIndicator(
+                        // Sengaja kembali ke halaman 1 (bukan me-refresh
+                        // in-place lalu mempertahankan halaman 2..N yang
+                        // sudah dimuat) — tarik-untuk-refresh adalah aksi
+                        // "mulai ulang dari data terbaru", dan `ledgerProvider`
+                        // hanya pernah menyimpan halaman pertama; halaman
+                        // lanjutan dikelola terpisah oleh `_state` (lihat
+                        // `_onFirstPage`), yang di-reset total begitu halaman
+                        // 1 baru ini tiba.
                         onRefresh: () async => ref.invalidate(ledgerProvider),
                         child: _LedgerList(
                           state: _state,
@@ -263,7 +305,7 @@ class _LedgerRow extends StatelessWidget {
             const SizedBox(height: 4),
             Row(
               children: [
-                _DirectionBadge(inflow: inflow),
+                _DirectionBadge(direction: entry.direction),
                 const SizedBox(width: 8),
                 Text(sourceLabel(entry.source)),
                 const Text(' · '),
@@ -288,11 +330,16 @@ class _LedgerRow extends StatelessWidget {
 }
 
 class _DirectionBadge extends StatelessWidget {
-  const _DirectionBadge({required this.inflow});
-  final bool inflow;
+  const _DirectionBadge({required this.direction});
+
+  /// `entry.direction` mentah — dipakai langsung (lewat [isInflow] &
+  /// [directionLabel]) supaya tak ada perjalanan bool→string→bool yang tak
+  /// perlu (dulu: `directionLabel(inflow ? 'in' : 'out')`).
+  final String direction;
 
   @override
   Widget build(BuildContext context) {
+    final inflow = isInflow(direction);
     final color = inflow ? AppColors.success : AppColors.error;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -301,7 +348,7 @@ class _DirectionBadge extends StatelessWidget {
         borderRadius: BorderRadius.circular(6),
       ),
       child: Text(
-        directionLabel(inflow ? 'in' : 'out'),
+        directionLabel(direction),
         style: Theme.of(context)
             .textTheme
             .labelSmall

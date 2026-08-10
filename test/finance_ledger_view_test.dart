@@ -1,4 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:rehat_app/core/network/dio_client.dart';
+import 'package:rehat_app/core/storage/secure_storage.dart';
 import 'package:rehat_app/features/finance/application/finance_ledger_view.dart';
 import 'package:rehat_app/features/finance/data/finance_repository.dart';
 
@@ -76,12 +78,6 @@ void main() {
       expect(result.nextBefore, page.nextBefore);
     });
 
-    test('hasMore diambil apa adanya dari page (true)', () {
-      final page = LedgerPage(items: [_entry()], hasMore: true);
-      final result = appendLedgerPage(LedgerListState.initial, page);
-      expect(result.hasMore, isTrue);
-    });
-
     test('hasMore diambil apa adanya dari page (false) walau state lama true', () {
       const oldState = LedgerListState(hasMore: true, nextBefore: 'x', nextBeforeId: 'y');
       final page = LedgerPage(items: [_entry()], hasMore: false);
@@ -96,6 +92,135 @@ void main() {
       expect(result.items.length, 1, reason: 'item lama tetap ada walau halaman baru kosong');
       expect(result.hasMore, isFalse);
       expect(result.nextBefore, isNull);
+    });
+
+    test('hasMore diambil apa adanya dari page (true, cursor lengkap)', () {
+      final page = LedgerPage(
+        items: [_entry()],
+        hasMore: true,
+        nextBefore: '2026-08-05T03:00:00.000Z',
+        nextBeforeId: 'next-1',
+      );
+      final result = appendLedgerPage(LedgerListState.initial, page);
+      expect(result.hasMore, isTrue);
+      expect(result.nextBefore, '2026-08-05T03:00:00.000Z');
+      expect(result.nextBeforeId, 'next-1');
+    });
+
+    // I1: backend hari ini tidak pernah membalas hasMore:true tanpa cursor,
+    // tapi klien tidak boleh bergantung pada itu — fetchLedger(before:null,
+    // beforeId:null) lolos validateCursor (dua-duanya null memang sah) dan
+    // akan mengembalikan HALAMAN 1 LAGI, bukan halaman berikutnya.
+    test(
+        'I1: hasMore true TANPA cursor lengkap diperlakukan sebagai AKHIR '
+        'DAFTAR (bukan diteruskan apa adanya)', () {
+      final page = LedgerPage(
+        items: [_entry()],
+        hasMore: true,
+        nextBefore: null,
+        nextBeforeId: null,
+      );
+      final result = appendLedgerPage(LedgerListState.initial, page);
+      expect(result.hasMore, isFalse,
+          reason: 'cursor tak lengkap → tak boleh menawarkan "muat lebih banyak" lagi');
+      expect(result.nextBefore, isNull);
+      expect(result.nextBeforeId, isNull);
+    });
+
+    test('I1: hasMore true dengan cursor SEBAGIAN (hanya before) juga akhir daftar', () {
+      final page = LedgerPage(
+        items: [_entry()],
+        hasMore: true,
+        nextBefore: '2026-08-05T03:00:00.000Z',
+        nextBeforeId: null,
+      );
+      final result = appendLedgerPage(LedgerListState.initial, page);
+      expect(result.hasMore, isFalse);
+    });
+
+    // I2: jaring pengaman terakhir — item yang id-nya sudah ada di state
+    // (mis. akibat balapan filter yang lolos sampai sini) tidak digandakan.
+    test('I2: dedupe berdasarkan id — item yang sudah ada di state tidak digandakan', () {
+      final state = LedgerListState(items: [_entry(id: 'dup'), _entry(id: 'lama')]);
+      final page = LedgerPage(items: [_entry(id: 'dup'), _entry(id: 'baru')]);
+      final result = appendLedgerPage(state, page);
+      expect(result.items.map((e) => e.id).toList(), ['dup', 'lama', 'baru'],
+          reason: 'item "dup" dari page tidak boleh ditambahkan lagi — sudah ada di state');
+    });
+  });
+
+  group('firstPageState', () {
+    test('selalu identik dengan reset+append dari page ini — tidak pernah membawa '
+        'apa pun dari luar (kelas bug "reset cursor saat ganti filter" tak mungkin '
+        'terjadi lagi karena fungsi ini tak menerima state lama sama sekali)', () {
+      final page = LedgerPage(
+        items: [_entry(id: 'p1'), _entry(id: 'p2')],
+        hasMore: true,
+        nextBefore: '2026-08-05T03:00:00.000Z',
+        nextBeforeId: 'next-1',
+      );
+      final result = firstPageState(page);
+      expect(result.items.map((e) => e.id).toList(), ['p1', 'p2']);
+      expect(result.hasMore, isTrue);
+      expect(result.nextBefore, '2026-08-05T03:00:00.000Z');
+      expect(result.nextBeforeId, 'next-1');
+    });
+
+    test('halaman pertama kosong → state kosong total, bukan error', () {
+      const page = LedgerPage(items: [], hasMore: false);
+      final result = firstPageState(page);
+      expect(result.items, isEmpty);
+      expect(result.hasMore, isFalse);
+    });
+  });
+
+  group('isLoadMoreResponseStale (C1)', () {
+    test('filter tidak berubah di kedua sisi → TIDAK basi', () {
+      expect(
+        isLoadMoreResponseStale(
+          requestedBucket: 'restock',
+          currentFilterBucket: 'restock',
+          stateBucket: 'restock',
+        ),
+        isFalse,
+      );
+    });
+
+    test('semua null (filter "Semua") tidak berubah → TIDAK basi', () {
+      expect(
+        isLoadMoreResponseStale(
+          requestedBucket: null,
+          currentFilterBucket: null,
+          stateBucket: null,
+        ),
+        isFalse,
+      );
+    });
+
+    test(
+        'reproduksi skenario reviewer: request dikirim saat filter restock, '
+        'user ganti ke personal sebelum respons tiba → BASI', () {
+      expect(
+        isLoadMoreResponseStale(
+          requestedBucket: 'restock',
+          currentFilterBucket: 'personal',
+          stateBucket: 'personal',
+        ),
+        isTrue,
+      );
+    });
+
+    test(
+        'halaman PERTAMA filter baru sudah tiba lebih dulu (stateBucket sudah '
+        'berubah) walau currentFilterBucket kebetulan balik lagi → tetap BASI', () {
+      expect(
+        isLoadMoreResponseStale(
+          requestedBucket: 'restock',
+          currentFilterBucket: 'restock',
+          stateBucket: 'personal',
+        ),
+        isTrue,
+      );
     });
   });
 
@@ -174,6 +299,36 @@ void main() {
     test('direction tak dikenal → default aman KELUAR, bukan MASUK', () {
       expect(isInflow('???'), isFalse);
       expect(directionLabel('???'), 'Keluar');
+    });
+  });
+
+  group('FinanceRepository.fetchLedger memanggil validateCursor (I3)', () {
+    // Regresi target: mutasi "hapus validateCursor(...) dari fetchLedger"
+    // lolos 263 test sebelumnya karena validateCursor hanya diuji sebagai
+    // fungsi statis lepas — tak ada yang membuktikan fetchLedger BENAR-BENAR
+    // memanggilnya sebelum menyentuh jaringan. Test ini memanggil
+    // fetchLedger langsung dengan setengah pasangan cursor dan menegaskan ia
+    // melempar SEBELUM request jaringan terjadi (kalau validateCursor
+    // dihapus, request akan berangkat ke jaringan sungguhan dan gagal dengan
+    // cara yang berbeda / menggantung, bukan ArgumentError).
+    late FinanceRepository repo;
+
+    setUp(() {
+      repo = FinanceRepository(client: DioClient(storage: SecureStorage()));
+    });
+
+    test('before terisi, beforeId kosong → ArgumentError', () {
+      expect(
+        repo.fetchLedger(before: '2026-08-05T03:00:00.000Z', beforeId: null),
+        throwsArgumentError,
+      );
+    });
+
+    test('beforeId terisi, before kosong → ArgumentError', () {
+      expect(
+        repo.fetchLedger(before: null, beforeId: 'some-id'),
+        throwsArgumentError,
+      );
     });
   });
 
