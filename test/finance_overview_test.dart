@@ -72,12 +72,12 @@ void main() {
   group('FinanceSettings.fromJson', () {
     test('membaca pengaturan alokasi', () {
       final s = FinanceSettings.fromJson({
-        'pct_restock': 0.4,
+        'pct_restock': 42,
         'operational_daily': 150000,
         'emergency_target': 20000000,
         'started_on': '2026-01-01',
       });
-      expect(s.pctRestock, 0.4);
+      expect(s.pctRestock, 42);
       expect(s.operationalDaily, 150000);
       expect(s.emergencyTarget, 20000000);
       expect(s.startedOn, '2026-01-01');
@@ -110,7 +110,7 @@ void main() {
           'emergencyReached': false,
         },
         'settings': {
-          'pct_restock': 0.4,
+          'pct_restock': 42,
           'operational_daily': 150000,
           'emergency_target': 20000000,
           'started_on': '2026-01-01',

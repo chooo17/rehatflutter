@@ -190,7 +190,8 @@ class FinanceSettings {
     this.startedOn,
   });
 
-  /// Pecahan (mis. 0.4 = 40%), bukan persen bulat.
+  /// PERSEN, bukan pecahan — produksi mengirim `42` untuk 42%, bukan `0.42`.
+  /// Jangan dikalikan 100 saat ditampilkan.
   final double pctRestock;
   final int operationalDaily;
   final int emergencyTarget;
