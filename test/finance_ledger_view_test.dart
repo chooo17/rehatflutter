@@ -175,12 +175,14 @@ void main() {
   });
 
   group('isLoadMoreResponseStale (C1)', () {
-    test('filter tidak berubah di kedua sisi → TIDAK basi', () {
+    test('filter & epoch tidak berubah di kedua sisi → TIDAK basi', () {
       expect(
         isLoadMoreResponseStale(
           requestedBucket: 'restock',
           currentFilterBucket: 'restock',
           stateBucket: 'restock',
+          requestedEpoch: 1,
+          currentEpoch: 1,
         ),
         isFalse,
       );
@@ -192,6 +194,8 @@ void main() {
           requestedBucket: null,
           currentFilterBucket: null,
           stateBucket: null,
+          requestedEpoch: 1,
+          currentEpoch: 1,
         ),
         isFalse,
       );
@@ -205,6 +209,8 @@ void main() {
           requestedBucket: 'restock',
           currentFilterBucket: 'personal',
           stateBucket: 'personal',
+          requestedEpoch: 1,
+          currentEpoch: 2,
         ),
         isTrue,
       );
@@ -218,9 +224,51 @@ void main() {
           requestedBucket: 'restock',
           currentFilterBucket: 'restock',
           stateBucket: 'personal',
+          requestedEpoch: 1,
+          currentEpoch: 2,
         ),
         isTrue,
       );
+    });
+
+    // C-3: bucket identik di KETIGA sisi (tak pernah berganti filter), tapi
+    // epoch naik karena tarik-untuk-refresh terjadi sementara "muat lebih
+    // banyak" masih di jalan. Pemeriksaan bucket-saja BUTA terhadap kasus
+    // ini — inilah tepatnya kenapa parameter epoch ditambahkan.
+    test(
+        'C-3: bucket sama semua sisi TAPI epoch naik (refresh saat load-more '
+        'pending, filter tak berubah) → tetap BASI', () {
+      expect(
+        isLoadMoreResponseStale(
+          requestedBucket: null,
+          currentFilterBucket: null,
+          stateBucket: null,
+          requestedEpoch: 1,
+          currentEpoch: 2,
+        ),
+        isTrue,
+      );
+    });
+
+    test('epoch sama & bucket sama → TIDAK basi walau angka epoch > 1', () {
+      expect(
+        isLoadMoreResponseStale(
+          requestedBucket: 'operational',
+          currentFilterBucket: 'operational',
+          stateBucket: 'operational',
+          requestedEpoch: 5,
+          currentEpoch: 5,
+        ),
+        isFalse,
+      );
+    });
+  });
+
+  group('nextEpoch', () {
+    test('selalu naik satu dari current', () {
+      expect(nextEpoch(0), 1);
+      expect(nextEpoch(1), 2);
+      expect(nextEpoch(41), 42);
     });
   });
 

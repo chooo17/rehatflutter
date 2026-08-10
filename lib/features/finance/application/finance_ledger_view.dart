@@ -64,7 +64,12 @@ LedgerListState appendLedgerPage(LedgerListState state, LedgerPage page) {
   final cursorComplete = page.nextBefore != null && page.nextBeforeId != null;
   final hasMore = page.hasMore && cursorComplete;
   final seenIds = state.items.map((e) => e.id).toSet();
-  final newItems = page.items.where((e) => seenIds.add(e.id));
+  // `.toList()` WAJIB — `where(...seenIds.add...)` ber-efek-samping lewat
+  // `Set.add`, dan `Iterable.where` itu LAZY. Tanpa materialisasi ini, iterasi
+  // KEDUA atas `newItems` (mis. debugging, atau pemanggil lain yang membaca
+  // `newItems.length` lalu memakainya lagi) mengembalikan KOSONG karena
+  // `seenIds` sudah terisi penuh dari iterasi pertama.
+  final newItems = page.items.where((e) => seenIds.add(e.id)).toList();
   return LedgerListState(
     items: [...state.items, ...newItems],
     hasMore: hasMore,
@@ -88,11 +93,11 @@ LedgerListState firstPageState(LedgerPage page) =>
     appendLedgerPage(resetLedgerState(), page);
 
 /// Apakah respons "muat lebih banyak" yang baru tiba — yang dikirim SAAT
-/// filter pos aktif adalah [requestedBucket] — sudah BASI dan wajib DIBUANG
-/// (bukan di-append ke state).
+/// filter pos aktif adalah [requestedBucket] dan generasi (epoch) halaman
+/// pertama yang sedang ditampilkan adalah [requestedEpoch] — sudah BASI dan
+/// wajib DIBUANG (bukan di-append ke state).
 ///
-/// Basi kalau filter pos sudah berpindah sejak request dikirim, dicek dari
-/// DUA sisi:
+/// Basi kalau salah satu berubah sejak request dikirim, dicek dari TIGA sisi:
 /// - [currentFilterBucket]: nilai `ledgerBucketFilterProvider` SAAT respons
 ///   tiba (mungkin sudah beda dari [requestedBucket] kalau user ganti chip
 ///   sambil menunggu).
@@ -100,17 +105,42 @@ LedgerListState firstPageState(LedgerPage page) =>
 ///   ditampilkan (`_stateBucket` di layar) — bisa sudah diganti oleh
 ///   halaman PERTAMA filter baru yang datang lebih dulu daripada halaman
 ///   lanjutan filter lama ini.
+/// - [requestedEpoch] vs [currentEpoch]: generasi halaman PERTAMA. Epoch naik
+///   setiap kali halaman pertama baru tiba — termasuk saat filter TIDAK
+///   berubah tapi user tarik-untuk-refresh. Tanpa sisi ini, refresh yang
+///   terjadi sementara "muat lebih banyak" masih di jalan LOLOS dari kedua
+///   pemeriksaan bucket di atas (bucket-nya sama persis sebelum & sesudah
+///   refresh) — respons lanjutan yang basi tetap di-append ke halaman 1 yang
+///   BARU saja diganti refresh, dan cursor-nya menimpa cursor halaman baru
+///   itu, membuat baris berikutnya terlewat permanen. Lihat C-3.
 ///
-/// Tanpa pemeriksaan ini, halaman lanjutan dari filter LAMA bisa ter-append
-/// ke daftar filter BARU, dan cursor filter BARU ikut tertimpa cursor
-/// posisi filter LAMA — baris filter baru bisa terlewat permanen sesudahnya.
+/// Tanpa pemeriksaan ini, halaman lanjutan dari filter/generasi LAMA bisa
+/// ter-append ke daftar filter/generasi BARU, dan cursor BARU ikut tertimpa
+/// cursor posisi LAMA — baris baru bisa terlewat permanen sesudahnya.
 bool isLoadMoreResponseStale({
   required String? requestedBucket,
   required String? currentFilterBucket,
   required String? stateBucket,
+  required int requestedEpoch,
+  required int currentEpoch,
 }) {
-  return requestedBucket != currentFilterBucket || requestedBucket != stateBucket;
+  return requestedBucket != currentFilterBucket ||
+      requestedBucket != stateBucket ||
+      requestedEpoch != currentEpoch;
 }
+
+/// Epoch (generasi) berikutnya setelah sebuah halaman PERTAMA (baru karena
+/// filter berganti, ATAU karena tarik-untuk-refresh dengan filter yang SAMA)
+/// diterima dan menggantikan [LedgerListState] yang sedang ditampilkan.
+///
+/// Dipanggil oleh layar setiap kali `_onFirstPage` dijalankan — tanpa
+/// terkecuali, termasuk saat filter tidak berubah — supaya SETIAP kali
+/// halaman 1 diganti, semua request "muat lebih banyak" yang masih tertunda
+/// dari sebelumnya otomatis basi (lihat [isLoadMoreResponseStale] & C-3).
+/// Sengaja hanya `current + 1` (bukan timestamp/UUID) — cukup sebagai
+/// pembanding urut karena hanya dibaca di proses yang sama, tak pernah
+/// dikirim ke jaringan atau disimpan lintas sesi.
+int nextEpoch(int current) => current + 1;
 
 /// Apakah tombol "Muat lebih banyak" boleh ditampilkan/aktif untuk [state].
 /// Murni membaca `hasMore` dari backend — TIDAK menyimpulkan dari panjang

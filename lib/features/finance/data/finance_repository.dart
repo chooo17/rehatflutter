@@ -568,7 +568,19 @@ final ledgerBucketFilterProvider = StateProvider<String?>((ref) => null);
 /// Halaman berikutnya (kursor keyset `next_before`/`next_before_id`)
 /// dikelola oleh layar (Task 7-8) lewat `FinanceRepository.fetchLedger`
 /// langsung, bukan lewat provider ini.
-final ledgerProvider = FutureProvider<LedgerPage>((ref) {
+///
+/// **`autoDispose` (Task 8 re-review, C-2):** tanpa ini, kunjungan KEDUA ke
+/// layar Buku Besar (pop lalu push lagi) menemukan provider ini SUDAH
+/// `AsyncData` dari kunjungan sebelumnya — `ref.listen` di layar tidak
+/// menyala untuk nilai yang sudah tersedia sebelum listener dipasang (hanya
+/// untuk transisi BARU), jadi state lokal layar tetap kosong walau datanya
+/// sudah ada ("Belum ada mutasi" palsu). Percobaan perbaikan sebelumnya
+/// menambal ini dengan "seed" manual di `build()` — itu sendiri jadi sumber
+/// bug baru (menyuntik data & cursor filter LAMA ke filter BARU). `autoDispose`
+/// membuang provider begitu layar ini tak lagi punya listener (mis. saat
+/// di-pop), sehingga kunjungan berikutnya SELALU memicu fetch baru dan
+/// `ref.listen` SELALU menyala — tak perlu seed sama sekali.
+final ledgerProvider = FutureProvider.autoDispose<LedgerPage>((ref) {
   final bucket = ref.watch(ledgerBucketFilterProvider);
   return ref.watch(financeRepositoryProvider).fetchLedger(bucket: bucket);
 });

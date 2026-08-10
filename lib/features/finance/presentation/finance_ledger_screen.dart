@@ -32,8 +32,17 @@ class _FinanceLedgerScreenState extends ConsumerState<FinanceLedgerScreen> {
   bool _loadingMore = false;
   String? _loadMoreError;
 
+  /// Generasi (epoch) halaman pertama yang SEDANG ditampilkan. Naik setiap
+  /// [_onFirstPage] dijalankan (filter berganti ATAU tarik-untuk-refresh
+  /// dengan filter sama) — lihat [nextEpoch] & [isLoadMoreResponseStale].
+  /// Ini satu-satunya cara membedakan "refresh dengan filter sama" dari
+  /// "tidak ada perubahan sama sekali" (C-3): perbandingan bucket saja buta
+  /// terhadap kasus itu karena bucket-nya identik sebelum & sesudah refresh.
+  int _epoch = 0;
+
   /// Menerima halaman PERTAMA dari [ledgerProvider] (dipicu ulang otomatis
-  /// oleh Riverpod tiap [ledgerBucketFilterProvider] berubah) dan
+  /// oleh Riverpod tiap [ledgerBucketFilterProvider] berubah, ATAU oleh
+  /// `ref.invalidate(ledgerProvider)` saat tarik-untuk-refresh) dan
   /// menggantikan [_state] sepenuhnya — bukan APPEND — karena ini selalu
   /// representasi ulang dari awal untuk filter [bucket] saat ini.
   void _onFirstPage(String? bucket, LedgerPage page) {
@@ -42,14 +51,16 @@ class _FinanceLedgerScreenState extends ConsumerState<FinanceLedgerScreen> {
       _stateBucket = bucket;
       _state = firstPageState(page);
       _loadMoreError = null;
+      _epoch = nextEpoch(_epoch);
     });
   }
 
   Future<void> _loadMore() async {
     if (_loadingMore || !canLoadMore(_state)) return;
-    // Dibaca SEBELUM await — filter pos bisa berganti sementara request ini
-    // masih di jalan (lihat isLoadMoreResponseStale).
+    // Dibaca SEBELUM await — filter pos & epoch bisa berubah sementara
+    // request ini masih di jalan (lihat isLoadMoreResponseStale).
     final requestedBucket = ref.read(ledgerBucketFilterProvider);
+    final requestedEpoch = _epoch;
     setState(() {
       _loadingMore = true;
       _loadMoreError = null;
@@ -62,16 +73,21 @@ class _FinanceLedgerScreenState extends ConsumerState<FinanceLedgerScreen> {
         beforeId: _state.nextBeforeId,
       );
       if (!mounted) return;
-      // Buang respons basi (filter sudah berganti sejak request dikirim) —
-      // JANGAN append. Selain merusak tampilan filter baru dengan baris
-      // filter lama, cursor filter baru juga akan tertimpa cursor posisi
-      // filter lama, membuat baris filter baru terlewat permanen.
+      // Buang respons basi (filter ATAU epoch sudah berubah sejak request
+      // dikirim) — JANGAN append. Selain merusak tampilan filter baru dengan
+      // baris filter lama, cursor baru juga akan tertimpa cursor posisi
+      // lama, membuat baris baru terlewat permanen (lihat C-2 & C-3).
       final stale = isLoadMoreResponseStale(
         requestedBucket: requestedBucket,
         currentFilterBucket: ref.read(ledgerBucketFilterProvider),
         stateBucket: _stateBucket,
+        requestedEpoch: requestedEpoch,
+        currentEpoch: _epoch,
       );
       setState(() {
+        // _loadingMore SELALU dilepas, basi atau tidak — kalau tidak,
+        // request berikutnya terkunci permanen oleh guard di baris pertama
+        // method ini.
         _loadingMore = false;
         if (!stale) {
           _state = appendLedgerPage(_state, page);
@@ -79,9 +95,22 @@ class _FinanceLedgerScreenState extends ConsumerState<FinanceLedgerScreen> {
       });
     } catch (_) {
       if (!mounted) return;
+      // Galat basi (filter/epoch sudah berubah sejak request dikirim) tidak
+      // relevan lagi untuk tampilan saat ini — jangan tampilkan pesan merah
+      // di daftar filter/generasi BARU untuk kegagalan yang sebenarnya
+      // milik filter/generasi LAMA.
+      final stale = isLoadMoreResponseStale(
+        requestedBucket: requestedBucket,
+        currentFilterBucket: ref.read(ledgerBucketFilterProvider),
+        stateBucket: _stateBucket,
+        requestedEpoch: requestedEpoch,
+        currentEpoch: _epoch,
+      );
       setState(() {
         _loadingMore = false;
-        _loadMoreError = 'Gagal memuat halaman berikutnya. Coba lagi.';
+        if (!stale) {
+          _loadMoreError = 'Gagal memuat halaman berikutnya. Coba lagi.';
+        }
       });
     }
   }
@@ -98,26 +127,13 @@ class _FinanceLedgerScreenState extends ConsumerState<FinanceLedgerScreen> {
       next.whenData((page) => _onFirstPage(ref.read(ledgerBucketFilterProvider), page));
     });
 
-    // C2 — cache hangat: `ledgerProvider` adalah FutureProvider BIASA (bukan
-    // autoDispose), jadi kunjungan KEDUA ke layar ini (mis. pop lalu push
-    // lagi) bisa menemukan provider SUDAH `AsyncData` dari kunjungan
-    // sebelumnya. `ref.listen` di atas TIDAK menyala untuk nilai yang sudah
-    // tersedia sebelum listener dipasang (hanya untuk transisi BARU) —
-    // sehingga tanpa baris ini, `_state` tetap kosong (`_stateBucket ==
-    // null`, `initState` baru) walau datanya sudah ada, dan layar tampil
-    // "Belum ada mutasi" padahal data ada. Diseed langsung di sini
-    // (bukan setState — kita masih di tengah build ini, jadi cukup ubah
-    // field lalu lanjutkan build dgn nilai baru) memakai fungsi murni yang
-    // sama dgn `_onFirstPage` supaya perilakunya identik (reset total, tidak
-    // pernah gabung dgn state filter lain).
-    if (_stateBucket != bucket) {
-      final cached = async.valueOrNull;
-      if (cached != null) {
-        _stateBucket = bucket;
-        _state = firstPageState(cached);
-        _loadMoreError = null;
-      }
-    }
+    // (C-1/C-2, seed dihapus) `ledgerProvider` kini `autoDispose` (lihat
+    // catatan di `finance_repository.dart`) — kunjungan berikutnya ke layar
+    // ini SELALU memicu fetch baru & `ref.listen` di atas SELALU menyala
+    // untuk mengisi `_state` lewat `_onFirstPage`. Tidak perlu (dan tidak
+    // boleh) menyeed `_state` langsung dari `async.valueOrNull` di sini —
+    // itu bisa berupa data filter LAMA yang bertahan di cache Riverpod,
+    // bukan filter yang sedang aktif (`bucket`).
 
     // Pola keep-previous-data: spinner HANYA saat filter ini belum pernah
     // punya data sama sekali. Saat berganti filter, daftar lama (filter
@@ -280,6 +296,7 @@ class _LedgerRow extends StatelessWidget {
     final inflow = isInflow(entry.direction);
     final amountColor = inflow ? AppColors.success : AppColors.error;
     return NeuCard(
+      key: Key('ledger-entry-${entry.id}'),
       padding: EdgeInsets.zero,
       child: ListTile(
         title: Row(
