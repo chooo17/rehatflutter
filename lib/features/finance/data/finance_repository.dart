@@ -32,6 +32,24 @@ List<String> _stringList(dynamic v) =>
 /// selalu UTC.
 final RegExp _hasTimezone = RegExp(r'(Z|[+-]\d{2}:?\d{2})$');
 
+/// Langkah normalisasi murni (string→string, tanpa `DateTime.parse`) yang
+/// dipakai [_utc]. Diekspos (bukan `private`) HANYA supaya test bisa
+/// menguji keputusan "tambah Z atau tidak" secara langsung.
+///
+/// Alasan ini perlu terpisah dari [_utc]: kalau langkah tambah-'Z' ini
+/// hilang, `DateTime.parse` pada string tanpa penanda zona jatuh ke
+/// interpretasi waktu LOKAL MESIN, lalu `_utc` memanggil `.toUtc()` yang
+/// pada mesin ber-offset 0 (spt runner CI GitHub Actions) adalah no-op —
+/// hasilnya SECARA KEBETULAN identik dengan implementasi yang benar,
+/// sehingga test yang menguji lewat `DateTime` hasil akhir (mis.
+/// `Formatters.toWib(...).hour` atau bahkan `toIso8601String()`) tidak
+/// akan gagal di CI walau regresi sungguh terjadi — hanya gagal di mesin
+/// ber-offset bukan nol. Menguji fungsi string murni ini langsung
+/// menghilangkan celah itu sepenuhnya karena tak pernah menyentuh zona
+/// waktu mesin sama sekali.
+String normalizeTimestampForParsing(String s) =>
+    _hasTimezone.hasMatch(s) ? s : '${s}Z';
+
 DateTime _utc(dynamic v) {
   final s = v?.toString();
   if (s == null || s.isEmpty) return DateTime.now().toUtc();
@@ -40,7 +58,7 @@ DateTime _utc(dynamic v) {
   // supaya string tanpa zona tetap ditafsirkan UTC, bukan dikonversi lewat
   // offset lokal perangkat (toUtc() pada DateTime non-UTC akan menggeser
   // jam, bukan sekadar menandainya UTC).
-  final normalized = _hasTimezone.hasMatch(s) ? s : '${s}Z';
+  final normalized = normalizeTimestampForParsing(s);
   final parsed = DateTime.tryParse(normalized);
   if (parsed == null) return DateTime.now().toUtc();
   return parsed.isUtc ? parsed : parsed.toUtc();
@@ -346,6 +364,37 @@ class LedgerPage {
       );
 }
 
+/// Hasil `POST /admin/finance/allocate`. Backend bisa membalas 200 dengan
+/// `allocated:false` (mis. tanggal sebelum `started_on`, atau tanggal itu
+/// sudah pernah dialokasikan) — BUKAN galat jaringan, tapi juga bukan
+/// keberhasilan menulis. Pemanggil (Task 7-8, alur backfill
+/// `missing_allocation_dates`) wajib membedakan keduanya, jadi method ini
+/// mengembalikan objek ini alih-alih `void`.
+class AllocateResult {
+  const AllocateResult({
+    required this.allocated,
+    this.reason,
+    this.revenue = 0,
+  });
+
+  /// `true` bila alokasi benar-benar ditulis ke buku besar kali ini.
+  final bool allocated;
+
+  /// Alasan tidak dialokasikan (mis. `'sudah dialokasikan'`,
+  /// `'sebelum started_on'`). Hanya terisi bila [allocated] `false`.
+  final String? reason;
+
+  /// Omzet hari itu yang dipakai sebagai dasar alokasi. `0` bila
+  /// [allocated] `false` (backend tidak selalu menyertakannya).
+  final int revenue;
+
+  factory AllocateResult.fromJson(Map<String, dynamic> j) => AllocateResult(
+        allocated: _bool(j['allocated']),
+        reason: j['reason']?.toString(),
+        revenue: _int(j['revenue']),
+      );
+}
+
 Map<String, dynamic> _unwrap(dynamic body) => (body is Map && body['data'] is Map)
     ? Map<String, dynamic>.from(body['data'] as Map)
     : Map<String, dynamic>.from(body as Map);
@@ -463,10 +512,11 @@ class FinanceRepository {
   /// tanggal tak dikirim, dan default itu berbahaya (mengunci alokasi pada
   /// omzet hari yang belum selesai/parsial). Method ini sengaja tak punya
   /// nilai default supaya tak ada jalan diam-diam memakai default backend.
-  Future<void> allocate(String date) async {
-    await _client.post<dynamic>(ApiConstants.financeAllocate, data: {
+  Future<AllocateResult> allocate(String date) async {
+    final res = await _client.post<dynamic>(ApiConstants.financeAllocate, data: {
       'date': date,
     });
+    return AllocateResult.fromJson(_unwrap(res.data));
   }
 }
 

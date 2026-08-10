@@ -173,6 +173,21 @@ void main() {
       expect(o.missingAllocationDates.length, 1);
       expect(o.missingAllocationCount, 75);
     });
+
+    test('margin_non_positive true terbaca (jual rugi — breakEvenDaily==0 bukan berarti aman)', () {
+      final o = FinanceOverview.fromJson({
+        'guards': {'breakEvenDaily': 0},
+        'margin_non_positive': true,
+      });
+      expect(o.marginNonPositive, isTrue);
+    });
+
+    test('variable_expenses_unavailable true terbaca (runwayDays bisa terlalu panjang)', () {
+      final o = FinanceOverview.fromJson({
+        'variable_expenses_unavailable': true,
+      });
+      expect(o.variableExpensesUnavailable, isTrue);
+    });
   });
 
   group('LedgerEntry.fromJson', () {
@@ -211,7 +226,34 @@ void main() {
       expect(wib.day, 10);
     });
 
-    test('created_at TANPA penanda zona tetap ditafsirkan UTC (bukan waktu lokal perangkat)', () {
+    test('normalizeTimestampForParsing menambah Z pada string tanpa penanda zona '
+        '(uji string murni — SATU-SATUNYA cara tahan zona mesin apa pun)', () {
+      // Diuji sebagai transformasi STRING→STRING murni, bukan lewat
+      // DateTime hasil akhir. Kenapa ini wajib: kalau langkah tambah-'Z' di
+      // produksi hilang, DateTime.parse membaca string tanpa zona sebagai
+      // waktu LOKAL MESIN, lalu kode memanggil .toUtc() — di mesin
+      // ber-offset 0 (persis runner CI GitHub Actions) itu no-op, sehingga
+      // hasil akhirnya SECARA KEBETULAN sama dengan implementasi yang
+      // benar. Test apa pun yang menilai lewat DateTime hasil akhir (jam
+      // WIB, bahkan toIso8601String()) TIDAK akan menangkap regresi itu di
+      // CI — hanya di mesin ber-offset ≠ 0 (dibuktikan di bawah). Menguji
+      // fungsi normalisasi murni ini tidak pernah menyentuh zona mesin sama
+      // sekali, jadi hasilnya identik di mesin mana pun.
+      expect(normalizeTimestampForParsing('2026-08-09T03:00:00.000'),
+          '2026-08-09T03:00:00.000Z');
+    });
+
+    test('normalizeTimestampForParsing TIDAK menambah Z bila sudah ada penanda zona', () {
+      expect(normalizeTimestampForParsing('2026-08-09T03:00:00.000Z'),
+          '2026-08-09T03:00:00.000Z');
+      expect(normalizeTimestampForParsing('2026-08-09T03:00:00.000+07:00'),
+          '2026-08-09T03:00:00.000+07:00');
+      expect(normalizeTimestampForParsing('2026-08-09T03:00:00.000+00:00'),
+          '2026-08-09T03:00:00.000+00:00');
+    });
+
+    test('created_at TANPA penanda zona tetap ditafsirkan UTC (bukan waktu lokal perangkat) '
+        '— sanity tambahan, TERGANTUNG offset mesin, lihat test normalisasi di atas untuk jaminan lintas-CI', () {
       final e = LedgerEntry.fromJson({
         'id': 'l4',
         // Tanpa 'Z' / offset — kalau helper parsing salah, DateTime.parse
@@ -219,7 +261,34 @@ void main() {
         'created_at': '2026-08-09T03:00:00.000',
       });
       expect(e.createdAt.isUtc, isTrue);
-      expect(Formatters.toWib(e.createdAt).hour, 10);
+      expect(e.createdAt.toIso8601String(), '2026-08-09T03:00:00.000Z');
+    });
+
+    test('created_at PRODUKSI dengan offset eksplisit (+00:00, bukan Z) diparse UTC dengan benar', () {
+      // Backend nyata (Postgres timestamptz) bisa mengirim offset eksplisit
+      // alih-alih 'Z'. Regex normalisasi (_hasTimezone) HARUS mengenali pola
+      // ini dan TIDAK menambahkan 'Z' lagi (kalau ditambah, jadi
+      // '...+00:00Z' — tryParse gagal, fallback DateTime.now(), lihat brief
+      // Task 6 butir 3).
+      final e = LedgerEntry.fromJson({
+        'id': 'l5',
+        'created_at': '2026-08-09T15:17:31.091176+00:00',
+      });
+      expect(e.createdAt.isUtc, isTrue);
+      expect(e.createdAt.toIso8601String(), '2026-08-09T15:17:31.091176Z');
+      // 15:17 UTC -> 22:17 WIB.
+      expect(Formatters.toWib(e.createdAt).hour, 22);
+    });
+
+    test('created_at dengan offset non-UTC (+07:00) dikonversi ke UTC dengan benar', () {
+      final e = LedgerEntry.fromJson({
+        'id': 'l6',
+        'created_at': '2026-08-09T22:17:31.000000+07:00',
+      });
+      expect(e.createdAt.isUtc, isTrue);
+      // 22:17 WIB (+07:00) == 15:17 UTC.
+      expect(e.createdAt.toIso8601String(), '2026-08-09T15:17:31.000Z');
+      expect(Formatters.toWib(e.createdAt).hour, 22);
     });
 
     test('amount negatif (penarikan) terbaca apa adanya', () {
@@ -273,6 +342,37 @@ void main() {
       final p = LedgerPage.fromJson(const {});
       expect(p.items, isEmpty);
       expect(p.hasMore, isFalse);
+    });
+  });
+
+  group('AllocateResult.fromJson', () {
+    test('allocated:true membawa revenue', () {
+      final r = AllocateResult.fromJson({
+        'date': '2026-08-09',
+        'allocated': true,
+        'revenue': 1279198,
+      });
+      expect(r.allocated, isTrue);
+      expect(r.revenue, 1279198);
+      expect(r.reason, isNull);
+    });
+
+    test('allocated:false membawa reason, BUKAN kegagalan jaringan', () {
+      final r = AllocateResult.fromJson({
+        'date': '2026-08-09',
+        'allocated': false,
+        'reason': 'sudah dialokasikan',
+      });
+      expect(r.allocated, isFalse);
+      expect(r.reason, 'sudah dialokasikan');
+      expect(r.revenue, 0);
+    });
+
+    test('field hilang jatuh ke nilai aman (allocated default false)', () {
+      final r = AllocateResult.fromJson(const {});
+      expect(r.allocated, isFalse);
+      expect(r.reason, isNull);
+      expect(r.revenue, 0);
     });
   });
 
