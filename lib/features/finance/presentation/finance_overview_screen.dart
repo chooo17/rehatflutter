@@ -45,17 +45,22 @@ class FinanceOverviewScreen extends ConsumerWidget {
       // Keep-previous-data: spinner HANYA saat belum ada data sama sekali.
       body: overview == null
           ? (async.hasError
-              ? Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Text(
-                      'Gagal memuat ringkasan keuangan. Tarik untuk mencoba lagi.',
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context)
-                          .textTheme
-                          .bodyMedium
-                          ?.copyWith(color: AppColors.error),
-                    ),
+              ? RefreshIndicator(
+                  onRefresh: () async => ref.invalidate(financeOverviewProvider),
+                  child: ListView(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 96, horizontal: 24),
+                        child: Text(
+                          'Gagal memuat ringkasan keuangan. Tarik untuk mencoba lagi.',
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodyMedium
+                              ?.copyWith(color: AppColors.error),
+                        ),
+                      ),
+                    ],
                   ),
                 )
               : const Center(child: CircularProgressIndicator()))
@@ -97,21 +102,26 @@ class _MissingAllocationsCardState extends ConsumerState<_MissingAllocationsCard
   Future<void> _backfill() async {
     setState(() => _running = true);
     final repo = ref.read(financeRepositoryProvider);
-    // Tanggal EKSPLISIT dari daftar backend — JANGAN pernah kirim tanggal
-    // hari ini (mengunci alokasi pada omzet parsial, tak bisa dikoreksi).
-    final dates = List<String>.from(widget.overview.missingAllocationDates);
+    // Tanggal EKSPLISIT dari fungsi murni [datesToBackfill] — JANGAN pernah
+    // kirim tanggal hari ini (mengunci alokasi pada omzet parsial, tak bisa
+    // dikoreksi).
+    final dates = datesToBackfill(widget.overview);
     final results = <AllocateResult>[];
     for (final date in dates) {
       try {
         results.add(await repo.allocate(date));
       } catch (_) {
-        // Tanggal ini gagal (jaringan/server) — lanjutkan sisanya, jangan
-        // hentikan seluruh backfill karena satu tanggal bermasalah.
-        results.add(const AllocateResult(allocated: false, reason: 'gagal'));
+        // Tanggal ini GAGAL TERKIRIM (jaringan/server) — beda dari
+        // "dilewati" oleh backend. Tandai `failed:true` supaya
+        // BackfillSummary tidak melaporkannya sebagai kondisi aman.
+        results.add(const AllocateResult(allocated: false, failed: true, reason: 'gagal'));
       }
     }
     if (!mounted) return;
-    final summary = BackfillSummary.fromResults(results);
+    final summary = BackfillSummary.fromResults(
+      results,
+      totalMissingCount: widget.overview.missingAllocationCount,
+    );
     setState(() => _running = false);
     ref.invalidate(financeOverviewProvider);
     ScaffoldMessenger.of(context)
@@ -121,6 +131,7 @@ class _MissingAllocationsCardState extends ConsumerState<_MissingAllocationsCard
   @override
   Widget build(BuildContext context) {
     final summary = missingAllocationSummary(widget.overview);
+    final sample = missingAllocationSample(widget.overview);
     return NeuCard(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -144,6 +155,16 @@ class _MissingAllocationsCardState extends ConsumerState<_MissingAllocationsCard
                   'omzet hari tersebut belum masuk amplop.',
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
+                if (sample.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    'Contoh tanggal: $sample',
+                    style: Theme.of(context)
+                        .textTheme
+                        .bodySmall
+                        ?.copyWith(color: AppColors.textSecondary),
+                  ),
+                ],
                 const SizedBox(height: 12),
                 NeuButton(
                   onPressed: _running ? null : _backfill,
@@ -192,11 +213,7 @@ class _GuardsCard extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Text('Runway operasional'),
-              Text(
-                'Cukup ${overview.guards.runwayDays} hari',
-                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    fontWeight: FontWeight.bold, color: AppColors.espresso),
-              ),
+              _RunwayValue(display: runwayDisplay(overview)),
             ],
           ),
           if (runwayWarn != null) ...[
@@ -257,9 +274,51 @@ class _BreakEvenValue extends StatelessWidget {
               .bodyMedium
               ?.copyWith(color: AppColors.error, fontWeight: FontWeight.bold),
         );
+      case BreakEvenStatus.costsUnknown:
+        return Text(
+          'Isi Biaya Tetap dulu',
+          textAlign: TextAlign.end,
+          style: Theme.of(context)
+              .textTheme
+              .bodyMedium
+              ?.copyWith(color: AppColors.warning, fontWeight: FontWeight.bold),
+        );
       case BreakEvenStatus.ok:
         return Text(
           Formatters.rupiah(display.amount),
+          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+              fontWeight: FontWeight.bold, color: AppColors.espresso),
+        );
+    }
+  }
+}
+
+class _RunwayValue extends StatelessWidget {
+  const _RunwayValue({required this.display});
+  final RunwayDisplay display;
+
+  @override
+  Widget build(BuildContext context) {
+    switch (display.status) {
+      case RunwayStatus.unknown:
+        return Text(
+          'Belum bisa dihitung',
+          style: Theme.of(context)
+              .textTheme
+              .bodyMedium
+              ?.copyWith(color: AppColors.textSecondary),
+        );
+      case RunwayStatus.deficit:
+        return Text(
+          'Defisit ${display.days.abs()} hari',
+          style: Theme.of(context)
+              .textTheme
+              .bodyMedium
+              ?.copyWith(color: AppColors.error, fontWeight: FontWeight.bold),
+        );
+      case RunwayStatus.ok:
+        return Text(
+          'Cukup ${display.days} hari',
           style: Theme.of(context).textTheme.bodyLarge?.copyWith(
               fontWeight: FontWeight.bold, color: AppColors.espresso),
         );
@@ -367,14 +426,13 @@ class _BucketGrid extends ConsumerWidget {
           icon: spec.icon,
           balance: spec.balance,
           withdrawState: state,
-          onWithdraw: () => _showWithdrawSheet(context, ref, spec),
+          onWithdraw: () => _showWithdrawSheet(context, spec),
         );
       },
     );
   }
 
-  Future<void> _showWithdrawSheet(
-      BuildContext context, WidgetRef ref, _BucketSpec spec) async {
+  Future<void> _showWithdrawSheet(BuildContext context, _BucketSpec spec) async {
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,

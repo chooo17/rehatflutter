@@ -67,11 +67,58 @@ void main() {
       expect(d.amount, 850000);
     });
 
-    test('breakEvenDaily 0 TANPA insufficientData/marginNonPositive tetap status ok (angka nyata)', () {
+    test('breakEvenDaily 0 TANPA insufficientData/marginNonPositive → costsUnknown, BUKAN ok/Rp0', () {
+      // Skenario nyata: sudah jualan (insufficientData=false), margin positif
+      // (marginNonPositive=false), TAPI belum ada satupun baris Biaya Tetap
+      // → monthlyCost=0 → breakEvenDaily=0 dari backend. Menampilkan ini
+      // sebagai "target Rp0" ("impas tanpa jualan") adalah cacat kritis —
+      // harus jadi rambu costsUnknown, bukan status ok.
       final o = _overview(guards: const FinanceGuards(breakEvenDaily: 0));
       final d = breakEvenDisplay(o);
+      expect(d.status, BreakEvenStatus.costsUnknown);
+    });
+
+    test('breakEvenDaily > 0 → tetap status ok (bukan false positive costsUnknown)', () {
+      final o = _overview(guards: const FinanceGuards(breakEvenDaily: 1));
+      final d = breakEvenDisplay(o);
       expect(d.status, BreakEvenStatus.ok);
-      expect(d.amount, 0);
+      expect(d.amount, 1);
+    });
+  });
+
+  group('runwayDisplay', () {
+    test('insufficientData true → unknown, walau runwayDays terisi', () {
+      final o = _overview(
+        insufficientData: true,
+        guards: const FinanceGuards(runwayDays: 30),
+      );
+      expect(runwayDisplay(o).status, RunwayStatus.unknown);
+    });
+
+    test('runwayDays negatif → deficit dengan hari APA ADANYA (tidak di-abs)', () {
+      final o = _overview(guards: const FinanceGuards(runwayDays: -4, breakEvenDaily: 5000));
+      final d = runwayDisplay(o);
+      expect(d.status, RunwayStatus.deficit);
+      expect(d.days, -4, reason: 'jangan pernah di-abs() — mutasi .abs() harus terdeteksi');
+    });
+
+    test('runwayDays 0 & breakEvenDaily 0 (sentinel biaya belum diketahui) → unknown, BUKAN "Cukup 0 hari"', () {
+      final o = _overview(guards: const FinanceGuards(runwayDays: 0, breakEvenDaily: 0));
+      expect(runwayDisplay(o).status, RunwayStatus.unknown);
+    });
+
+    test('runwayDays 0 TAPI breakEvenDaily > 0 (bukan sentinel) → ok dengan 0 hari', () {
+      final o = _overview(guards: const FinanceGuards(runwayDays: 0, breakEvenDaily: 5000));
+      final d = runwayDisplay(o);
+      expect(d.status, RunwayStatus.ok);
+      expect(d.days, 0);
+    });
+
+    test('runwayDays positif & breakEvenDaily > 0 → ok dengan angka asli', () {
+      final o = _overview(guards: const FinanceGuards(runwayDays: 45, breakEvenDaily: 5000));
+      final d = runwayDisplay(o);
+      expect(d.status, RunwayStatus.ok);
+      expect(d.days, 45);
     });
   });
 
@@ -170,6 +217,66 @@ void main() {
         () => expect(emergencyBarFraction(150), 1.0));
   });
 
+  group('bucketIsNegative & bucketDisplayBalance', () {
+    test('saldo negatif → bucketIsNegative true', () {
+      expect(bucketIsNegative(-500), isTrue);
+    });
+
+    test('saldo nol/positif → bucketIsNegative false', () {
+      expect(bucketIsNegative(0), isFalse);
+      expect(bucketIsNegative(500), isFalse);
+    });
+
+    test('bucketDisplayBalance TIDAK PERNAH clamp saldo negatif ke 0', () {
+      expect(bucketDisplayBalance(-12345), -12345);
+    });
+
+    test('bucketDisplayBalance meneruskan saldo positif apa adanya', () {
+      expect(bucketDisplayBalance(12345), 12345);
+    });
+  });
+
+  group('datesToBackfill', () {
+    test('meneruskan missingAllocationDates apa adanya bila tak ada hari ini', () {
+      final o = _overview(missingAllocationDates: const ['2026-08-01', '2026-08-05']);
+      final result = datesToBackfill(o, now: DateTime.utc(2026, 8, 9, 12));
+      expect(result, ['2026-08-01', '2026-08-05']);
+    });
+
+    test('hari ini (WIB) TIDAK PERNAH ada dalam daftar yang dikembalikan', () {
+      // now = 2026-08-09T20:00 UTC → WIB (+7) = 2026-08-10. Andai backend
+      // pernah keliru menyertakan tanggal hari ini, pertahanan kedua ini
+      // wajib menyaringnya keluar sebelum dikirim ke `repo.allocate`.
+      final o = _overview(
+        missingAllocationDates: const ['2026-08-09', '2026-08-10', '2026-08-11'],
+      );
+      final result = datesToBackfill(o, now: DateTime.utc(2026, 8, 9, 20));
+      expect(result, isNot(contains('2026-08-10')));
+      expect(result, ['2026-08-09', '2026-08-11']);
+    });
+  });
+
+  group('missingAllocationSample', () {
+    test('daftar kosong → string kosong', () {
+      expect(missingAllocationSample(_overview(missingAllocationDates: const [])), '');
+    });
+
+    test('satu tanggal → tampilkan tanggal itu saja', () {
+      expect(
+        missingAllocationSample(_overview(missingAllocationDates: const ['2026-08-05'])),
+        '2026-08-05',
+      );
+    });
+
+    test('lebih dari satu → tampilkan tanggal paling lama & paling baru', () {
+      final s = missingAllocationSample(_overview(
+        missingAllocationDates: const ['2026-07-01', '2026-07-15', '2026-08-05'],
+      ));
+      expect(s, contains('2026-07-01'));
+      expect(s, contains('2026-08-05'));
+    });
+  });
+
   group('missingAllocationSummary & hasMissingAllocations', () {
     test('daftar kosong → string kosong DAN hasMissingAllocations false ("jangan tampilkan apa-apa")', () {
       final o = _overview(missingAllocationDates: const [], missingAllocationCount: 0);
@@ -236,6 +343,59 @@ void main() {
     test('list kosong → pesan "tidak ada tanggal"', () {
       final r = BackfillSummary.fromResults(const []);
       expect(r.message, contains('Tidak ada'));
+    });
+
+    test('semua gagal terkirim (failed:true) → dilaporkan sebagai KEGAGALAN, bukan "dilewati"', () {
+      // Ini kasus IMPORTANT 1: server 500 / koneksi putus. Pesan TIDAK
+      // BOLEH menyiratkan "sudah pernah dialokasikan" — itu penyebab yang
+      // salah dan menenangkan padahal pembukuan masih bolong.
+      final r = BackfillSummary.fromResults(const [
+        AllocateResult(allocated: false, failed: true, reason: 'gagal'),
+        AllocateResult(allocated: false, failed: true, reason: 'gagal'),
+      ]);
+      expect(r.allocatedCount, 0);
+      expect(r.skippedCount, 0);
+      expect(r.failedCount, 2);
+      expect(r.message, contains('gagal'));
+      expect(r.message, isNot(contains('sudah pernah dialokasikan')));
+    });
+
+    test('campuran berhasil + dilewati + gagal → sebut ketiganya secara terpisah', () {
+      final r = BackfillSummary.fromResults(const [
+        AllocateResult(allocated: true, revenue: 100000),
+        AllocateResult(allocated: false, reason: 'sudah dialokasikan'),
+        AllocateResult(allocated: false, failed: true, reason: 'gagal'),
+      ]);
+      expect(r.allocatedCount, 1);
+      expect(r.skippedCount, 1);
+      expect(r.failedCount, 1);
+      expect(r.message, contains('dilewati'));
+      expect(r.message, contains('gagal'));
+    });
+
+    test('kegagalan (failed:true) TIDAK PERNAH dihitung sebagai allocated', () {
+      final r = BackfillSummary.fromResults(const [
+        AllocateResult(allocated: false, failed: true, reason: 'gagal'),
+      ]);
+      expect(r.allocatedCount, 0,
+          reason: 'mutasi "kegagalan dihitung allocated:true" harus terdeteksi di sini');
+    });
+
+    test('totalMissingCount > jumlah hasil yang diproses → sisa backlog disebut di pesan', () {
+      // IMPORTANT 2: daftar backend dipotong 60. Andai total 75 tapi hanya
+      // 60 diproses, sisa 15 tak boleh hilang dari kesadaran pemilik.
+      final results = List<AllocateResult>.generate(
+          60, (_) => const AllocateResult(allocated: true, revenue: 1000));
+      final r = BackfillSummary.fromResults(results, totalMissingCount: 75);
+      expect(r.remainingCount, 15);
+      expect(r.message, contains('15'));
+    });
+
+    test('totalMissingCount sama dengan jumlah hasil → tak ada sisa disebut', () {
+      final results = List<AllocateResult>.generate(
+          3, (_) => const AllocateResult(allocated: true, revenue: 1000));
+      final r = BackfillSummary.fromResults(results, totalMissingCount: 3);
+      expect(r.remainingCount, 0);
     });
   });
 

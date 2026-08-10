@@ -27,7 +27,7 @@ class BucketCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final negative = balance < 0;
+    final negative = bucketIsNegative(balance);
     final balanceColor = negative ? AppColors.error : AppColors.espresso;
     return NeuCard(
       child: Column(
@@ -44,7 +44,7 @@ class BucketCard extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            Formatters.rupiah(balance),
+            Formatters.rupiah(bucketDisplayBalance(balance)),
             style: Theme.of(context)
                 .textTheme
                 .titleLarge

@@ -375,6 +375,7 @@ class AllocateResult {
     required this.allocated,
     this.reason,
     this.revenue = 0,
+    this.failed = false,
   });
 
   /// `true` bila alokasi benar-benar ditulis ke buku besar kali ini.
@@ -387,6 +388,15 @@ class AllocateResult {
   /// Omzet hari itu yang dipakai sebagai dasar alokasi. `0` bila
   /// [allocated] `false` (backend tidak selalu menyertakannya).
   final int revenue;
+
+  /// `true` HANYA untuk hasil sintetis yang dibuat pemanggil saat request
+  /// gagal total (exception jaringan/server) — TIDAK PERNAH diisi dari
+  /// `fromJson` (respons 200 backend selalu berarti request-nya berhasil
+  /// sampai, terlepas dari nilai [allocated]). Dipakai `BackfillSummary`
+  /// untuk membedakan "dilewati oleh backend" (bukan kegagalan) dari
+  /// "gagal terkirim" (kegagalan nyata yang wajib dilaporkan sebagai
+  /// kegagalan, bukan disamarkan jadi "sudah dialokasikan").
+  final bool failed;
 
   factory AllocateResult.fromJson(Map<String, dynamic> j) => AllocateResult(
         allocated: _bool(j['allocated']),

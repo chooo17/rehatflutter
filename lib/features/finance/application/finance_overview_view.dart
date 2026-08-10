@@ -1,4 +1,5 @@
 import '../../../core/network/api_exception.dart';
+import '../../../core/utils/formatters.dart';
 import '../data/finance_repository.dart';
 
 /// Logika penyajian murni untuk layar Ringkasan Keuangan (Task 7).
@@ -15,6 +16,12 @@ enum BreakEvenStatus {
 
   /// Ada omzet tapi margin ≤ 0 (jual rugi) — target Rp0 akan MENYESATKAN.
   marginNonPositive,
+
+  /// Ada omzet & margin positif TAPI `breakEvenDaily == 0` — sentinel
+  /// backend untuk "biaya bulanan belum diketahui" (mis. Biaya Tetap masih
+  /// kosong), BUKAN "impas tanpa jualan". Rp0 di sini akan MENYESATKAN
+  /// persis seperti dua kondisi di atas.
+  costsUnknown,
 
   /// Angka [BreakEvenDisplay.amount] valid untuk ditampilkan.
   ok,
@@ -37,10 +44,62 @@ BreakEvenDisplay breakEvenDisplay(FinanceOverview overview) {
   if (overview.marginNonPositive) {
     return const BreakEvenDisplay(status: BreakEvenStatus.marginNonPositive);
   }
+  // `breakEvenDaily == 0` di sini bukan target yang tercapai — itu sentinel
+  // backend untuk "biaya bulanan (fixedCosts + variabel) belum diketahui",
+  // biasanya karena layar Biaya Tetap masih kosong. Menampilkannya sebagai
+  // Rp0 sama menyesatkannya dengan dua kondisi di atas.
+  if (overview.guards.breakEvenDaily == 0) {
+    return const BreakEvenDisplay(status: BreakEvenStatus.costsUnknown);
+  }
   return BreakEvenDisplay(
     status: BreakEvenStatus.ok,
     amount: overview.guards.breakEvenDaily,
   );
+}
+
+/// Status tampilan rambu runway operasional.
+enum RunwayStatus {
+  /// Belum bisa dihitung — data belum cukup ATAU biaya bulanan belum
+  /// diketahui (sentinel `runwayDays == 0` yang berdampingan dengan
+  /// `breakEvenDaily == 0`, lihat [breakEvenDisplay]). BUKAN "kas habis".
+  unknown,
+
+  /// Runway negatif nyata dari backend — pos operasional SUDAH minus.
+  /// Kalimat tampilan harus mencerminkan defisit, bukan "cukup N hari".
+  deficit,
+
+  /// [RunwayDisplay.days] valid untuk ditampilkan sebagai "Cukup N hari".
+  ok,
+}
+
+class RunwayDisplay {
+  const RunwayDisplay({required this.status, this.days = 0});
+
+  final RunwayStatus status;
+
+  /// Hari APA ADANYA dari backend — TIDAK di-`abs()`. Untuk [deficit] ini
+  /// tetap negatif (mis. -4) supaya pemanggil bisa menyusun kalimat yang
+  /// jujur soal defisitnya, bukan angka positif yang menyamarkannya.
+  final int days;
+}
+
+/// Menentukan apa yang boleh ditampilkan untuk runway operasional.
+/// Urutan pemeriksaan penting: `insufficientData` lebih dulu, lalu nilai
+/// NEGATIF nyata (defisit sungguhan, harus tetap dilaporkan sebagai
+/// defisit meski `breakEvenDaily` kebetulan juga 0), baru sentinel
+/// "0 & 0" (biaya belum diketahui).
+RunwayDisplay runwayDisplay(FinanceOverview overview) {
+  if (overview.insufficientData) {
+    return const RunwayDisplay(status: RunwayStatus.unknown);
+  }
+  final days = overview.guards.runwayDays;
+  if (days < 0) {
+    return RunwayDisplay(status: RunwayStatus.deficit, days: days);
+  }
+  if (days == 0 && overview.guards.breakEvenDaily == 0) {
+    return const RunwayDisplay(status: RunwayStatus.unknown);
+  }
+  return RunwayDisplay(status: RunwayStatus.ok, days: days);
 }
 
 /// Peringatan tambahan untuk runway ketika biaya variabel tidak lengkap di
@@ -82,6 +141,16 @@ WithdrawButtonState withdrawButtonState({
   }
   return const WithdrawButtonState(enabled: true);
 }
+
+/// Apakah saldo bucket dianggap defisit (pewarnaan & keterangan "Defisit").
+/// Diekstrak jadi fungsi murni terpisah supaya bisa diuji tanpa merender
+/// widget — mutasi `balance < 0` → `false` akan langsung ketahuan.
+bool bucketIsNegative(int balance) => balance < 0;
+
+/// Nilai saldo yang DITAMPILKAN di kartu amplop. Sengaja identitas (bukan
+/// `balance < 0 ? 0 : balance`) — saldo negatif adalah bukti overspend
+/// nyata dan TIDAK PERNAH boleh di-clamp ke 0 di layar ini.
+int bucketDisplayBalance(int balance) => balance;
 
 /// Nama bulan Indonesia — dipakai lokal di sini (bukan lewat `intl`
 /// `DateFormat`) supaya fungsi ini murni & tidak butuh inisialisasi locale
@@ -152,36 +221,111 @@ String missingAllocationSummary(FinanceOverview overview) {
 bool hasMissingAllocations(FinanceOverview overview) =>
     overview.missingAllocationDates.isNotEmpty;
 
+/// Beberapa contoh tanggal dari backlog supaya pemilik bisa cross-check —
+/// bukan cuma melihat sebuah angka. `missingAllocationDates` sudah terurut
+/// menaik dari backend, jadi elemen pertama = paling lama, elemen terakhir
+/// = paling baru. String kosong bila daftar kosong.
+String missingAllocationSample(FinanceOverview overview) {
+  final dates = overview.missingAllocationDates;
+  if (dates.isEmpty) return '';
+  if (dates.length == 1) return dates.first;
+  return '${dates.first} s/d ${dates.last}';
+}
+
+/// Kunci tanggal WIB hari ini dalam format `YYYY-MM-DD` — dipakai sebagai
+/// pertahanan kedua di [datesToBackfill].
+String _wibDateKey(DateTime now) {
+  final wib = Formatters.toWib(now);
+  final y = wib.year.toString().padLeft(4, '0');
+  final m = wib.month.toString().padLeft(2, '0');
+  final d = wib.day.toString().padLeft(2, '0');
+  return '$y-$m-$d';
+}
+
+/// Tanggal yang akan diproses aksi "Alokasikan tanggal bolong". Pada
+/// dasarnya salinan `missingAllocationDates` dari backend APA ADANYA, TAPI
+/// hari ini (WIB) disaring keluar secara eksplisit sebagai lapis
+/// pertahanan kedua — mengirim tanggal hari ini akan mengunci alokasi pada
+/// omzet yang belum selesai/parsial dan tak bisa dikoreksi lagi setelahnya.
+/// [now] hanya untuk keperluan test (default `DateTime.now()`).
+List<String> datesToBackfill(FinanceOverview overview, {DateTime? now}) {
+  final todayKey = _wibDateKey(now ?? DateTime.now());
+  return overview.missingAllocationDates.where((d) => d != todayKey).toList();
+}
+
 /// Hasil menjalankan alokasi untuk sekumpulan tanggal bolong secara
 /// berurutan — dipakai widget untuk menyusun pesan ringkasan setelah aksi
 /// "Alokasikan semua" selesai.
 class BackfillSummary {
-  const BackfillSummary({required this.allocatedCount, required this.skippedCount});
+  const BackfillSummary({
+    required this.allocatedCount,
+    required this.skippedCount,
+    this.failedCount = 0,
+    this.remainingCount = 0,
+  });
 
   final int allocatedCount;
+
+  /// Backend membalas 200 tapi `allocated:false` (mis. sudah pernah
+  /// dialokasikan / di luar rentang) — BUKAN kegagalan.
   final int skippedCount;
 
-  factory BackfillSummary.fromResults(List<AllocateResult> results) {
+  /// Permintaan gagal total (jaringan/server, exception dilempar) — HARUS
+  /// dilaporkan sebagai kegagalan, bukan disamakan dengan "dilewati" yang
+  /// menenangkan padahal pembukuan masih bolong.
+  final int failedCount;
+
+  /// Sisa backlog yang tak sempat diproses karena daftar dipotong 60 oleh
+  /// backend (`missingAllocationCount` bisa lebih besar dari jumlah
+  /// tanggal yang dikirim ke [fromResults]).
+  final int remainingCount;
+
+  /// [totalMissingCount] = `overview.missingAllocationCount` SEBELUM aksi
+  /// dijalankan — dipakai untuk menghitung [remainingCount] (tanggal yang
+  /// tak pernah dicoba karena daftar backend dipotong 60).
+  factory BackfillSummary.fromResults(
+    List<AllocateResult> results, {
+    int totalMissingCount = 0,
+  }) {
     final allocated = results.where((r) => r.allocated).length;
+    final failed = results.where((r) => !r.allocated && r.failed).length;
+    final skipped = results.length - allocated - failed;
+    final remaining = totalMissingCount - results.length;
     return BackfillSummary(
       allocatedCount: allocated,
-      skippedCount: results.length - allocated,
+      skippedCount: skipped,
+      failedCount: failed,
+      remainingCount: remaining > 0 ? remaining : 0,
     );
   }
 
   /// Pesan ringkasan Bahasa Indonesia siap ditampilkan (mis. snackbar).
   String get message {
-    if (allocatedCount == 0 && skippedCount == 0) {
+    if (allocatedCount == 0 && skippedCount == 0 && failedCount == 0) {
       return 'Tidak ada tanggal untuk dialokasikan.';
     }
-    if (skippedCount == 0) {
-      return '$allocatedCount tanggal berhasil dialokasikan.';
-    }
-    if (allocatedCount == 0) {
-      return 'Semua $skippedCount tanggal dilewati (sudah pernah dialokasikan '
+    String core;
+    if (skippedCount == 0 && failedCount == 0) {
+      core = '$allocatedCount tanggal berhasil dialokasikan.';
+    } else if (allocatedCount == 0 && failedCount == 0) {
+      core = 'Semua $skippedCount tanggal dilewati (sudah pernah dialokasikan '
           'atau di luar rentang).';
+    } else if (allocatedCount == 0 && skippedCount == 0) {
+      core = 'Semua $failedCount tanggal gagal dialokasikan (masalah '
+          'jaringan/server) — pembukuan masih bolong, coba lagi.';
+    } else {
+      final parts = <String>['$allocatedCount berhasil'];
+      if (skippedCount > 0) parts.add('$skippedCount dilewati');
+      if (failedCount > 0) {
+        parts.add('$failedCount gagal (jaringan/server)');
+      }
+      core = '${parts.join(', ')}.';
     }
-    return '$allocatedCount tanggal berhasil dialokasikan, $skippedCount dilewati.';
+    if (remainingCount > 0) {
+      core += ' Masih ada $remainingCount tanggal lain yang belum diproses '
+          '(di luar 60 yang ditampilkan).';
+    }
+    return core;
   }
 }
 
