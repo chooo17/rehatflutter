@@ -32,6 +32,17 @@ class _FinanceLedgerScreenState extends ConsumerState<FinanceLedgerScreen> {
   bool _loadingMore = false;
   String? _loadMoreError;
 
+  /// `true` sejak halaman pertama PERTAMA KALI diterima (lihat
+  /// [_onFirstPage]). **Final whole-branch review, C-3:** dulu
+  /// "punya-data-untuk-filter-ini" hanya dicek lewat `_stateBucket == bucket`
+  /// — pada render PERTAMA `_stateBucket` masih `null` dan filter default
+  /// JUGA `null`, jadi `null == null` bernilai `true` walau `_state` masih
+  /// kosong sama sekali (request halaman 1 belum selesai). Akibatnya layar
+  /// langsung menyatakan "Belum ada mutasi untuk filter ini." selama seluruh
+  /// durasi request pertama, bukan menampilkan spinner. Flag terpisah ini
+  /// tak mungkin `true` secara kebetulan sebelum data sungguhan tiba.
+  bool _hasEverLoaded = false;
+
   /// Generasi (epoch) halaman pertama yang SEDANG ditampilkan. Naik setiap
   /// [_onFirstPage] dijalankan (filter berganti ATAU tarik-untuk-refresh
   /// dengan filter sama) — lihat [isLoadMoreResponseStale].
@@ -49,6 +60,7 @@ class _FinanceLedgerScreenState extends ConsumerState<FinanceLedgerScreen> {
     if (!mounted) return;
     setState(() {
       _stateBucket = bucket;
+      _hasEverLoaded = true;
       _state = firstPageState(page);
       _loadMoreError = null;
       _epoch++;
@@ -143,7 +155,7 @@ class _FinanceLedgerScreenState extends ConsumerState<FinanceLedgerScreen> {
     // (`_stateBucket == bucket`) sehingga `hasDataForCurrentFilter` true dan
     // daftar lama tetap tampil sampai halaman baru datang lewat listener di
     // atas — layar tak berkedip kosong saat tarik-untuk-refresh.
-    final hasDataForCurrentFilter = _stateBucket == bucket;
+    final hasDataForCurrentFilter = _hasEverLoaded && _stateBucket == bucket;
     final showInitialSpinner = !hasDataForCurrentFilter && async.isLoading;
     final showInitialError = !hasDataForCurrentFilter && async.hasError;
 

@@ -93,6 +93,30 @@ void main() {
   });
 
   testWidgets(
+      'C-3: render PERTAMA (request halaman 1 masih pending) menampilkan '
+      'spinner — BUKAN "Belum ada mutasi untuk filter ini." (sentinel '
+      '_stateBucket==bucket salah pas keduanya masih null)', (tester) async {
+    final repo = _FakeFinanceRepository();
+    final container = ProviderContainer(
+      overrides: [financeRepositoryProvider.overrideWithValue(repo)],
+    );
+    addTearDown(container.dispose);
+
+    await _mountScreen(tester, container);
+    await tester.pump();
+    // Request halaman 1 SENGAJA dibiarkan pending (completers[0] belum
+    // di-complete) — pada render pertama `_stateBucket` (null) dan filter
+    // default (null) kebetulan SAMA, jadi sentinel yang salah akan
+    // menyimpulkan "sudah punya data untuk filter ini" walau `_state`
+    // masih kosong total.
+    expect(find.text('Belum ada mutasi untuk filter ini.'), findsNothing,
+        reason: 'C-3: request pertama masih di jalan — layar TIDAK boleh '
+            'menyatakan buku besar kosong sebelum tahu jawabannya');
+    expect(find.byType(CircularProgressIndicator), findsOneWidget,
+        reason: 'spinner wajib tampil selama request pertama masih pending');
+  });
+
+  testWidgets(
       'C-1: kunjungan KEDUA ke layar (pop lalu push, ProviderContainer SAMA) '
       'memicu fetch baru & menampilkan data — bukan stuck "Belum ada mutasi"',
       (tester) async {

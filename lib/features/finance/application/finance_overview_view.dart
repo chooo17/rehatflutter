@@ -126,8 +126,15 @@ String runwayOkLabel(int days) {
 /// backend — `null` bila tidak perlu peringatan.
 String? runwayWarning(FinanceOverview overview) {
   if (!overview.variableExpensesUnavailable) return null;
-  return 'Biaya belum lengkap — runway di atas kemungkinan terlalu panjang '
-      'dan rem tarik-pribadi bisa meleset.';
+  // I-2 (final whole-branch review): saat query pengeluaran variabel gagal,
+  // backend memakai `variableExpenses=0` → `monthlyCost` (fixedCosts +
+  // variableComponent) ikut mengecil → `breakEvenDaily` (= (monthlyCost/30)
+  // / margin) IKUT diremehkan bersama runway. Peringatan lama hanya
+  // menyebut runway & rem tarik-pribadi, sehingga "Omzet impas harian" tepat
+  // di atasnya tetap tampil tebal & normal padahal terlalu optimis.
+  return 'Biaya belum lengkap — omzet impas harian & runway di atas '
+      'kemungkinan terlalu rendah/panjang, dan rem tarik-pribadi bisa '
+      'meleset.';
 }
 
 /// Keadaan tombol tarik untuk satu amplop.
@@ -192,6 +199,34 @@ String monthLabelIndo(String yyyyMm) {
   return '${_bulanIndo[month - 1]} $year';
 }
 
+/// Mengubah `YYYY-MM-DD` (tanggal WIB MURNI dari [FinanceOverview.lastAllocatedDate],
+/// tanpa komponen jam/zona) menjadi "9 Agustus 2026". String kosong bila
+/// [yyyyMmDd] `null`/format tak dikenali — pemanggil menyembunyikan baris
+/// bila kosong.
+///
+/// Minor (final whole-branch review): `lastAllocatedDate` diparse & diuji
+/// (`finance_models_test.dart`) tapi TIDAK PERNAH dirender — satu-satunya
+/// penanda "kapan pembukuan amplop terakhir diperbarui" di layar Ringkasan,
+/// biayanya sudah dibayar (sudah ada di model). SENGAJA TIDAK lewat
+/// `Formatters.toWib`/`DateFormat` seperti timestamp lain di app — nilai ini
+/// tanggal KALENDER murni (bukan `timestamptz`); memaksakannya lewat
+/// `DateTime.parse` lalu `.toUtc()` bisa menggeser tanggalnya tergantung
+/// zona waktu MESIN yang menjalankannya (persis kelas bug yang coba
+/// dihindari proyek ini di tempat lain — lihat §5d CLAUDE.md). Parsing
+/// komponen string manual di sini aman dari itu sama sekali.
+String lastAllocatedLabel(String? yyyyMmDd) {
+  if (yyyyMmDd == null) return '';
+  final parts = yyyyMmDd.split('-');
+  if (parts.length != 3) return '';
+  final year = int.tryParse(parts[0]);
+  final month = int.tryParse(parts[1]);
+  final day = int.tryParse(parts[2]);
+  if (year == null || month == null || day == null || month < 1 || month > 12) {
+    return '';
+  }
+  return '$day ${_bulanIndo[month - 1]} $year';
+}
+
 /// Label dasar perhitungan rambu ("Berdasarkan bulan lalu: Juli 2026" dst.)
 /// supaya pemilik tahu dari bulan mana angka break-even/runway berasal.
 /// String kosong bila [FinanceOverview.basis] tak dikenal (belum ada data).
@@ -211,10 +246,16 @@ String basisLabel(FinanceOverview overview) {
   }
 }
 
-/// Pecahan (0.0–1.0) untuk lebar bar progres dana darurat. `emergencyPct`
-/// bisa melebihi 100 (target sudah tercapai/terlampaui) — bar tetap dibatasi
-/// penuh, TAPI teks persentase yang ditampilkan di widget harus tetap
-/// memakai `emergencyPct` mentah, bukan hasil fungsi ini.
+/// Pecahan (0.0–1.0) untuk lebar bar progres dana darurat.
+///
+/// Minor (final whole-branch review): backend SUDAH menjepit `emergencyPct`
+/// dengan `Math.min(100, …)`, jadi dalam praktiknya nilai yang tiba di sini
+/// tidak pernah melebihi 100 dan cabang `>= 100` di bawah tidak pernah
+/// tercapai lewat data nyata. Klem itu TETAP DIPERTAHANKAN sebagai
+/// pertahanan defensif (mis. bila klem backend suatu saat hilang/berubah) —
+/// bukan dihapus. Teks persentase yang ditampilkan di widget tetap wajib
+/// memakai `emergencyPct` mentah, bukan hasil fungsi ini (fungsi ini HANYA
+/// untuk lebar bar visual, 0.0–1.0).
 double emergencyBarFraction(int emergencyPct) {
   if (emergencyPct <= 0) return 0.0;
   if (emergencyPct >= 100) return 1.0;
@@ -232,8 +273,11 @@ String missingAllocationSummary(FinanceOverview overview) {
   if (total > shown) {
     return '$total tanggal belum dialokasikan (menampilkan $shown terbaru).';
   }
-  final noun = total == 1 ? 'tanggal' : 'tanggal';
-  return '$total $noun belum dialokasikan.';
+  // Minor (final whole-branch review): dulu ada `total == 1 ? 'tanggal' :
+  // 'tanggal'` — sisa refactor, kedua cabang identik ("tanggal" tak
+  // berubah bentuk jamak/tunggal dalam Bahasa Indonesia). Disederhanakan
+  // jadi literal langsung.
+  return '$total tanggal belum dialokasikan.';
 }
 
 /// Apakah kartu/aksi "alokasikan tanggal bolong" perlu ditampilkan sama
@@ -390,6 +434,18 @@ String withdrawErrorMessage(Object error) {
       return 'Penarikan yang sama baru saja dilakukan (dalam 60 detik '
           'terakhir). Tunggu sebentar sebelum mencoba lagi — ini proteksi '
           'anti-klik-ganda, bukan kegagalan sistem.';
+    }
+    // I-1 (final whole-branch review): validasi Zod backend (`withdrawSchema`)
+    // membalas 400 `VALIDATION_ERROR` dengan `error.message` BERBAHASA
+    // INGGRIS mentah (mis. "Too big: expected string to have <=200
+    // characters") — satu-satunya jalur 400 yang bisa dicapai dari UI ini.
+    // `maxLength: 200` di sheet penarikan sudah mencegah kasus catatan
+    // kepanjangan, TAPI jaring pengaman ini tetap wajib ada supaya validasi
+    // 400 APA PUN yang lolos (skema backend berubah, dsb.) tidak pernah
+    // menampilkan pesan Inggris di aksi yang menulis uang.
+    if (error.code == 'VALIDATION_ERROR') {
+      return 'Data penarikan tidak valid. Periksa kembali nominal dan '
+          'catatan (maksimal 200 karakter), lalu coba lagi.';
     }
     return error.message;
   }

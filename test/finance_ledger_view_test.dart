@@ -306,16 +306,21 @@ void main() {
   });
 
   group('sourceLabel', () {
-    test('lima sumber sesuai brief diterjemahkan', () {
+    // I-3 (final whole-branch review): lima nilai HARUS cocok dengan CHECK
+    // constraint DB (`src/db/migrations/016*.sql` di repo backend) —
+    // `('allocation','withdrawal','expense','adjustment','shortfall')`.
+    // `'correction'` bukan salah satunya (entri mati); `'adjustment'` ADA di
+    // DB (lahir dari koreksi manual SQL Supabase) dan wajib diterjemahkan.
+    test('lima sumber sesuai constraint DB diterjemahkan', () {
       expect(sourceLabel('allocation'), 'Alokasi harian');
       expect(sourceLabel('withdrawal'), 'Penarikan');
       expect(sourceLabel('expense'), 'Pengeluaran');
-      expect(sourceLabel('correction'), 'Koreksi');
+      expect(sourceLabel('adjustment'), 'Penyesuaian manual');
       expect(sourceLabel('shortfall'), 'Kekurangan');
     });
 
     test('kode mentah TIDAK PERNAH bocor ke tampilan untuk kunci dikenal', () {
-      for (final code in ['allocation', 'withdrawal', 'expense', 'correction', 'shortfall']) {
+      for (final code in ['allocation', 'withdrawal', 'expense', 'adjustment', 'shortfall']) {
         expect(sourceLabel(code), isNot(code));
       }
     });
@@ -401,6 +406,27 @@ void main() {
       final label = signedAmountLabel(e);
       expect(label, startsWith('+'));
       expect(label, contains('50.000'));
+    });
+
+    // Minor (final whole-branch review): kedua test di atas memakai
+    // `isNot(contains('−−'))`, TAPI `Formatters.rupiah` mencetak nominal
+    // negatif dengan minus ASCII biasa ('-Rp 50.000'), BUKAN unicode minus
+    // ('−') yang dipakai untuk tanda arah — jadi mutasi "hapus `.abs()`"
+    // menghasilkan '−-Rp 50.000' (satu unicode + satu ASCII minus), yang
+    // TIDAK mengandung substring '−−' dan lolos dari kedua test di atas
+    // tanpa terdeteksi. Kesetaraan STRING PERSIS di sini menutup celah itu.
+    test('KUNCI I: hapus .abs() → output persis berbeda dari yang diharapkan (out)', () {
+      final e = _entry(direction: 'out', amount: -50000);
+      expect(signedAmountLabel(e), '−Rp 50.000',
+          reason: 'tanpa .abs(), Formatters.rupiah(-50000) mencetak minus '
+              'ASCII sendiri ("-Rp 50.000"), menghasilkan "−-Rp 50.000" — '
+              'string persis ini menangkap regresi itu, beda dari '
+              'isNot(contains("−−")) yang tidak melihatnya');
+    });
+
+    test('KUNCI I: hapus .abs() → output persis berbeda dari yang diharapkan (in)', () {
+      final e = _entry(direction: 'in', amount: -50000);
+      expect(signedAmountLabel(e), '+Rp 50.000');
     });
   });
 }

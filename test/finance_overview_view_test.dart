@@ -163,6 +163,15 @@ void main() {
       expect(runwayWarning(o), isNotNull);
     });
 
+    test('I-2: pesan peringatan MENYEBUT omzet impas harian, bukan cuma runway', () {
+      // monthlyCost (fixedCosts + variableComponent) ikut diremehkan saat
+      // variableExpenses gagal diambil → breakEvenDaily ikut terlalu rendah,
+      // bukan cuma runwayDays. Peringatan wajib menyebut keduanya supaya
+      // angka "Omzet impas harian" tak tampil tebal & normal seolah aman.
+      final o = _overview(variableExpensesUnavailable: true);
+      expect(runwayWarning(o), contains('impas harian'));
+    });
+
     test('variableExpensesUnavailable false → null (tanpa peringatan)', () {
       final o = _overview();
       expect(runwayWarning(o), isNull);
@@ -240,6 +249,23 @@ void main() {
     test('basis tak dikenal/kosong → string kosong', () {
       expect(basisLabel(_overview(basis: '', basisMonth: '')), '');
       expect(basisLabel(_overview(basis: 'unknown', basisMonth: '2026-08')), '');
+    });
+  });
+
+  group('lastAllocatedLabel', () {
+    test('YYYY-MM-DD valid → "9 Agustus 2026"', () {
+      expect(lastAllocatedLabel('2026-08-09'), '9 Agustus 2026');
+    });
+
+    test('null → string kosong', () {
+      expect(lastAllocatedLabel(null), '');
+    });
+
+    test('format tak dikenali → string kosong, bukan crash', () {
+      expect(lastAllocatedLabel(''), '');
+      expect(lastAllocatedLabel('2026-08'), '');
+      expect(lastAllocatedLabel('abcd-ef-gh'), '');
+      expect(lastAllocatedLabel('2026-13-01'), '');
     });
   });
 
@@ -503,6 +529,23 @@ void main() {
     test('ApiException kode lain → pakai pesan aslinya', () {
       final e = ApiException('Saldo tidak cukup', code: 'INSUFFICIENT_BALANCE');
       expect(withdrawErrorMessage(e), 'Saldo tidak cukup');
+    });
+
+    test('I-1: ApiException code VALIDATION_ERROR → pesan Bahasa Indonesia, '
+        'BUKAN pesan Zod mentah berbahasa Inggris', () {
+      // Reproduksi persis: backend (`withdrawSchema`, note max 200) membalas
+      // 400 dengan pesan Zod asli. `error.message` di sini SENGAJA diisi
+      // teks Inggris itu untuk membuktikan method ini tidak menerus­kannya
+      // apa adanya.
+      final e = ApiException(
+        'Too big: expected string to have <=200 characters',
+        code: 'VALIDATION_ERROR',
+        statusCode: 400,
+      );
+      final msg = withdrawErrorMessage(e);
+      expect(msg, isNot(contains('Too big')));
+      expect(msg, isNot(contains('characters')));
+      expect(msg, contains('200 karakter'));
     });
 
     test('error non-ApiException → pesan generik', () {

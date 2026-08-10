@@ -159,11 +159,21 @@ const List<String> bucketFilterKeys = [
 /// kode mentah (`allocation`, `withdrawal`, dst.) langsung ke pengguna.
 /// Kunci tak dikenal tetap ditampilkan apa adanya sebagai fallback aman,
 /// bukan disembunyikan.
+///
+/// **I-3 (final whole-branch review):** lima nilai ini HARUS sama persis
+/// dengan CHECK constraint DB (`src/db/migrations/016*.sql` di repo
+/// backend): `('allocation','withdrawal','expense','adjustment','shortfall')`.
+/// Peta lama memuat `'correction'` (tak pernah ada di DB — entri mati) dan
+/// TIDAK memuat `'adjustment'` (ada di DB, lahir dari koreksi manual lewat
+/// SQL Supabase — satu-satunya cara koreksi baris `finance_ledger` sampai
+/// ada endpoint resmi). Tanpa perbaikan ini, baris hasil koreksi manual
+/// menampilkan kode mentah `adjustment` ke pemilik alih-alih label
+/// Indonesia.
 const Map<String, String> sourceLabels = {
   'allocation': 'Alokasi harian',
   'withdrawal': 'Penarikan',
   'expense': 'Pengeluaran',
-  'correction': 'Koreksi',
+  'adjustment': 'Penyesuaian manual',
   'shortfall': 'Kekurangan',
 };
 

@@ -557,7 +557,19 @@ final pnlProvider = FutureProvider<ProfitLoss>((ref) {
 });
 
 /// Ringkasan amplop alokasi (saldo lima bucket + rambu kesehatan kas).
-final financeOverviewProvider = FutureProvider<FinanceOverview>((ref) {
+///
+/// **`autoDispose` (final whole-branch review, C-2):** tanpa ini, kunjungan
+/// KEDUA ke layar Ringkasan (pop lalu push lagi) menemukan provider ini
+/// SUDAH `AsyncData` dari kunjungan sebelumnya — `fetchOverview()` tidak
+/// dipanggil ulang sama sekali, dan layar menampilkan saldo BASI tanpa
+/// spinner/tanda apa pun (termasuk `missingAllocationDates`, yang bisa
+/// gagal menunjukkan bolong baru atau menunjukkan tanggal yang sudah
+/// dialokasikan). Ini persis C-2 yang sudah diperbaiki untuk
+/// [ledgerProvider] di Buku Besar — sekarang diterapkan juga ke saldonya
+/// sendiri. `autoDispose` membuang provider begitu layar ini tak lagi
+/// punya listener (mis. saat di-pop), sehingga kunjungan berikutnya SELALU
+/// memicu fetch baru.
+final financeOverviewProvider = FutureProvider.autoDispose<FinanceOverview>((ref) {
   return ref.watch(financeRepositoryProvider).fetchOverview();
 });
 

@@ -199,6 +199,7 @@ class _GuardsCard extends StatelessWidget {
     final breakEven = breakEvenDisplay(overview);
     final runwayWarn = runwayWarning(overview);
     final basis = basisLabel(overview);
+    final lastAllocated = lastAllocatedLabel(overview.lastAllocatedDate);
 
     return NeuCard(
       child: Column(
@@ -244,6 +245,16 @@ class _GuardsCard extends StatelessWidget {
             const SizedBox(height: 10),
             Text(
               basis,
+              style: Theme.of(context)
+                  .textTheme
+                  .bodySmall
+                  ?.copyWith(color: AppColors.textSecondary),
+            ),
+          ],
+          if (lastAllocated.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(
+              'Pembukuan amplop terakhir: $lastAllocated',
               style: Theme.of(context)
                   .textTheme
                   .bodySmall
@@ -363,8 +374,14 @@ class _EmergencyProgressCard extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            '${guards.emergencyPct}% dari target '
-            '${Formatters.rupiah(overview.settings.emergencyTarget)}',
+            // Minor (final whole-branch review): `emergencyTarget == 0`
+            // berarti pemilik BELUM PERNAH mengatur target (bukan "target
+            // Rp0 tercapai") — tampilkan itu apa adanya, bukan "0% dari
+            // target Rp0" yang membingungkan (seolah target memang nol).
+            overview.settings.emergencyTarget <= 0
+                ? 'Target belum diatur'
+                : '${guards.emergencyPct}% dari target '
+                    '${Formatters.rupiah(overview.settings.emergencyTarget)}',
             style: Theme.of(context).textTheme.bodySmall,
           ),
         ],
@@ -413,25 +430,36 @@ class _BucketGrid extends ConsumerWidget {
       _BucketSpec('emergency', 'Dana Darurat', Icons.shield_outlined, b.emergency),
     ];
 
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: buckets.length,
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        mainAxisSpacing: 12,
-        crossAxisSpacing: 12,
-        childAspectRatio: 1.05,
-      ),
-      itemBuilder: (context, i) {
-        final spec = buckets[i];
-        final state = withdrawButtonState(bucket: spec.key, guards: g);
-        return BucketCard(
-          label: spec.label,
-          icon: spec.icon,
-          balance: spec.balance,
-          withdrawState: state,
-          onWithdraw: () => _showWithdrawSheet(context, spec),
+    // `Wrap` alih-alih `GridView` + `childAspectRatio` tetap (final
+    // whole-branch review, C-1): tinggi sel GridView tetap TIDAK bisa
+    // menampung isi kartu untuk semua kombinasi nyata (saldo jutaan yang
+    // membungkus 2-3 baris, tombol Tarik, teks defisit, DAN
+    // `blockedReason` sekaligus) — diverifikasi overflow 52-334px pada
+    // 360×800 logis (HP standar) untuk keempat kombinasi
+    // (normal/diblokir × positif/defisit). `Wrap` membiarkan setiap kartu
+    // mengambil TINGGI INTRINSIK isinya sendiri (lewat `SizedBox` yang
+    // hanya mematok LEBAR, bukan tinggi) — kartu boleh setinggi apa pun
+    // yang dibutuhkan kontennya, tak ada batas yang bisa terlampaui.
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        const spacing = 12.0;
+        final cardWidth = (constraints.maxWidth - spacing) / 2;
+        return Wrap(
+          spacing: spacing,
+          runSpacing: spacing,
+          children: [
+            for (final spec in buckets)
+              SizedBox(
+                width: cardWidth,
+                child: BucketCard(
+                  label: spec.label,
+                  icon: spec.icon,
+                  balance: spec.balance,
+                  withdrawState: withdrawButtonState(bucket: spec.key, guards: g),
+                  onWithdraw: () => _showWithdrawSheet(context, spec),
+                ),
+              ),
+          ],
         );
       },
     );
@@ -482,15 +510,30 @@ class _WithdrawSheetState extends ConsumerState<_WithdrawSheet> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+    final amount = int.parse(_amountCtrl.text.replaceAll(RegExp(r'[^0-9]'), ''));
     setState(() => _submitting = true);
     try {
       await ref.read(financeRepositoryProvider).withdraw(
             bucket: widget.bucket,
-            amount: int.parse(_amountCtrl.text.replaceAll(RegExp(r'[^0-9]'), '')),
+            amount: amount,
             note: _noteCtrl.text.trim(),
           );
       ref.invalidate(financeOverviewProvider);
-      if (mounted) Navigator.pop(context);
+      if (!mounted) return;
+      // Minor (final whole-branch review): dulu sheet ditutup TANPA umpan
+      // balik apa pun setelah penarikan berhasil — aksi yang menulis uang
+      // wajib memberi konfirmasi eksplisit (nominal & pos), bukan diam-diam
+      // hilang. `ScaffoldMessenger` diambil SEBELUM `pop()` (context sheet
+      // masih hidup di sini), lalu snackbar ditampilkan SESUDAH pop —
+      // `ScaffoldMessengerState` tetap valid karena melekat ke Scaffold
+      // layar Ringkasan di baliknya, bukan ke sheet yang baru ditutup.
+      final messenger = ScaffoldMessenger.of(context);
+      Navigator.pop(context);
+      messenger.showSnackBar(SnackBar(
+        content: Text(
+          '${Formatters.rupiah(amount)} berhasil ditarik dari ${widget.label}.',
+        ),
+      ));
     } catch (e) {
       if (!mounted) return;
       setState(() => _submitting = false);
@@ -530,9 +573,23 @@ class _WithdrawSheetState extends ConsumerState<_WithdrawSheet> {
             const SizedBox(height: 12),
             TextFormField(
               controller: _noteCtrl,
+              // I-1 (final whole-branch review): backend (`withdrawSchema`,
+              // `note: z.string().max(200)`) menolak catatan >200 karakter
+              // dengan pesan Zod BERBAHASA INGGRIS ("Too big: expected
+              // string to have <=200 characters") yang lolos apa adanya
+              // lewat `withdrawErrorMessage`. `maxLength` di sini mencegah
+              // pengguna mengetik melebihi batas SAMA SEKALI — jalur 400 ini
+              // seharusnya tak pernah tercapai lagi dari UI.
+              maxLength: 200,
               decoration: const InputDecoration(labelText: 'Catatan'),
-              validator: (v) =>
-                  (v == null || v.trim().isEmpty) ? 'Catatan wajib diisi' : null,
+              validator: (v) {
+                final trimmed = (v ?? '').trim();
+                if (trimmed.isEmpty) return 'Catatan wajib diisi';
+                if (trimmed.length > 200) {
+                  return 'Catatan maksimal 200 karakter';
+                }
+                return null;
+              },
             ),
             const SizedBox(height: 16),
             SizedBox(
