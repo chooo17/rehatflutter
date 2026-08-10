@@ -105,6 +105,8 @@ Deteksi deploy baru live: endpoint baru balas **401** (route ada) vs **404** (be
 | 015 | QR meja (`orders.table_number`) | ✅ terpasang (`node src/db/verify-015.js`) |
 | 016 | modul keuangan (`finance_settings`, `fixed_costs`, `finance_ledger`, `finance_calibration`, `expenses.bucket`, `users.can_access_finance`; backfill `expenses.bucket='restock'`) | ✅ terpasang (`node src/db/verify-016.js`) |
 
+**Modul Keuangan Tahap 2 (amplop alokasi, lihat §5g) TIDAK menambah migrasi** — semua tabel (`finance_settings`, `finance_ledger`, dll.) sudah ada dari migrasi 016; Tahap 2 murni logika baru di atasnya.
+
 Pola verifikasi umum: skrip sekali-pakai di folder backend pakai `supabaseAdmin` (contoh §8). `DATABASE_URL` placeholder → `pg`/psql tak jalan.
 
 **Pola WAJIB saat menambah kolom:** buat query-nya **defensif** (coba dengan kolom baru → ulangi tanpa kolom itu bila error menyebut kolom tsb). Tanpa ini, migrasi yang tertinggal bisa **merusak alur pembayaran**. Contoh ada di `getSalesReport` (cost_price), `updateOrderStatus` (source), dan `createGuestOrder` (`optionalCols`).
@@ -115,6 +117,7 @@ Pola verifikasi umum: skrip sekali-pakai di folder backend pakai `supabaseAdmin`
 
 - **AppColors**: token tema (espresso, crema, textPrimary…) adalah **getter runtime**, BUKAN const → jangan pakai `const` dgn itu (build rusak). Token semantik (`success`, `error`, `warning`, `amber`) memang `const`.
 - **Widget Neu** (`shared/widgets/neu.dart`): sudah **flat** (border tipis), dependency `flutter_neumorphic_plus` **dihapus**. API dipertahankan (`NeuCard/NeuButton/NeuInset/NeuCircleButton/NeuBottomBar/NeuThemeScope`).
+- **`NeuButton` dulu mengoper `borderRadius` DAN `shape` ke `Material`** — `Material` memprioritaskan `borderRadius`, jadi `BorderSide` pada varian non-accent **tak pernah tampil di rilis**, dan di build debug ia meledak di assert (memblokir semua widget test). Diperbaiki (Tahap 2 keuangan, task buku besar): `borderRadius` dibuang, `shape` dipertahankan → ~24 tombol non-accent di 27 berkas kini menampilkan border tipis sesuai desain yang memang dimaksud. Varian accent tidak berubah tampilannya.
 - **Navbar** (`main_shell.dart`): floating pill + micro-interactions (press-scale, haptic, ikon scale+fade).
 - **NeuButton** membungkus child dengan `Align(heightFactor:1)` — penting agar tak memuai di `bottomNavigationBar`.
 - **Font**: di-bundle lokal (`assets/fonts/`, Inter+Cormorant+Archivo+Anton), `google_fonts` **dihapus**.
@@ -132,6 +135,16 @@ Pola verifikasi umum: skrip sekali-pakai di folder backend pakai `supabaseAdmin`
 - **Backend kini punya test** (sebelumnya tidak ada sama sekali). Jest + Supertest: `cd D:\REHAT\rehat-backend\rehat-backend && npx jest` → 23 test lulus, sengaja lulus **tanpa `.env`** (test file `jest.mock` `config/supabase`). Logika keuangan murni ada di `financeCalc.js` (`computePnl`) & `expenseService.js`/`financeService.js` (`splitByBucket`, `sumFixedCosts`) — semua tanpa DB supaya bisa diuji.
 - **`net_profit` di `/admin/reports/sales` masih memotong restock dua kali** (restock sudah masuk HPP). Angka yang benar ada di `/admin/finance/pnl` (`getMonthlyPnl`). Endpoint lama sengaja dibiarkan apa adanya agar dashboard existing tidak pecah — jangan jadikan `net_profit` lama sebagai sumber kebenaran laba.
 - **Biaya tetap tidak punya tanggal berlaku** — `getMonthlyPnl` menjumlah baris `fixed_costs` yang ada **saat ini** untuk **semua** bulan yang diminta. Tambah biaya sewa bulan September → laba rugi Juli yang sudah dilaporkan ikut turun retroaktif; hapus satu baris (`deleteFixedCost` hard delete) → laba naik. Artinya **P&L historis tidak reproducible**: dicetak hari ini vs bulan depan bisa beda angka untuk bulan yang sama. Dapat diterima untuk Tahap 1; Tahap 2 perlu kolom `effective_from`/`effective_to` di `fixed_costs` agar tiap bulan memakai biaya tetap yang berlaku saat itu.
+- **Alokasi amplop otomatis HANYA untuk hari WIB KEMARIN** (`financeService.yesterdayWibKey()`), dipicu dari `GET /admin/reports/closing`. Alasannya: endpoint itu **bukan** aksi "tutup kasir", melainkan tembakan otomatis tiap kali layar Tutup Kasir dibuka (watch di `build()`, pull-to-refresh, ganti tanggal). Memicu untuk **hari berjalan** mengunci alokasi pada omzet **PARSIAL** — dan **tak ada endpoint koreksi mana pun** (`allocateForDate` hubung-singkat begitu sudah ada baris untuk tanggal itu; satu-satunya jalan perbaikan adalah SQL manual di Supabase). Ini regresi nyata yang sempat lolos & ditutup di Task 5 (Tahap 2) — **jangan "disederhanakan" jadi hari ini**.
+- **`POST /admin/finance/allocate` default-nya HARI INI** (`wibDateKey(new Date())` bila `date` tak dikirim) — default itu **berbahaya** persis karena alasan di atas. `FinanceRepository.allocate()` di Flutter **mewajibkan tanggal eksplisit** (parameter wajib, tak ada default) — jangan tambahkan overload tanpa tanggal.
+- **Paginasi buku besar (`GET /admin/finance/ledger`) wajib keyset komposit** `before` (created_at ISO) + `before_id` (uuid), **berpasangan**. Sebabnya konkret: `allocateForDate` menulis 5–6 baris dalam **satu insert**, jadi `created_at`-nya identik untuk semua baris hari itu (terbukti di data produksi 9 Agt 2026). Cursor `.lt(created_at)` biasa akan membuang seluruh baris ber-timestamp sama → **baris alokasi hilang permanen** dari buku besar. Klien harus meneruskan `next_before`/`next_before_id` dari respons apa adanya, jangan menyusun cursor sendiri dari item terakhir.
+- **`breakEvenDaily == 0` TIDAK berarti aman.** `GET /admin/finance/overview` membedakan penyebabnya lewat flag: `insufficient_data` (belum ada omzet bulan dasar), `margin_non_positive` (jual rugi, atau margin <0,5% dibulatkan jadi 0), dan biaya bulanan kosong (`fixed_costs` belum diisi → `monthlyCost` 0). UI (`BreakEvenStatus` di `finance_overview_view.dart`) wajib membedakan ketiganya — menampilkan "Rp0" polos sebagai kabar baik adalah cacat rambu uang (pernah divonis CRITICAL saat review Task 7).
+- **Dasar rambu break-even/runway = bulan LENGKAP terakhir** (`basis: 'previous'`), fallback ke bulan berjalan yang di-run-rate (`basis: 'current_partial'`) bila bulan lalu kosong. Ini **sengaja menyimpang** dari rencana awal yang memakai bulan berjalan mentah — rencana itu cacat: tiap tanggal 1, omzet MTD = 0 → margin 0 → `breakEvenDaily` dilaporkan Rp0 alias "aman" justru saat belum ada dasar apa pun.
+- **`variable_expenses_unavailable`**: bila query pengeluaran non-restock gagal, biaya kena remehkan → runway dilaporkan lebih panjang dari nyatanya & rem tarik-pribadi (`personalWithdrawBlocked`) bisa `false` padahal seharusnya `true`. Flag ini **harus** diteruskan sampai ke UI, jangan dibuang di lapisan mana pun.
+- **Idempotensi penarikan (`POST /admin/finance/withdraw`) hanya lapis aplikasi** — menolak penarikan identik (bucket+amount+note+created_by) dalam jendela 60 detik → 409 `DUPLICATE_WITHDRAWAL`. **Bukan** unique index seperti alokasi; masih ada race dua request bersamaan (diakui di komentar kode `financeService.js`).
+- **Saldo pos amplop BOLEH NEGATIF** — baris shortfall alokasi & penarikan yang melebihi saldo memang diizinkan tanpa clamp (rambunya ada di UI, bukan di data). Jangan `clamp(0, ...)` saldo pos di widget mana pun.
+- **`finance_settings.pct_restock` adalah PERSEN (mis. 42), bukan pecahan** — jangan dikalikan/dibagi 100 lagi saat ditampilkan.
+- **`missing_allocation_dates` / `missing_allocation_count`** di `GET /admin/finance/overview`: daftar tanggal WIB dari `started_on` s/d **kemarin** yang belum punya baris alokasi (array dipotong 60 tanggal terbaru, `count` tetap jumlah sebenarnya). Ini satu-satunya cara pemilik tahu pembukuannya bolong — kegagalan alokasi otomatis saat tutup kasir hanya dicatat via `console.error` (tak pernah sampai ke pemilik, karena yang membuka layar Tutup Kasir adalah kasir, bukan pemilik). Layar Ringkasan Keuangan (§5g) **wajib** menampilkan ini dengan aksi "Alokasikan tanggal bolong" yang memanggil `allocate()` per tanggal — jangan pakai default endpoint (= hari ini).
 
 ---
 
@@ -141,7 +154,7 @@ Pola verifikasi umum: skrip sekali-pakai di folder backend pakai `supabaseAdmin`
 Login OTP/tamu · Menu (kategori, cari, urut, opsi size/gula/suhu) · Keranjang & Checkout (dine-in/takeaway) · **Bayar: QRIS (DOKU) + Saldo Rehat** · Nomor antrian + linimasa status live · **Tracker pesanan di halaman Menu** (banner progres 4 tahap, **FIFO** — pesanan paling dulu dibuat; auto-hilang bila tak ada pesanan aktif) · **Layar "Lacak Pesanan"** via ikon struk di app bar (Sedang berjalan FIFO + Riwayat) · Riwayat pesanan · **Pesan Lagi** (reorder) · Loyalti (poin + stamp + tier) · Spin wheel · Favorit · Ulasan menu · Notifikasi push · **Dompet/Saldo (top-up DOKU + riwayat)** · **Referral (ajak teman, voucher 15%)** · Hadiah ulang tahun otomatis · Mode gelap.
 
 ### Admin / Kasir
-Dashboard penjualan (**omzet, HPP, laba kotor & bersih RIIL, margin%**) · Grafik harian + kalender · Item terlaris (dgn margin) · **Analitik** (jam sibuk, hari, AOV, repeat-rate) · **Tutup Kasir + rekonsiliasi DOKU + ekspor CSV** · **Segmen Pelanggan (RFM) + broadcast promo** · Pesanan masuk & pending · POS kasir (Tunai/QRIS/**Saldo**/Simpan) · Ubah status pesanan · **HPP & Margin Menu** (editor modal) · Kelola gambar menu · Kelola banner · Pesanan tersimpan · Printer thermal Bluetooth + auto-struk · Pengeluaran · **Keuangan (KHUSUS PEMILIK)**: Laba Rugi bulanan yang benar + biaya tetap.
+Dashboard penjualan (**omzet, HPP, laba kotor & bersih RIIL, margin%**) · Grafik harian + kalender · Item terlaris (dgn margin) · **Analitik** (jam sibuk, hari, AOV, repeat-rate) · **Tutup Kasir + rekonsiliasi DOKU + ekspor CSV** · **Segmen Pelanggan (RFM) + broadcast promo** · Pesanan masuk & pending · POS kasir (Tunai/QRIS/**Saldo**/Simpan) · Ubah status pesanan · **HPP & Margin Menu** (editor modal) · Kelola gambar menu · Kelola banner · Pesanan tersimpan · Printer thermal Bluetooth + auto-struk · Pengeluaran · **Keuangan (KHUSUS PEMILIK)**: Laba Rugi bulanan + biaya tetap (Tahap 1), **amplop alokasi + buku besar + rambu break-even/runway** (Tahap 2, lihat §5g).
 
 ### Loyalti — mekanisme saat ini
 - **Poin**: 1 poin / Rp 1.000 (`POINTS_PER_RUPIAH = 1/1000`), dihitung saat order dibuat (`points_earned`). Menentukan **TIER**: Bronze(0)/Silver(500)/Gold(1000)/Platinum(1500). **Poin belum bisa dibelanjakan** (hanya status — label "Poin tersedia" di UI agak menyesatkan).
@@ -230,6 +243,19 @@ Default "hari ini" (tutup kasir) & "bulan ini" (kalender) juga memakai `Formatte
 
 ---
 
+## 5g. Modul Keuangan Tahap 2 (amplop alokasi) — KHUSUS PEMILIK
+
+Lanjutan Modul Keuangan Tahap 1 (§8). Omzet harian dipecah **waterfall** ke 5 pos ("amplop"): **restock, operational, personal, scaling, emergency**. Tiap alokasi/penarikan ditulis sebagai **baris di `finance_ledger`** (`direction: 'in'|'out'`, `source: 'allocation'|'withdrawal'`) — **saldo pos TIDAK PERNAH disimpan sebagai kolom**, selalu dijumlah ulang dari ledger (event-sourced, `bucketBalances()` di `financeCalc.js`). **Tidak menambah migrasi DB** — tabel sudah tersedia dari migrasi 016.
+
+- **Alokasi** (`financeService.allocateForDate`): waterfall 3-arah dari jatah pemilik (restock % dari `finance_settings.pct_restock`, operational tetap harian, sisanya dibagi rasio personal/scaling/emergency). Idempoten permanen lewat **unique index parsial** `(bucket, ref_date) WHERE source='allocation'` — memanggil dua kali untuk tanggal sama tidak menggandakan baris.
+- **Penarikan** (`financeService.withdrawFromBucket`): baris `direction:'out'`, idempotensi hanya **lapis aplikasi** (lihat §4).
+- **Rambu keputusan** (`GET /admin/finance/overview`): `breakEvenDaily` (omzet harian minimum biar bulan ini impas) + `runwayDays` (berapa hari saldo `personal` bertahan di laju penarikan saat ini) + `personalWithdrawBlocked` (rem otomatis tarik-pribadi). Dasar perhitungan = **bulan LENGKAP terakhir** (`basis:'previous'`), fallback bulan berjalan yang di-run-rate (`basis:'current_partial'`) — lihat §4 untuk alasan.
+- **Layar Flutter**: Ringkasan Keuangan (`finance-overview`, `/profile/finance/overview`, `finance_overview_screen.dart`) — kartu 5 pos + rambu + aksi backfill tanggal bolong. Buku Besar (`finance-ledger`, `/profile/finance/ledger`, `finance_ledger_screen.dart`) — daftar mutasi berpaginasi keyset, filter per pos.
+- **Repository**: `FinanceRepository` (`finance_repository.dart`) — `fetchOverview()`, `fetchLedger({bucket,limit,before,beforeId})`, `withdraw({bucket,amount,note})`, `allocate(String date)` (tanggal **wajib**, tak ada default).
+- Detail jebakan (jendela pemicu, bentuk cursor, flag rambu, dll.) ada di §4.
+
+---
+
 ## 6. Endpoint Backend (peta ringkas)
 
 - **Auth**: `POST /auth/{register,verify-otp,login,resend-otp,refresh,logout}` (identifier-based, camelCase token).
@@ -239,7 +265,7 @@ Default "hari ini" (tutup kasir) & "bulan ini" (kalender) juga memakai `Formatte
 - **Loyalty/Spin/Voucher/Favorites/Notifications**: `GET /loyalty`, `/loyalty/history`, `/spin`, `/spin/status`, `/vouchers`, `/vouchers/validate`, `/favorites`, `/notifications`, `POST /admin/broadcast`.
 - **Referral/Wallet**: `GET /referrals/me`, `POST /referrals/apply`, `GET /wallet`, `POST /wallet/topup`.
 - **Admin reports**: `/admin/reports/{sales,calendar,closing,analytics}`, `/admin/customers/segments`, `/admin/expenses`.
-- **Admin finance** (KHUSUS PEMILIK, lihat §4): `GET /admin/finance/ping`, `GET/POST /admin/finance/fixed-costs`, `DELETE /admin/finance/fixed-costs/:id`, `GET /admin/finance/pnl?month=YYYY-MM`.
+- **Admin finance** (KHUSUS PEMILIK, lihat §4 & §5g): `GET /admin/finance/ping`, `GET/POST /admin/finance/fixed-costs`, `DELETE /admin/finance/fixed-costs/:id`, `GET /admin/finance/pnl?month=YYYY-MM` (Tahap 1); `POST /admin/finance/allocate` (default HARI INI — berbahaya, lihat §4), `GET /admin/finance/overview`, `POST /admin/finance/withdraw`, `GET /admin/finance/ledger` (Tahap 2). Semua di belakang `authenticate` + `requireFinanceAccess` (404 utk non-pemilik).
 - **Payments webhook**: `POST /payments/doku/notify` (cabang `TOPUP-*` → kredit saldo; selain itu → order paid).
 
 Detail model & validasi ada di kode (`src/routes/index.js`, `src/services/*`). Enum `notif_type` & `voucher_source` ketat — nilai tak dikenal di-coerce/gagal senyap.
@@ -277,7 +303,10 @@ Detail model & validasi ada di kode (`src/routes/index.js`, `src/services/*`). E
   Menjadikan admin: `node src/db/set-admin.js <nomor>` di folder backend.
 - ⏳ **Ditunda (permintaan user):** penukaran stamp digital & belanja poin.
 - ✅ **Refund tunai** live (backend `POST /admin/orders/:id/refund` + tombol di detail pesanan admin); migrasi 012 terpasang. Masih **tunai-only** (QRIS/Saldo belum).
-- ✅ **Modul Keuangan Tahap 1** live (layar Laba Rugi bulanan + Biaya Tetap, khusus pemilik `irurr`); migrasi 016 terpasang. Margin kotor produksi **58,6%** (HPP 41,4%), biaya tetap **Rp8.000.000/bulan**, P&L Juli 2026: omzet Rp15.055.400 → laba bersih **Rp742.877 (5%)**. Tahap 2 (amplop alokasi/ledger) & Tahap 3 (auto-kalibrasi) **belum dikerjakan**.
+- ✅ **Modul Keuangan Tahap 1** live (layar Laba Rugi bulanan + Biaya Tetap, khusus pemilik `irurr`); migrasi 016 terpasang. Margin kotor produksi **58,6%** (HPP 41,4%), biaya tetap **Rp8.000.000/bulan**, P&L Juli 2026: omzet Rp15.055.400 → laba bersih **Rp742.877 (5%)**.
+- ✅ **Modul Keuangan Tahap 2 (amplop alokasi, lihat §5g) selesai di branch `feat/keuangan-tahap2`** (backend + Flutter, kedua repo) — **belum di-push, belum deploy**. Tidak menambah migrasi. Sanity produksi 2026-08-09: alokasi harian idempoten (5 baris ledger, Σ persis omzet hari itu), `breakEvenDaily` Rp462.128 (basis Juli 2026 penuh), `runwayDays` 1, `personalWithdrawBlocked` true. Backend 133/133 test, Flutter 281/281 test, keduanya lulus tanpa kredensial.
+- ⏳ **Tahap 3 (auto-kalibrasi: shrinkage `w=n/(n+30)`, deadband 2 poin persen, batas gerak ±3 poin/bulan, wizard kalibrasi) belum dikerjakan.**
+- ⏳ **Utang Tahap 2 yang sengaja ditunda:** tak ada endpoint koreksi/pembatalan baris `finance_ledger` (hanya SQL manual Supabase); tak ada batas atas `amount` penarikan; paginasi `getFinanceOverview` masih offset (keyset hanya di `listLedger`); `runwayDays` boleh negatif tanpa dibatasi; `grossMarginPct` dibulatkan ke integer oleh `pct()`.
 - ⏳ **Belum:** keystore rilis + AAB, manajemen stok, refund QRIS/Saldo beraudit.
 
 ### Cara cepat verifikasi skema/DB (tanpa psql)
