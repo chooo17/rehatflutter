@@ -143,10 +143,10 @@ class AdminDashboardScreen extends ConsumerWidget {
                                   Icons.account_balance_wallet_outlined,
                                   color: AppColors.espresso),
                               title: const Text('Keuangan'),
-                              subtitle: const Text('Laba rugi & biaya tetap'),
+                              subtitle: const Text('Amplop, laba rugi & biaya tetap'),
                               trailing: const Icon(Icons.chevron_right_rounded),
                               onTap: () =>
-                                  context.pushNamed(RouteNames.financePnl),
+                                  context.pushNamed(RouteNames.financeOverview),
                             ),
                           ),
                         )
