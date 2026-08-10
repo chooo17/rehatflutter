@@ -31,6 +31,11 @@ class FinanceOverviewScreen extends ConsumerWidget {
         title: const Text('Ringkasan Keuangan'),
         actions: [
           IconButton(
+            tooltip: 'Buku besar',
+            icon: const Icon(Icons.menu_book_outlined),
+            onPressed: () => context.pushNamed(RouteNames.financeLedger),
+          ),
+          IconButton(
             tooltip: 'Laba rugi',
             icon: const Icon(Icons.bar_chart_rounded),
             onPressed: () => context.pushNamed(RouteNames.financePnl),

@@ -28,6 +28,7 @@ import '../../features/auth/presentation/profile_setup_screen.dart';
 import '../../features/auth/presentation/register_screen.dart';
 import '../../features/auth/presentation/reset_password_screen.dart';
 import '../../features/favorites/presentation/favorites_screen.dart';
+import '../../features/finance/presentation/finance_ledger_screen.dart';
 import '../../features/finance/presentation/finance_overview_screen.dart';
 import '../../features/finance/presentation/fixed_costs_screen.dart';
 import '../../features/finance/presentation/profit_loss_screen.dart';
@@ -387,6 +388,11 @@ final routerProvider = Provider<GoRouter>((ref) {
                     path: 'finance/fixed-costs',
                     name: RouteNames.financeFixedCosts,
                     builder: (context, state) => const FixedCostsScreen(),
+                  ),
+                  GoRoute(
+                    path: 'finance/ledger',
+                    name: RouteNames.financeLedger,
+                    builder: (context, state) => const FinanceLedgerScreen(),
                   ),
                 ],
               ),
