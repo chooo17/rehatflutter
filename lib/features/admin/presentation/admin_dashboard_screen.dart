@@ -8,6 +8,7 @@ import '../../../core/router/route_names.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../shared/widgets/neu.dart';
 import '../../finance/data/finance_repository.dart';
+import '../application/expense_bucket.dart';
 import '../data/admin_report_repository.dart';
 
 /// (Admin) Dashboard laporan penjualan: ringkasan, grafik harian, item terlaris.
@@ -694,45 +695,20 @@ class _ExpensesSection extends ConsumerWidget {
   const _ExpensesSection();
 
   Future<void> _add(BuildContext context, WidgetRef ref) async {
-    final amountCtrl = TextEditingController();
-    final noteCtrl = TextEditingController();
-    final ok = await showDialog<bool>(
+    final result = await showDialog<_AddExpenseResult>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.surface,
-        title: Text('Catat Pengeluaran', style: AppTextStyles.titleLarge),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: amountCtrl,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                  labelText: 'Jumlah (Rp)', prefixText: 'Rp '),
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: noteCtrl,
-              decoration: const InputDecoration(labelText: 'Keterangan (opsional)'),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Batal')),
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Simpan')),
-        ],
-      ),
+      builder: (ctx) => const _AddExpenseDialog(),
     );
-    if (ok != true) return;
-    final amount = int.tryParse(amountCtrl.text.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
-    if (amount <= 0) return;
-    await ref
-        .read(adminReportRepositoryProvider)
-        .addExpense(amount: amount, note: noteCtrl.text);
+    if (result == null) return;
+    // `context` NON-AKTIF setelah `await` di atas (dialog bisa memakan waktu
+    // & widget ini bisa sudah dilepas) — tak dipakai lagi di bawah sini,
+    // hanya `ref` (aman dipakai setelah await selama widget masih hidup;
+    // Riverpod membuang panggilan pada provider yang sudah dibuang).
+    await ref.read(adminReportRepositoryProvider).addExpense(
+          amount: result.amount,
+          note: result.note,
+          bucket: result.bucket,
+        );
     ref.invalidate(expensesProvider);
     ref.invalidate(salesReportProvider);
   }
@@ -817,6 +793,105 @@ class _ExpensesSection extends ConsumerWidget {
   }
 }
 
+/// Hasil dialog "Catat Pengeluaran" — `null` dari `showDialog` berarti
+/// dibatalkan (tombol Batal / tutup di luar dialog), instance ini berarti
+/// "Simpan" ditekan dengan input valid.
+class _AddExpenseResult {
+  const _AddExpenseResult({required this.amount, required this.note, required this.bucket});
+  final int amount;
+  final String note;
+  final String bucket;
+}
+
+/// Dialog "Catat Pengeluaran" — `StatefulWidget` tersendiri (bukan dibangun
+/// inline di `_add`) supaya `TextEditingController` yang dipakainya bisa
+/// di-`dispose` dengan benar. Sebelumnya dua controller (`amountCtrl`,
+/// `noteCtrl`) dibuat langsung di method `_add` lalu dibiarkan begitu saja
+/// setelah dialog ditutup — bocor setiap kali dialog dibuka. Pola yang sama
+/// (ekstraksi jadi `StatefulWidget` sendiri) sudah dipakai di layar keuangan
+/// untuk memperbaiki kebocoran serupa (lihat CLAUDE.md §4, NeuButton).
+class _AddExpenseDialog extends StatefulWidget {
+  const _AddExpenseDialog();
+
+  @override
+  State<_AddExpenseDialog> createState() => _AddExpenseDialogState();
+}
+
+class _AddExpenseDialogState extends State<_AddExpenseDialog> {
+  late final TextEditingController _amountCtrl = TextEditingController();
+  late final TextEditingController _noteCtrl = TextEditingController();
+  // Default 'restock' — mempertahankan perilaku lama (satu-satunya pos yang
+  // pernah dipakai sebelum pemilih ini ada) untuk kasir yang menekan Simpan
+  // tanpa mengubah pilihan.
+  String _bucket = defaultExpenseBucket;
+
+  @override
+  void dispose() {
+    _amountCtrl.dispose();
+    _noteCtrl.dispose();
+    super.dispose();
+  }
+
+  void _save() {
+    final amount = int.tryParse(_amountCtrl.text.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+    if (amount <= 0) return;
+    Navigator.pop(
+      context,
+      _AddExpenseResult(
+        amount: amount,
+        note: _noteCtrl.text,
+        bucket: resolveExpenseBucket(_bucket),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: AppColors.surface,
+      title: Text('Catat Pengeluaran', style: AppTextStyles.titleLarge),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          TextField(
+            controller: _amountCtrl,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(labelText: 'Jumlah (Rp)', prefixText: 'Rp '),
+          ),
+          const SizedBox(height: 10),
+          TextField(
+            controller: _noteCtrl,
+            decoration: const InputDecoration(labelText: 'Keterangan (opsional)'),
+          ),
+          const SizedBox(height: 14),
+          Text('Pos (amplop)', style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSecondary)),
+          const SizedBox(height: 6),
+          DropdownButtonFormField<String>(
+            initialValue: _bucket,
+            isExpanded: true,
+            decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true),
+            items: [
+              for (final b in expenseBucketOptions)
+                DropdownMenuItem(value: b, child: Text(expenseBucketLabel(b))),
+            ],
+            onChanged: (v) => setState(() => _bucket = v ?? defaultExpenseBucket),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Pengeluaran ini akan memotong saldo pos yang dipilih.',
+            style: AppTextStyles.caption.copyWith(color: AppColors.textSecondary),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Batal')),
+        TextButton(onPressed: _save, child: const Text('Simpan')),
+      ],
+    );
+  }
+}
+
 class _ExpenseRow extends StatelessWidget {
   const _ExpenseRow({required this.item, required this.onDelete});
   final ExpenseItem item;
@@ -837,9 +912,19 @@ class _ExpenseRow extends StatelessWidget {
                     style: AppTextStyles.bodyMedium,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis),
-                Text(Formatters.tanggalJam(item.spentAt),
-                    style: AppTextStyles.caption
-                        .copyWith(color: AppColors.textSecondary)),
+                Row(
+                  children: [
+                    Text(Formatters.tanggalJam(item.spentAt),
+                        style: AppTextStyles.caption
+                            .copyWith(color: AppColors.textSecondary)),
+                    Text('  ·  ',
+                        style: AppTextStyles.caption
+                            .copyWith(color: AppColors.textSecondary)),
+                    Text(expenseBucketLabel(item.bucket),
+                        style: AppTextStyles.caption
+                            .copyWith(color: AppColors.amberDark, fontWeight: FontWeight.w600)),
+                  ],
+                ),
               ],
             ),
           ),

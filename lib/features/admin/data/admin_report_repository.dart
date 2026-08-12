@@ -153,11 +153,20 @@ int _int(dynamic v) {
 /// Satu catatan pengeluaran.
 class ExpenseItem {
   const ExpenseItem(
-      {required this.id, required this.amount, this.note = '', this.category = '', required this.spentAt});
+      {required this.id,
+      required this.amount,
+      this.note = '',
+      this.category = '',
+      this.bucket = 'restock',
+      required this.spentAt});
   final String id;
   final int amount;
   final String note;
   final String category;
+  // Pos (amplop) yang dipotong pengeluaran ini. Default 'restock' meniru
+  // default backend (lihat migrasi 016 & `expenseService.js`) untuk baris
+  // lama yang dicatat sebelum kolom ini ada / respons tanpa field ini.
+  final String bucket;
   final DateTime spentAt;
 
   factory ExpenseItem.fromJson(Map<String, dynamic> j) => ExpenseItem(
@@ -165,6 +174,9 @@ class ExpenseItem {
         amount: _int(j['amount']),
         note: (j['note'] ?? '').toString(),
         category: (j['category'] ?? '').toString(),
+        bucket: (j['bucket'] == null || j['bucket'].toString().isEmpty)
+            ? 'restock'
+            : j['bucket'].toString(),
         spentAt: DateTime.tryParse((j['spent_at'] ?? '').toString()) ?? DateTime.now(),
       );
 }
@@ -325,11 +337,18 @@ class AdminReportRepository {
     );
   }
 
-  Future<void> addExpense({required int amount, String? note, String? category}) async {
+  /// [bucket] pos (amplop) yang dipotong — backend memakai default
+  /// `'restock'` bila tak dikirim, tapi klien SELALU mengirimnya secara
+  /// eksplisit (dialog "Catat Pengeluaran" mewajibkan pemilihan, lihat
+  /// `expense_bucket.dart`) supaya tak bergantung diam-diam pada default
+  /// backend.
+  Future<void> addExpense(
+      {required int amount, String? note, String? category, required String bucket}) async {
     await _client.post<dynamic>(ApiConstants.adminExpenses, data: {
       'amount': amount,
       if (note != null && note.trim().isNotEmpty) 'note': note.trim(),
       if (category != null && category.trim().isNotEmpty) 'category': category.trim(),
+      'bucket': bucket,
     });
   }
 
