@@ -237,6 +237,9 @@ class FinanceOverview {
     this.variableExpensesUnavailable = false,
     this.missingAllocationDates = const [],
     this.missingAllocationCount = 0,
+    this.expenseLedgerOrphans = const [],
+    this.expenseLedgerOrphanCount = 0,
+    this.expenseLedgerOrphansUnavailable = false,
   });
 
   final BucketBalances balances;
@@ -272,6 +275,22 @@ class FinanceOverview {
   /// dari `missingAllocationDates.length` (daftar dipotong 60).
   final int missingAllocationCount;
 
+  /// Id `expenses` yang TIDAK punya baris `finance_ledger` (source='expense')
+  /// pasangannya -- gejala kompensasi rollback yang gagal saat mencatat
+  /// pengeluaran (`EXPENSE_LEDGER_ORPHANED`, lihat CLAUDE.md §4). Pengeluaran
+  /// ini masuk P&L (dihitung dua kali kalau dicatat ulang) TAPI amplop
+  /// terkait tidak ikut terpotong -- perlu perbaikan manual di Supabase,
+  /// tidak ada endpoint koreksi otomatis.
+  final List<String> expenseLedgerOrphans;
+
+  final int expenseLedgerOrphanCount;
+
+  /// Backend gagal memuat daftar id pengeluaran untuk deteksi yatim (mis.
+  /// jaringan) -- `expenseLedgerOrphans` kosong di kondisi ini TIDAK berarti
+  /// "aman", melainkan "tidak diketahui". Sama semangatnya dengan
+  /// `variableExpensesUnavailable`.
+  final bool expenseLedgerOrphansUnavailable;
+
   factory FinanceOverview.fromJson(Map<String, dynamic> j) => FinanceOverview(
         balances: BucketBalances.fromJson(
             Map<String, dynamic>.from((j['balances'] as Map?) ?? const {})),
@@ -287,6 +306,9 @@ class FinanceOverview {
         variableExpensesUnavailable: _bool(j['variable_expenses_unavailable']),
         missingAllocationDates: _stringList(j['missing_allocation_dates']),
         missingAllocationCount: _int(j['missing_allocation_count']),
+        expenseLedgerOrphans: _stringList(j['expense_ledger_orphans']),
+        expenseLedgerOrphanCount: _int(j['expense_ledger_orphan_count']),
+        expenseLedgerOrphansUnavailable: _bool(j['expense_ledger_orphans_unavailable']),
       );
 }
 
