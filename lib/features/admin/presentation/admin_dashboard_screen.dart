@@ -713,8 +713,7 @@ class _ExpensesSection extends ConsumerWidget {
     ref.invalidate(salesReportProvider);
   }
 
-  Future<void> _delete(WidgetRef ref, String id) async {
-    await ref.read(adminReportRepositoryProvider).deleteExpense(id);
+  void _onDeleted(WidgetRef ref) {
     ref.invalidate(expensesProvider);
     ref.invalidate(salesReportProvider);
   }
@@ -784,7 +783,7 @@ class _ExpensesSection extends ConsumerWidget {
             )
           else
             for (final e in list.items) ...[
-              _ExpenseRow(item: e, onDelete: () => _delete(ref, e.id)),
+              _ExpenseRow(item: e, onDeleted: () => _onDeleted(ref)),
               const SizedBox(height: 8),
             ],
         ],
@@ -892,13 +891,74 @@ class _AddExpenseDialogState extends State<_AddExpenseDialog> {
   }
 }
 
-class _ExpenseRow extends StatelessWidget {
-  const _ExpenseRow({required this.item, required this.onDelete});
+/// Satu baris pengeluaran + tombol hapus.
+///
+/// `ConsumerStatefulWidget` (bukan `StatelessWidget` + callback) supaya
+/// bisa menyimpan state `_deleting` sendiri (C-1, review
+/// pengeluaran-potong-amplop): backend hanya idempoten lewat DB (migrasi
+/// 018, unique index parsial pada baris pembalik) — dua ketukan cepat pada
+/// tombol hapus TETAP mengirim dua request HTTP; migrasi 018 memastikan
+/// hanya SATU yang benar-benar menulis baris pembalik, tapi UI tanpa
+/// pengaman ini masih terasa aneh (tombol tampak "tak merespons" saat
+/// request pertama masih di jalan) dan tetap membebani jaringan/server
+/// tanpa perlu. Dialog konfirmasi mencegah tap-tak-sengaja sama sekali.
+class _ExpenseRow extends ConsumerStatefulWidget {
+  const _ExpenseRow({required this.item, required this.onDeleted});
   final ExpenseItem item;
-  final VoidCallback onDelete;
+  final VoidCallback onDeleted;
+
+  @override
+  ConsumerState<_ExpenseRow> createState() => _ExpenseRowState();
+}
+
+class _ExpenseRowState extends ConsumerState<_ExpenseRow> {
+  bool _deleting = false;
+
+  Future<void> _confirmAndDelete(BuildContext context) async {
+    if (_deleting) return;
+    final item = widget.item;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        title: const Text('Hapus pengeluaran?'),
+        content: Text(
+          '${item.note.isEmpty ? 'Pengeluaran' : item.note} · '
+          '${Formatters.rupiah(item.amount)}\n\n'
+          'Amplop ${expenseBucketLabel(item.bucket)} akan dikembalikan sejumlah ini.',
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Batal')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Hapus')),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _deleting = true);
+    try {
+      await ref.read(adminReportRepositoryProvider).deleteExpense(item.id);
+      widget.onDeleted();
+    } catch (_) {
+      if (mounted) {
+        setState(() => _deleting = false);
+        ScaffoldMessenger.of(this.context).showSnackBar(const SnackBar(
+            content: Text('Gagal menghapus pengeluaran. Coba lagi.')));
+      }
+      return;
+    }
+    // Widget ini sendiri akan dibuang begitu `expensesProvider` (yang
+    // dipicu `onDeleted`) selesai memuat ulang daftar tanpa baris ini --
+    // tak perlu `setState(_deleting = false)` di jalur sukses.
+  }
 
   @override
   Widget build(BuildContext context) {
+    final item = widget.item;
     return NeuCard(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       radius: 14,
@@ -930,11 +990,20 @@ class _ExpenseRow extends StatelessWidget {
           ),
           Text(Formatters.rupiah(item.amount),
               style: AppTextStyles.label.copyWith(color: AppColors.amberDark)),
-          IconButton(
-            onPressed: onDelete,
-            icon: Icon(Icons.delete_outline_rounded,
-                size: 20, color: AppColors.textSecondary),
-          ),
+          _deleting
+              ? const Padding(
+                  padding: EdgeInsets.all(12),
+                  child: SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                )
+              : IconButton(
+                  onPressed: () => _confirmAndDelete(context),
+                  icon: Icon(Icons.delete_outline_rounded,
+                      size: 20, color: AppColors.textSecondary),
+                ),
         ],
       ),
     );

@@ -285,6 +285,25 @@ String missingAllocationSummary(FinanceOverview overview) {
 bool hasMissingAllocations(FinanceOverview overview) =>
     overview.missingAllocationDates.isNotEmpty;
 
+/// Apakah kartu peringatan "pengeluaran tanpa baris amplop" (I-1/I-2, review
+/// pengeluaran-potong-amplop) perlu ditampilkan. Tampil baik saat SUDAH ada
+/// yatim yang terdeteksi MAUPUN saat backend gagal memeriksa (unavailable) --
+/// keduanya bukan kondisi "aman", jadi keduanya wajib terlihat pemilik.
+bool hasOrphanedExpenses(FinanceOverview overview) =>
+    overview.expenseLedgerOrphans.isNotEmpty || overview.expenseLedgerOrphansUnavailable;
+
+/// Ringkasan teks kartu pengeluaran yatim. Tidak dipanggil bila
+/// [hasOrphanedExpenses] `false` (kontrak sama seperti [missingAllocationSummary]).
+String orphanedExpensesSummary(FinanceOverview overview) {
+  if (overview.expenseLedgerOrphansUnavailable) {
+    return 'Gagal memeriksa pengeluaran tanpa baris amplop. Tarik untuk mencoba lagi.';
+  }
+  final n = overview.expenseLedgerOrphanCount;
+  return n == 1
+      ? '1 pengeluaran tercatat tanpa memotong amplop -- amplop tidak berkurang untuk pengeluaran ini.'
+      : '$n pengeluaran tercatat tanpa memotong amplop -- amplop tidak berkurang untuk pengeluaran-pengeluaran ini.';
+}
+
 /// Beberapa contoh tanggal dari backlog supaya pemilik bisa cross-check —
 /// bukan cuma melihat sebuah angka. `missingAllocationDates` sudah terurut
 /// menaik dari backend, jadi elemen pertama = paling lama, elemen terakhir

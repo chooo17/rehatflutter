@@ -78,6 +78,10 @@ class FinanceOverviewScreen extends ConsumerWidget {
                     _MissingAllocationsCard(overview: overview),
                     const SizedBox(height: 16),
                   ],
+                  if (hasOrphanedExpenses(overview)) ...[
+                    _OrphanedExpensesCard(overview: overview),
+                    const SizedBox(height: 16),
+                  ],
                   _GuardsCard(overview: overview),
                   const SizedBox(height: 16),
                   _EmergencyProgressCard(overview: overview),
@@ -180,6 +184,58 @@ class _MissingAllocationsCardState extends ConsumerState<_MissingAllocationsCard
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
                       : const Text('Alokasikan tanggal bolong'),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Peringatan pengeluaran yang tercatat TANPA memotong amplop (I-1/I-2,
+/// review pengeluaran-potong-amplop) -- gejala kompensasi rollback yang
+/// gagal saat `POST /admin/expenses`. Beda dari `_MissingAllocationsCard`:
+/// TIDAK ADA tombol perbaikan otomatis, karena tidak ada endpoint koreksi
+/// untuk `finance_ledger` (event-sourced, lihat CLAUDE.md §4) -- satu-
+/// satunya jalan perbaikan adalah SQL manual di Supabase.
+class _OrphanedExpensesCard extends StatelessWidget {
+  const _OrphanedExpensesCard({required this.overview});
+  final FinanceOverview overview;
+
+  @override
+  Widget build(BuildContext context) {
+    return NeuCard(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.error_outline_rounded, color: AppColors.error),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Pengeluaran tanpa potongan amplop',
+                  style: Theme.of(context)
+                      .textTheme
+                      .titleSmall
+                      ?.copyWith(color: AppColors.error),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  orphanedExpensesSummary(overview),
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Tidak ada perbaikan otomatis untuk ini -- hubungi pemilik '
+                  'untuk koreksi manual di database.',
+                  style: Theme.of(context)
+                      .textTheme
+                      .bodySmall
+                      ?.copyWith(color: AppColors.textSecondary),
                 ),
               ],
             ),
