@@ -53,9 +53,24 @@ bahan — mis. kopi: satuan dasar `g`, satuan beli `kg`, konversi 1000.
 Satu menu → banyak baris bahan, masing-masing dengan takaran dalam satuan dasar.
 Contoh: *Kopi Susu Pisang* = 18 g kopi + 120 ml susu + 30 ml sirup pisang + 1 pcs cup + 1 pcs sedotan.
 
-**Varian ukuran:** baris resep boleh diberi penanda ukuran (`small`/`regular`/`large`). Baris
-tanpa penanda berlaku untuk semua ukuran. Gula & suhu **tidak** mengubah resep (dampak biayanya
-tak berarti) — sengaja tidak didukung agar pendataan tidak meledak.
+**Varian suhu:** baris resep boleh diberi penanda `hot` / `iced`. Baris tanpa penanda berlaku
+untuk keduanya — jadi menu yang tidak punya dua versi cukup didata sekali.
+
+**Ukuran & gula sengaja TIDAK didukung.** Dasarnya data produksi (1.000 baris pesanan terakhir):
+
+| Opsi | Pemakaian nyata | Putusan |
+|---|---|---|
+| Ukuran | **2 baris**, keduanya `regular` — cup kedai hanya satu ukuran | tidak didukung |
+| Gula | 379 baris, **359 di antaranya 100%** — variasi tipis, ongkos receh | tidak didukung |
+| **Suhu** | **168 panas vs 211 dingin** — hampir separuh-separuh | **didukung** |
+
+Suhu mengubah bahan sungguhan (es batu, dan cup dingin yang berbeda dari cup panas), jadi
+mengabaikannya membuat menu laris versi dingin tampak lebih untung dari kenyataan. Ukuran & gula
+tidak mengubah ongkos secara berarti — mendukungnya hanya melipatgandakan pekerjaan pendataan.
+
+> Catatan di luar lingkup: 57 menu masih menawarkan pilihan ukuran small/regular/large ke
+> pelanggan padahal cup hanya satu ukuran. Menyesatkan pembeli; layak dicabut dari definisi menu
+> di pekerjaan terpisah.
 
 **HPP menu jadi terhitung, bukan diisi tangan:** `cost_price` berhenti jadi sumber kebenaran dan
 menjadi angka turunan dari resep × harga rata-rata bahan.
@@ -141,7 +156,7 @@ turun sementara omzet tetap, ada kebocoran.
 ```
 ingredients          id, name, base_unit, purchase_unit, units_per_purchase,
                      avg_cost, min_stock, abc_class, is_active
-recipes              id, menu_item_id, ingredient_id, qty_base, size (nullable)
+recipes              id, menu_item_id, ingredient_id, qty_base, temperature (nullable: hot|iced)
 stock_receipts       id, received_at, total_cost, note, created_by, ledger_ref_id
 stock_receipt_items  id, receipt_id, ingredient_id, qty_base, unit_cost
 stock_consumption    id, ref_date, ingredient_id, qty_base, unit_cost   -- 1 baris/bahan/hari
@@ -217,5 +232,8 @@ tetap memakai `cost_price` lama, jadi sistem berjalan campuran tanpa rusak.
 
 - Opname **bertingkat** (A harian / B mingguan / C bulanan), bukan harian penuh 100 bahan.
 - Resep **didata** supaya HPP per produk nyata dan presisi.
+- Resep mendukung **suhu** (panas/dingin), **tidak** mendukung ukuran & gula — lihat §3.2.
+- **Pemilik sendiri** yang mendata resep, jadi layar resep cukup di balik gate keuangan yang
+  sudah ada (`requireFinanceAccess`); tak perlu peran baru untuk barista.
 - 7 menu tanpa HPP **tidak dihapus** — semuanya punya riwayat penjualan; 6 sudah tidak aktif.
 - Pos `personal` tetap di luar laba rugi (prive), tetap memotong amplop.
