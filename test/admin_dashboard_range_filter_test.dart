@@ -23,7 +23,8 @@ class _FakeAdminReportRepository extends AdminReportRepository {
   _FakeAdminReportRepository() : super(client: DioClient(storage: SecureStorage()));
 
   @override
-  Future<SalesReport> fetchSales({String range = '7d', String? date, String? endDate}) async =>
+  Future<SalesReport> fetchSales(
+          {String range = '7d', String? date, String? endDate, int? topLimit}) async =>
       const SalesReport(
         range: '7d',
         revenue: 0,

@@ -38,7 +38,8 @@ class _FakeAdminReportRepository extends AdminReportRepository {
   Completer<void>? deleteExpensePending;
 
   @override
-  Future<SalesReport> fetchSales({String range = '7d', String? date, String? endDate}) async =>
+  Future<SalesReport> fetchSales(
+          {String range = '7d', String? date, String? endDate, int? topLimit}) async =>
       const SalesReport(
         range: '7d',
         revenue: 0,
