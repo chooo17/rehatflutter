@@ -166,4 +166,12 @@ class RouteNames {
   /// pathParameters: {'menuItemId': id})`. Rute didaftarkan di `app_router.dart`.
   static const String stockRecipe = 'stock-recipe';
   static const String stockRecipePath = '/profile/stock/recipe/:menuItemId';
+
+  /// Perbandingan HPP terhitung vs `cost_price` lama (Manajemen Stok
+  /// Fase A, **Task 8 — deliverable utama Fase A**) — HUB modul stok:
+  /// dijangkau dari tombol AppBar di `FinanceOverviewScreen`, dan dari sini
+  /// bercabang ke [stockIngredients]/[stockRecipeList] lewat tombol
+  /// AppBar-nya sendiri. Rute didaftarkan di `app_router.dart`.
+  static const String stockHppComparison = 'stock-hpp-comparison';
+  static const String stockHppComparisonPath = '/profile/stock/hpp-comparison';
 }

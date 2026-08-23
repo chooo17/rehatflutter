@@ -32,6 +32,7 @@ import '../../features/finance/presentation/finance_ledger_screen.dart';
 import '../../features/finance/presentation/finance_overview_screen.dart';
 import '../../features/finance/presentation/fixed_costs_screen.dart';
 import '../../features/finance/presentation/profit_loss_screen.dart';
+import '../../features/stock/presentation/hpp_comparison_screen.dart';
 import '../../features/stock/presentation/ingredients_screen.dart';
 import '../../features/stock/presentation/recipe_screen.dart';
 import '../../features/home/presentation/home_screen.dart';
@@ -411,6 +412,11 @@ final routerProvider = Provider<GoRouter>((ref) {
                     name: RouteNames.stockRecipe,
                     builder: (context, state) =>
                         RecipeScreen(menuItemId: state.pathParameters['menuItemId']!),
+                  ),
+                  GoRoute(
+                    path: 'stock/hpp-comparison',
+                    name: RouteNames.stockHppComparison,
+                    builder: (context, state) => const HppComparisonScreen(),
                   ),
                 ],
               ),

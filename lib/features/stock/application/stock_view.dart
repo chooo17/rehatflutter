@@ -260,3 +260,162 @@ HppDeltaResult computeHppDelta({required int computed, required int? storedCostP
   final pct = delta / storedCostPrice * 100;
   return HppDeltaResult(delta: delta, pct: pct, hasStored: true);
 }
+
+/// ---------------------------------------------------------------------
+/// Task 8 — layar Perbandingan HPP (deliverable utama Fase A)
+/// ---------------------------------------------------------------------
+
+/// Urutkan [HppRow] untuk layar Perbandingan HPP: **selisih terbesar di
+/// ATAS**, diukur dari NILAI ABSOLUT `delta` — HPP resep yang jauh lebih
+/// TINGGI dari `cost_price` lama sama-sama penting diperhatikan pemilik
+/// dengan yang jauh lebih RENDAH (keduanya berarti tebakan manual lama
+/// meleset besar), jadi disatukan dalam satu peringkat, bukan dipisah
+/// naik/turun.
+///
+/// Hanya baris dengan delta NYATA (`hasStored && complete`) yang punya
+/// besaran untuk diranking. Baris tanpa itu (`!complete` — belum ada resep
+/// sama sekali, atau `complete && !hasStored` — resep ada tapi `cost_price`
+/// belum pernah diisi) tidak punya "selisih" yang bermakna — SEMUANYA
+/// ditaruh SETELAH baris berperingkat, diurutkan alfabetis (urutan sekunder
+/// stabil) supaya daftar tidak acak antar-render.
+List<HppRow> sortHppRowsByBiggestDifference(List<HppRow> rows) {
+  final ranked = rows.where((r) => r.hasStored && r.complete).toList()
+    ..sort((a, b) => (b.delta ?? 0).abs().compareTo((a.delta ?? 0).abs()));
+  final unranked = rows.where((r) => !(r.hasStored && r.complete)).toList()
+    ..sort((a, b) => a.name.compareTo(b.name));
+  return [...ranked, ...unranked];
+}
+
+/// Tiga keadaan tampilan WAJIB dibedakan secara visual di layar Perbandingan
+/// HPP (brief Task 8) — BEDA dari [HppComparisonState] (Task 7) yang cuma
+/// membedakan ARAH selisih dan TIDAK memperhitungkan `complete` sama sekali
+/// (wajar untuk `RecipeScreen`, yang selalu berada dalam konteks SATU menu
+/// yang sedang diedit resepnya — menu itu tak mungkin "belum ada resep" di
+/// layar itu sendiri). Di sini `complete` JUGA menentukan keadaan, karena
+/// layar ini menampilkan SEMUA menu sekaligus, termasuk yang belum punya
+/// resep apa pun.
+enum HppRowVisualState {
+  /// Belum ada resep sama sekali (`!complete`) — TIDAK ADA angka HPP/selisih
+  /// ditampilkan, hanya ajakan menambah resep.
+  noRecipe,
+
+  /// Resep sudah ada, TAPI `cost_price` lama belum pernah diisi
+  /// (`complete && !hasStored`) — HPP terhitung tampil, tapi area
+  /// selisih/persen digantikan pesan "belum ada HPP lama", BUKAN `Rp0`/`0%`
+  /// palsu.
+  noStoredPrice,
+
+  /// Resep ADA dan `cost_price` lama ADA (`complete && hasStored`) — selisih
+  /// & persen NYATA ditampilkan apa adanya, termasuk saat keduanya kebetulan
+  /// `0` (data sah, bukan placeholder — harus tetap tampil beda dari dua
+  /// keadaan lain).
+  compared,
+}
+
+/// Tentukan [HppRowVisualState] satu baris. `complete` diperiksa LEBIH DULU
+/// (menentukan [HppRowVisualState.noRecipe]), baru `hasStored` (menentukan
+/// [HppRowVisualState.noStoredPrice]). Urutan ini disengaja: menu bisa saja
+/// punya `cost_price` lama TAPI belum punya resep (`hasStored` true,
+/// `complete` false) — itu tetap [HppRowVisualState.noRecipe], karena tanpa
+/// resep tak ada HPP terhitung sama sekali untuk dibandingkan.
+HppRowVisualState hppRowVisualState(HppRow row) {
+  if (!row.complete) return HppRowVisualState.noRecipe;
+  if (!row.hasStored) return HppRowVisualState.noStoredPrice;
+  return HppRowVisualState.compared;
+}
+
+/// Satu menu yang layak masuk hitungan dampak gabungan tertimbang — hanya
+/// dibangun oleh [eligibleHppImpactInputs] untuk baris yang sudah lolos
+/// syarat eligibility (bukan dipakai untuk membangun baris sembarangan).
+class HppImpactInput {
+  const HppImpactInput({required this.delta, required this.quantity});
+
+  /// `HppRow.delta` NYATA (bukan `null`) — pemanggil WAJIB memastikan
+  /// `hasStored && complete` sebelum membangun baris ini.
+  final int delta;
+
+  /// Porsi terjual dalam jendela sampel (30 hari) — SELALU `> 0` untuk
+  /// baris yang dibangun lewat [eligibleHppImpactInputs].
+  final int quantity;
+}
+
+/// Saring [hppRows] jadi daftar [HppImpactInput] yang layak masuk dampak
+/// gabungan tertimbang: `hasStored && complete` (delta nyata & bisa
+/// dibandingkan) DAN pernah terjual (`quantity > 0`) dalam jendela sampel
+/// [topItems] (dari `GET /admin/reports/sales?range=30d&top_limit=100` —
+/// cakupan PENUH, BUKAN sampel top-N seperti `stockTopSellingItemsProvider`
+/// milik Task 7 yang `topLimit: 30`; memakai provider itu di sini akan
+/// diam-diam membuang quantity menu di luar 30 besar dan merusak rata-rata
+/// tertimbang).
+///
+/// Join key SAMA dengan [sortMenusByPopularity]: nama PERSIS
+/// (`HppRow.name == TopItem.name`, case-sensitive) — `TopItem` tak punya id.
+/// Menu tanpa kecocokan nama di [topItems] mendapat `quantity: 0` dan
+/// otomatis TERSARING (tak masuk daftar), tanpa penanganan khusus.
+List<HppImpactInput> eligibleHppImpactInputs({
+  required List<HppRow> hppRows,
+  required List<TopItem> topItems,
+}) {
+  final qtyByName = <String, int>{};
+  for (final t in topItems) {
+    qtyByName[t.name] = (qtyByName[t.name] ?? 0) + t.quantity;
+  }
+  final result = <HppImpactInput>[];
+  for (final row in hppRows) {
+    if (!row.hasStored || !row.complete) continue;
+    final qty = qtyByName[row.name] ?? 0;
+    if (qty <= 0) continue;
+    result.add(HppImpactInput(delta: row.delta ?? 0, quantity: qty));
+  }
+  return result;
+}
+
+/// Hasil dampak gabungan HPP terhitung vs `cost_price` lama, DITIMBANG
+/// menurut porsi terjual — lihat [computeWeightedHppImpact].
+class WeightedHppImpact {
+  const WeightedHppImpact({required this.weightedDelta, required this.menuCount});
+
+  /// `Σ(quantity_i × delta_i) / Σ(quantity_i)` — SENTINEL DISENGAJA:
+  /// `null` berarti "belum cukup data" (tak ada menu eligible SAMA SEKALI),
+  /// BUKAN `0.0`. Menyamakan keduanya adalah cacat rambu uang yang sama
+  /// dengan `HppRow.pct`/`FinanceGuards` (lihat CLAUDE.md §4) — di sini
+  /// akibatnya lebih parah: "Rp0" palsu untuk "belum ada data" akan dibaca
+  /// pemilik sebagai "tebakan HPP saya selama ini sudah pas", padahal belum
+  /// ada satu pun menu yang bisa dibandingkan sama sekali.
+  final double? weightedDelta;
+
+  /// Jumlah menu yang IKUT dihitung (delta nyata & terjual > 0 di jendela
+  /// sampel) — `0` bila [weightedDelta] `null`.
+  final int menuCount;
+}
+
+/// Dampak gabungan HPP terhitung vs `cost_price` lama, DITIMBANG menurut
+/// porsi terjual — brief Task 8: "ditimbang menurut porsi terjual, bukan
+/// rata-rata polos (menu laris harus berbobot lebih besar)". Rata-rata
+/// POLOS (unweighted, `Σdelta_i / n`) akan membiarkan menu yang nyaris tak
+/// pernah dipesan tapi salah tebak HPP-nya BESAR menggeser ringkasan sama
+/// kuatnya dengan menu terlaris — fungsi ini SENGAJA menimbang tiap menu
+/// dengan porsi terjualnya (`quantity_i`), rumus rata-rata tertimbang biasa.
+///
+/// [eligibleRows] WAJIB sudah disaring lewat [eligibleHppImpactInputs]
+/// (`hasStored && complete && quantity > 0`) SEBELUM dipanggil — fungsi ini
+/// tetap menyaring ulang `quantity > 0` sebagai jaring pengaman murni
+/// aritmetika (mencegah pembagi nol), TIDAK menduplikasi keputusan
+/// eligibility `hasStored`/`complete` (itu keputusan
+/// [eligibleHppImpactInputs], bukan fungsi ini).
+WeightedHppImpact computeWeightedHppImpact(List<HppImpactInput> eligibleRows) {
+  final positive = eligibleRows.where((r) => r.quantity > 0).toList();
+  if (positive.isEmpty) {
+    return const WeightedHppImpact(weightedDelta: null, menuCount: 0);
+  }
+  var weightedSum = 0.0;
+  var qtySum = 0;
+  for (final r in positive) {
+    weightedSum += r.delta * r.quantity;
+    qtySum += r.quantity;
+  }
+  if (qtySum <= 0) {
+    return WeightedHppImpact(weightedDelta: null, menuCount: positive.length);
+  }
+  return WeightedHppImpact(weightedDelta: weightedSum / qtySum, menuCount: positive.length);
+}

@@ -45,6 +45,14 @@ class FinanceOverviewScreen extends ConsumerWidget {
             icon: const Icon(Icons.receipt_long_outlined),
             onPressed: () => context.pushNamed(RouteNames.financeFixedCosts),
           ),
+          // Task 8 (Manajemen Stok Fase A) — satu-satunya tautan masuk ke
+          // layar Perbandingan HPP, yang jadi HUB modul stok (dari sana
+          // bercabang ke Kelola Bahan/Kelola Resep, Task 6-7).
+          IconButton(
+            tooltip: 'Perbandingan HPP',
+            icon: const Icon(Icons.compare_arrows_outlined),
+            onPressed: () => context.pushNamed(RouteNames.stockHppComparison),
+          ),
         ],
       ),
       // Keep-previous-data: spinner HANYA saat belum ada data sama sekali.

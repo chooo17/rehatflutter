@@ -9,6 +9,8 @@ import 'package:rehat_app/shared/models/menu_item_model.dart';
 /// isi per satuan beli, dan kalimat selisih HPP untuk tiga keadaan.
 
 HppRow _row({
+  String menuItemId = 'm1',
+  String name = 'Menu',
   int? storedCostPrice,
   int computedHot = 0,
   int computedIced = 0,
@@ -18,8 +20,8 @@ HppRow _row({
   bool hasStored = false,
 }) =>
     HppRow(
-      menuItemId: 'm1',
-      name: 'Menu',
+      menuItemId: menuItemId,
+      name: name,
       storedCostPrice: storedCostPrice,
       computedHot: computedHot,
       computedIced: computedIced,
@@ -351,6 +353,192 @@ void main() {
       expect(r.hasStored, isTrue);
       expect(r.delta, -4000);
       expect(r.pct, closeTo(-40.0, 0.001));
+    });
+  });
+
+  group('sortHppRowsByBiggestDifference (Task 8 — urutan layar Perbandingan HPP)', () {
+    test('baris berperingkat diurutkan berdasar NILAI ABSOLUT delta, TERBESAR di atas', () {
+      final rows = [
+        _row(menuItemId: 'kecil', hasStored: true, complete: true, delta: 50),
+        _row(menuItemId: 'besarNegatif', hasStored: true, complete: true, delta: -900),
+        _row(menuItemId: 'sedang', hasStored: true, complete: true, delta: 300),
+      ];
+      final sorted = sortHppRowsByBiggestDifference(rows);
+      expect(sorted.map((r) => r.menuItemId).toList(), ['besarNegatif', 'sedang', 'kecil'],
+          reason: 'selisih -900 (|900|) wajib di atas +300 dan +50, walau NEGATIF — '
+              'HPP terlalu tinggi & terlalu rendah sama-sama layak diperhatikan pemilik');
+    });
+
+    test('baris tanpa delta nyata (!complete ATAU complete&&!hasStored) ditaruh SETELAH '
+        'semua baris berperingkat, diurutkan ALFABETIS', () {
+      final rows = [
+        _row(menuItemId: 'a', name: 'Zebra Mocha', hasStored: false, complete: false), // no recipe
+        _row(menuItemId: 'b', name: 'Kecil', hasStored: true, complete: true, delta: 10),
+        _row(menuItemId: 'c', name: 'Avocado Coffee', hasStored: false, complete: true), // recipe, no cost_price
+      ];
+      final sorted = sortHppRowsByBiggestDifference(rows);
+      expect(sorted.map((r) => r.name).toList(), ['Kecil', 'Avocado Coffee', 'Zebra Mocha'],
+          reason: '"Kecil" satu-satunya baris berperingkat (delta nyata) → di atas; '
+              'dua sisanya (tanpa delta nyata) diurutkan alfabetis di bawahnya');
+    });
+
+    test('GIGI: menukar ke perbandingan delta MENTAH (bukan .abs()) membuat test ini gagal — '
+        'delta negatif besar wajib tetap di atas delta positif kecil', () {
+      final rows = [
+        _row(menuItemId: 'positifKecil', hasStored: true, complete: true, delta: 20),
+        _row(menuItemId: 'negatifBesar', hasStored: true, complete: true, delta: -5000),
+      ];
+      final sorted = sortHppRowsByBiggestDifference(rows);
+      expect(sorted.first.menuItemId, 'negatifBesar');
+    });
+
+    test('daftar kosong -> daftar kosong', () {
+      expect(sortHppRowsByBiggestDifference(const []), isEmpty);
+    });
+  });
+
+  group('hppRowVisualState (Task 8 — tiga keadaan tampilan WAJIB berbeda)', () {
+    test('keadaan 1: !complete -> noRecipe, TERLEPAS dari hasStored', () {
+      expect(hppRowVisualState(_row(complete: false, hasStored: false)),
+          HppRowVisualState.noRecipe);
+      // GIGI: cost_price lama ADA tapi resep BELUM ada -> tetap noRecipe,
+      // BUKAN noStoredPrice/compared. Kalau implementasi keliru memeriksa
+      // hasStored duluan, baris ini akan salah diklasifikasi.
+      expect(hppRowVisualState(_row(complete: false, hasStored: true, storedCostPrice: 8000)),
+          HppRowVisualState.noRecipe);
+    });
+
+    test('keadaan 2: complete && !hasStored -> noStoredPrice', () {
+      expect(hppRowVisualState(_row(complete: true, hasStored: false)),
+          HppRowVisualState.noStoredPrice);
+    });
+
+    test('keadaan 3: complete && hasStored -> compared (termasuk saat delta 0)', () {
+      expect(
+        hppRowVisualState(_row(complete: true, hasStored: true, storedCostPrice: 8000, delta: 0)),
+        HppRowVisualState.compared,
+      );
+      expect(
+        hppRowVisualState(
+            _row(complete: true, hasStored: true, storedCostPrice: 8000, delta: 500)),
+        HppRowVisualState.compared,
+      );
+    });
+
+    test('ketiga keadaan SALING BERBEDA satu sama lain (bukti gigi utama brief)', () {
+      final states = {
+        hppRowVisualState(_row(complete: false, hasStored: false)),
+        hppRowVisualState(_row(complete: true, hasStored: false)),
+        hppRowVisualState(_row(complete: true, hasStored: true, storedCostPrice: 8000, delta: 0)),
+      };
+      expect(states.length, 3, reason: 'ketiga keadaan wajib jadi tiga nilai enum BERBEDA');
+    });
+  });
+
+  group('eligibleHppImpactInputs (Task 8 — saring menu layak masuk dampak gabungan)', () {
+    test('hanya menu hasStored&&complete DAN terjual (qty>0) yang ikut', () {
+      final rows = [
+        _row(menuItemId: 'a', name: 'Latte', hasStored: true, complete: true, delta: 500),
+        _row(menuItemId: 'b', name: 'Americano', hasStored: false, complete: true, delta: null),
+        _row(menuItemId: 'c', name: 'Cappuccino', hasStored: true, complete: false, delta: null),
+        _row(menuItemId: 'd', name: 'Matcha', hasStored: true, complete: true, delta: 200),
+      ];
+      final eligible = eligibleHppImpactInputs(
+        hppRows: rows,
+        topItems: const [
+          TopItem(name: 'Latte', quantity: 40, revenue: 0),
+          TopItem(name: 'Americano', quantity: 99, revenue: 0), // tak eligible (hasStored false)
+          TopItem(name: 'Cappuccino', quantity: 99, revenue: 0), // tak eligible (!complete)
+          // 'Matcha' TIDAK muncul di topItems -> quantity 0 -> tersaring.
+        ],
+      );
+      expect(eligible.length, 1);
+      expect(eligible.single.delta, 500);
+      expect(eligible.single.quantity, 40);
+    });
+
+    test('join key nama PERSIS (case-sensitive) — beda kapital tak cocok, tersaring', () {
+      final rows = [_row(menuItemId: 'a', name: 'Kopi Susu', hasStored: true, complete: true, delta: 100)];
+      final eligible = eligibleHppImpactInputs(
+        hppRows: rows,
+        topItems: const [TopItem(name: 'kopi susu', quantity: 50, revenue: 0)],
+      );
+      expect(eligible, isEmpty);
+    });
+
+    test('daftar hppRows kosong -> daftar kosong', () {
+      expect(
+        eligibleHppImpactInputs(hppRows: const [], topItems: const [TopItem(name: 'x', quantity: 1, revenue: 0)]),
+        isEmpty,
+      );
+    });
+  });
+
+  group('computeWeightedHppImpact (Task 8 — dampak gabungan DITIMBANG porsi terjual)', () {
+    test('daftar kosong -> weightedDelta null, menuCount 0 ("belum cukup data", bukan Rp0)', () {
+      final r = computeWeightedHppImpact(const []);
+      expect(r.weightedDelta, isNull);
+      expect(r.menuCount, 0);
+    });
+
+    test('satu menu -> weightedDelta = delta menu itu sendiri', () {
+      final r = computeWeightedHppImpact(const [HppImpactInput(delta: 700, quantity: 10)]);
+      expect(r.weightedDelta, 700.0);
+      expect(r.menuCount, 1);
+    });
+
+    test('perhitungan dasar: Σ(qty×delta)/Σqty', () {
+      final r = computeWeightedHppImpact(const [
+        HppImpactInput(delta: 100, quantity: 10), // 1000
+        HppImpactInput(delta: 400, quantity: 5), // 2000
+      ]);
+      // (1000 + 2000) / 15 = 200.0
+      expect(r.weightedDelta, closeTo(200.0, 0.0001));
+      expect(r.menuCount, 2);
+    });
+
+    test(
+        'GIGI WAJIB: hasil DITIMBANG wajib BEDA dari rata-rata POLOS pada fixture di mana '
+        'outlier volume rendah + delta besar akan menggeser rata-rata polos jauh, tapi '
+        'TIDAK menggeser rata-rata tertimbang sebanyak itu (brief: "menu laris harus '
+        'berbobot lebih besar")', () {
+      const bestSeller = HppImpactInput(delta: 100, quantity: 500); // laris, selisih kecil
+      const outlier = HppImpactInput(delta: 10000, quantity: 2); // nyaris tak laku, selisih raksasa
+
+      final weighted = computeWeightedHppImpact(const [bestSeller, outlier]);
+      final naiveAverage = (bestSeller.delta + outlier.delta) / 2; // rata-rata POLOS: 5050.0
+
+      expect(weighted.weightedDelta, isNotNull);
+      // Weighted = (500*100 + 2*10000) / 502 = 70000/502 ≈ 139.44
+      expect(weighted.weightedDelta, closeTo(139.44, 0.5));
+      expect(naiveAverage, 5050.0);
+      expect(weighted.weightedDelta, isNot(closeTo(naiveAverage, 100)),
+          reason: 'rata-rata tertimbang wajib TETAP DEKAT ke delta menu TERLARIS (100), '
+              'bukan tertarik jauh oleh satu menu nyaris-tak-laku dengan selisih raksasa — '
+              'kalau implementasi diam-diam berubah jadi rata-rata polos (Σdelta/n), test '
+              'ini gagal karena weightedDelta akan mendekati 5050, bukan ~139');
+      // Bukti tambahan: tertimbang jauh lebih dekat ke delta best-seller (100)
+      // daripada ke rata-rata polos (5050).
+      expect((weighted.weightedDelta! - bestSeller.delta).abs(),
+          lessThan((weighted.weightedDelta! - naiveAverage).abs()));
+    });
+
+    test('delta negatif ikut terhitung benar (bukan nilai absolut)', () {
+      final r = computeWeightedHppImpact(const [
+        HppImpactInput(delta: -200, quantity: 10), // -2000
+        HppImpactInput(delta: 100, quantity: 10), // 1000
+      ]);
+      // (-2000 + 1000) / 20 = -50.0
+      expect(r.weightedDelta, closeTo(-50.0, 0.0001));
+    });
+
+    test('baris dengan quantity 0 disaring sendiri (jaring pengaman pembagi nol)', () {
+      final r = computeWeightedHppImpact(const [
+        HppImpactInput(delta: 999999, quantity: 0), // wajib DIABAIKAN
+        HppImpactInput(delta: 300, quantity: 10),
+      ]);
+      expect(r.weightedDelta, closeTo(300.0, 0.0001));
+      expect(r.menuCount, 1, reason: 'baris quantity 0 tidak ikut dihitung menuCount');
     });
   });
 }
