@@ -52,12 +52,23 @@ class AdminDashboardScreen extends ConsumerWidget {
         lastDate: now,
       );
       if (picked == null) return;
-      final spanDays = picked.end.difference(picked.start).inDays + 1;
+      // Aritmetika berbasis tengah-malam UTC (BUKAN Duration atas DateTime
+      // lokal) — di zona yang mengenal DST, .difference().inDays bisa meleset
+      // satu hari saat rentang melintasi transisi DST. Ini menyamai
+      // perhitungan backend (Date.parse berbasis UTC) persis.
+      final spanDays = DateTime.utc(picked.end.year, picked.end.month, picked.end.day)
+              .difference(
+                  DateTime.utc(picked.start.year, picked.start.month, picked.start.day))
+              .inDays +
+          1;
       if (spanDays > 90) {
         messenger
           ..hideCurrentSnackBar()
           ..showSnackBar(
-              const SnackBar(content: Text('Rentang maksimal 90 hari')));
+              const SnackBar(
+                content: Text('Rentang maksimal 90 hari'),
+                backgroundColor: AppColors.error,
+              ));
         return;
       }
       ref.read(salesDateRangeProvider.notifier).state = picked;
