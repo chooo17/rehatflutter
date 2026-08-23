@@ -407,6 +407,17 @@ final menuRecipeProvider =
   return ref.watch(stockRepositoryProvider).fetchRecipe(menuItemId);
 });
 
-final hppComparisonProvider = FutureProvider<List<HppRow>>((ref) {
+/// **`autoDispose`** — sama alasan dengan [ingredientsProvider]/
+/// [menuRecipeProvider] di atas (staleness bug yang sama sudah dua kali
+/// menggigit modul keuangan; lihat komentar keduanya). `HppComparisonScreen`
+/// (layar hub modul ini) TETAP ter-mount di bawah saat pengguna menekan
+/// "Kelola Bahan" untuk mengubah harga bahan (push, bukan replace) — tanpa
+/// `autoDispose` DAN tanpa `ref.invalidate` eksplisit di titik sukses
+/// create/update/nonaktifkan bahan (`ingredients_screen.dart`) dan simpan
+/// resep (`recipe_screen.dart`, sudah benar sejak Task 7), kunjungan
+/// berikutnya ke layar ini akan tetap menampilkan HPP/selisih BASI dari
+/// sebelum harga bahan diubah, bukan angka terbaru (temuan I-1, review
+/// whole-branch feat/stok-fase-a).
+final hppComparisonProvider = FutureProvider.autoDispose<List<HppRow>>((ref) {
   return ref.watch(stockRepositoryProvider).fetchHppComparison();
 });

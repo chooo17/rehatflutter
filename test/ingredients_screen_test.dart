@@ -25,11 +25,30 @@ class _FakeStockRepository extends StockRepository {
       : super(client: DioClient(storage: SecureStorage()));
 
   final List<Map<String, dynamic>> createCalls = [];
+  final List<String> deactivateCalls = [];
   final List<Ingredient> ingredients;
+
+  /// Jumlah panggilan `fetchHppComparison` — dipakai untuk membuktikan
+  /// `hppComparisonProvider` benar-benar DIBANGUN ULANG (bukan cuma
+  /// `ingredientsProvider`) setelah create/update/nonaktifkan sukses. Sama
+  /// pola dengan `_FakeStockRepository.fetchHppComparisonCalls` di
+  /// `recipe_screen_test.dart` (Task 7).
+  int fetchHppComparisonCalls = 0;
+
+  @override
+  Future<List<HppRow>> fetchHppComparison() async {
+    fetchHppComparisonCalls++;
+    return const [];
+  }
 
   @override
   Future<List<Ingredient>> fetchIngredients({bool? activeOnly, String? abc}) async =>
       ingredients;
+
+  @override
+  Future<void> deactivateIngredient(String id) async {
+    deactivateCalls.add(id);
+  }
 
   @override
   Future<Ingredient> createIngredient({
@@ -329,6 +348,121 @@ void main() {
     expect(call['abcClass'], 'C', reason: 'golongan ABC default C bila tak diubah pengguna');
     expect(find.text('Tambah Bahan'), findsNothing,
         reason: 'sheet wajib tertutup setelah submit sukses');
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+      'submit lengkap & valid → hppComparisonProvider ikut di-invalidate '
+      '(bukan cuma ingredientsProvider), supaya HppComparisonScreen yang '
+      'tetap ter-mount di bawah IngredientsScreen tak menampilkan HPP basi '
+      'setelah harga bahan diubah', (tester) async {
+    final repo = _FakeStockRepository();
+    final container = ProviderContainer(
+      overrides: [stockRepositoryProvider.overrideWithValue(repo)],
+    );
+    addTearDown(container.dispose);
+
+    // Priming: sama seperti HppComparisonScreen yang tetap ter-mount di
+    // BAWAH IngredientsScreen (push, bukan replace, lewat "Kelola Bahan")
+    // dan sudah membaca provider ini SEBELUM IngredientsScreen dibuka.
+    await container.read(hppComparisonProvider.future);
+    expect(repo.fetchHppComparisonCalls, 1);
+
+    await setPhoneSize(tester);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          theme: AppTheme.build(Brightness.light),
+          home: const IngredientsScreen(),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    await tester.tap(find.byIcon(Icons.add));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.widgetWithText(TextFormField, 'Nama'), 'Kopi Arabika');
+    await tester.tap(find.text('Satuan dasar'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('gram (g)').last);
+    await tester.pumpAndSettle();
+    await tester.enterText(find.widgetWithText(TextFormField, 'Satuan beli'), 'kg');
+    await tester.enterText(find.widgetWithText(TextFormField, 'Isi per satuan beli'), '1000');
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Harga per satuan beli (Rp)'),
+      '150000',
+    );
+    await tester.pump();
+
+    await tester.tap(find.text('Simpan'));
+    await tester.pumpAndSettle();
+
+    expect(repo.createCalls.length, 1);
+
+    // Baca ulang lewat container (bukan lewat widget — HppComparisonScreen
+    // tidak ter-mount di test ini) untuk memastikan provider itu sendiri
+    // BENAR-BENAR dibangun ulang, bukan sekadar tak error di layar ini.
+    await container.read(hppComparisonProvider.future);
+    expect(repo.fetchHppComparisonCalls, 2,
+        reason: '_IngredientFormSheetState._submit() wajib '
+            'ref.invalidate(hppComparisonProvider) juga, bukan cuma '
+            'ingredientsProvider — tanpa itu HppComparisonScreen tetap '
+            'menampilkan HPP basi setelah harga bahan diubah lewat form ini '
+            '(temuan I-1, review whole-branch feat/stok-fase-a).');
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+      'nonaktifkan bahan sukses → hppComparisonProvider ikut di-invalidate '
+      'juga (bukan cuma ingredientsProvider)', (tester) async {
+    final repo = _FakeStockRepository(ingredients: const [
+      Ingredient(
+        id: 'ing-kopi',
+        name: 'Kopi Arabika',
+        baseUnit: 'g',
+        purchaseUnit: 'kg',
+        unitsPerPurchase: 1000,
+        purchasePrice: 150000,
+        costPerBase: 150,
+        abcClass: 'A',
+      ),
+    ]);
+    final container = ProviderContainer(
+      overrides: [stockRepositoryProvider.overrideWithValue(repo)],
+    );
+    addTearDown(container.dispose);
+
+    await container.read(hppComparisonProvider.future);
+    expect(repo.fetchHppComparisonCalls, 1);
+
+    await setPhoneSize(tester);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          theme: AppTheme.build(Brightness.light),
+          home: const IngredientsScreen(),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    await tester.tap(find.byTooltip('Nonaktifkan'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(TextButton, 'Nonaktifkan'));
+    await tester.pumpAndSettle();
+
+    expect(repo.deactivateCalls, ['ing-kopi']);
+
+    await container.read(hppComparisonProvider.future);
+    expect(repo.fetchHppComparisonCalls, 2,
+        reason: '_confirmDeactivate() wajib ref.invalidate(hppComparisonProvider) '
+            'juga, bukan cuma ingredientsProvider (temuan I-1, review '
+            'whole-branch feat/stok-fase-a).');
     expect(tester.takeException(), isNull);
   });
 }

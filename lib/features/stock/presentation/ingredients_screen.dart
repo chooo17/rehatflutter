@@ -146,6 +146,12 @@ class _IngredientTile extends ConsumerWidget {
     try {
       await ref.read(stockRepositoryProvider).deactivateIngredient(ing.id);
       ref.invalidate(ingredientsProvider);
+      // HppComparisonScreen (layar hub) bisa tetap ter-mount di bawah lewat
+      // "Kelola Bahan" — tanpa ini badge/HPP di sana tetap basi sampai
+      // pull-to-refresh manual walau bahan baru saja dinonaktifkan (temuan
+      // I-1, review whole-branch feat/stok-fase-a; sama pola dengan
+      // RecipeScreen._save()).
+      ref.invalidate(hppComparisonProvider);
     } on ApiException catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
@@ -295,6 +301,12 @@ class _IngredientFormSheetState extends State<_IngredientFormSheet> {
         );
       }
       widget.ref.invalidate(ingredientsProvider);
+      // HppComparisonScreen (layar hub) bisa tetap ter-mount di bawah lewat
+      // "Kelola Bahan" — tanpa ini HPP/selisih di sana tetap basi sampai
+      // pull-to-refresh manual walau harga bahan baru saja diubah (temuan
+      // I-1, review whole-branch feat/stok-fase-a; sama pola dengan
+      // RecipeScreen._save()).
+      widget.ref.invalidate(hppComparisonProvider);
       if (mounted) Navigator.pop(context);
     } on ApiException catch (e) {
       // Pesan ApiException sudah Bahasa Indonesia, siap tampil apa adanya
