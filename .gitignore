@@ -35,3 +35,6 @@ graphify-out/
 # Build APK/AAB — jangan commit binari besar ke git
 *.apk
 *.aab
+
+# Worktree sementara (superpowers:using-git-worktrees)
+.worktrees/
