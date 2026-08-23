@@ -21,13 +21,15 @@ import 'package:rehat_app/features/stock/presentation/ingredients_screen.dart';
 /// bisa dibuktikan validasi klien (form kosong, isi per satuan beli <= 0)
 /// benar-benar MENGHENTIKAN pemanggilan sebelum sempat "menyentuh jaringan".
 class _FakeStockRepository extends StockRepository {
-  _FakeStockRepository() : super(client: DioClient(storage: SecureStorage()));
+  _FakeStockRepository({this.ingredients = const []})
+      : super(client: DioClient(storage: SecureStorage()));
 
   final List<Map<String, dynamic>> createCalls = [];
+  final List<Ingredient> ingredients;
 
   @override
   Future<List<Ingredient>> fetchIngredients({bool? activeOnly, String? abc}) async =>
-      const [];
+      ingredients;
 
   @override
   Future<Ingredient> createIngredient({
@@ -140,6 +142,67 @@ void main() {
     expect(tester.takeException(), isNull);
     expect(find.text('Master Bahan'), findsOneWidget);
     expect(find.textContaining('Belum ada bahan'), findsOneWidget);
+  });
+
+  testWidgets(
+      'render daftar bahan TERISI 360×800 → ListTile bahan punya Material '
+      'ancestor sendiri (efek tap ink splash/highlight terlihat, bukan '
+      '"ditembus" ke Material Scaffold yang jauh di atas NeuCard)',
+      (tester) async {
+    final repo = _FakeStockRepository(ingredients: const [
+      Ingredient(
+        id: 'ing-kopi',
+        name: 'Kopi Arabika',
+        baseUnit: 'g',
+        purchaseUnit: 'kg',
+        unitsPerPurchase: 1000,
+        purchasePrice: 150000,
+        costPerBase: 150,
+        abcClass: 'A',
+      ),
+    ]);
+    final container = ProviderContainer(
+      overrides: [stockRepositoryProvider.overrideWithValue(repo)],
+    );
+    addTearDown(container.dispose);
+
+    await setPhoneSize(tester);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          theme: AppTheme.build(Brightness.light),
+          home: const IngredientsScreen(),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('Kopi Arabika'), findsOneWidget);
+
+    final listTileFinder = find.byType(ListTile);
+    expect(listTileFinder, findsOneWidget);
+
+    // ListTile SELALU menemukan *suatu* Material ancestor jauh di atasnya
+    // (mis. milik Scaffold, `MaterialType.canvas`) — itu tidak cukup untuk
+    // membuktikan fix ini, karena assertion Flutter yang dilanggar sebelum
+    // fix menyoal Material yang LANGSUNG membungkusnya. Bukti yang benar:
+    // ada Material `type: transparency` sebagai ancestor — persis yang
+    // ditambahkan `Material(type: MaterialType.transparency)` di dalam
+    // NeuCard. Tanpa fix, tidak ada Material transparency sama sekali di
+    // sini (satu-satunya Material ancestor adalah milik Scaffold, `canvas`).
+    final materialAncestors =
+        find.ancestor(of: listTileFinder, matching: find.byType(Material));
+    final transparencyAncestors = tester
+        .widgetList<Material>(materialAncestors)
+        .where((m) => m.type == MaterialType.transparency);
+    expect(transparencyAncestors, isNotEmpty,
+        reason: 'ListTile bahan wajib dibungkus Material(type: transparency) '
+            'sendiri di dalam NeuCard, sama pola dengan RecipeListScreen — '
+            'tanpa ini efek tap (ink splash/highlight) ListTile tak pernah '
+            'terlihat walau tetap bisa ditekan');
   });
 
   testWidgets(

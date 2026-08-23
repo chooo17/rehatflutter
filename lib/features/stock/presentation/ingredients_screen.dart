@@ -104,14 +104,23 @@ class _IngredientTile extends ConsumerWidget {
       padding: const EdgeInsets.only(bottom: 12),
       child: NeuCard(
         padding: EdgeInsets.zero,
-        child: ListTile(
-          onTap: onEdit,
-          title: Text(ingredient.name),
-          subtitle: Text(subtitleParts.join(' · ')),
-          trailing: IconButton(
-            icon: const Icon(Icons.archive_outlined),
-            tooltip: 'Nonaktifkan',
-            onPressed: () => _confirmDeactivate(context, ref, ingredient),
+        // ListTile melukis latar & percikan tinta pada Material ANCESTOR
+        // TERDEKAT — NeuCard sendiri tidak menyediakan satu (parameter
+        // `onTap` miliknya tidak dipakai di sini, hanya `ListTile.onTap`),
+        // jadi tanpa Material transparan ini efek tap ListTile tak pernah
+        // terlihat. Sama pola persis dengan `RecipeListScreen` di
+        // `recipe_screen.dart` (Task 7).
+        child: Material(
+          type: MaterialType.transparency,
+          child: ListTile(
+            onTap: onEdit,
+            title: Text(ingredient.name),
+            subtitle: Text(subtitleParts.join(' · ')),
+            trailing: IconButton(
+              icon: const Icon(Icons.archive_outlined),
+              tooltip: 'Nonaktifkan',
+              onPressed: () => _confirmDeactivate(context, ref, ingredient),
+            ),
           ),
         ),
       ),
