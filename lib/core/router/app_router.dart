@@ -33,6 +33,7 @@ import '../../features/finance/presentation/finance_overview_screen.dart';
 import '../../features/finance/presentation/fixed_costs_screen.dart';
 import '../../features/finance/presentation/profit_loss_screen.dart';
 import '../../features/stock/presentation/ingredients_screen.dart';
+import '../../features/stock/presentation/recipe_screen.dart';
 import '../../features/home/presentation/home_screen.dart';
 import '../../features/loyalty/presentation/loyalty_history_screen.dart';
 import '../../features/loyalty/presentation/loyalty_screen.dart';
@@ -399,6 +400,17 @@ final routerProvider = Provider<GoRouter>((ref) {
                     path: 'stock/ingredients',
                     name: RouteNames.stockIngredients,
                     builder: (context, state) => const IngredientsScreen(),
+                  ),
+                  GoRoute(
+                    path: 'stock/recipe',
+                    name: RouteNames.stockRecipeList,
+                    builder: (context, state) => const RecipeListScreen(),
+                  ),
+                  GoRoute(
+                    path: 'stock/recipe/:menuItemId',
+                    name: RouteNames.stockRecipe,
+                    builder: (context, state) =>
+                        RecipeScreen(menuItemId: state.pathParameters['menuItemId']!),
                   ),
                 ],
               ),

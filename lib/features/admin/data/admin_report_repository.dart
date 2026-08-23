@@ -301,14 +301,22 @@ class AdminReportRepository {
   /// [date] (YYYY-MM-DD) menang atas [range] bila diisi. [endDate] (opsional,
   /// juga YYYY-MM-DD) mengubah [date] jadi awal rentang kustom — WAJIB
   /// dikirim bersama [date], diabaikan backend bila [date] kosong.
+  ///
+  /// [topLimit] (opsional, backend commit `72516fa`) mengubah jumlah
+  /// `top_items` yang dikembalikan — backend default 5 bila tak dikirim.
+  /// Dipakai layar Entri Resep (Task 7, Manajemen Stok) dengan `topLimit: 30`
+  /// untuk mengurutkan daftar menu "paling laris di atas" (lihat
+  /// `sortMenusByPopularity` di `stock_view.dart`) — dashboard existing tetap
+  /// memakai default 5 dengan tidak mengirim parameter ini sama sekali.
   Future<SalesReport> fetchSales(
-      {String range = '7d', String? date, String? endDate}) async {
+      {String range = '7d', String? date, String? endDate, int? topLimit}) async {
     final res = await _client.get<dynamic>(
       ApiConstants.adminSalesReport,
       query: {
         'range': range,
         if (date != null) 'date': date,
         if (endDate != null) 'end': endDate,
+        if (topLimit != null) 'top_limit': topLimit.toString(),
       },
     );
     return SalesReport.fromJson(_unwrap(res.data));

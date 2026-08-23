@@ -393,7 +393,17 @@ final ingredientsProvider = FutureProvider.autoDispose<List<Ingredient>>((ref) {
   return ref.watch(stockRepositoryProvider).fetchIngredients();
 });
 
-final menuRecipeProvider = FutureProvider.family<MenuRecipe, String>((ref, menuItemId) {
+/// **`autoDispose`** — Task 5 punya provider ini sebagai `FutureProvider.family`
+/// polos & reviewnya menandai ini sebagai risiko ke depan (staleness bug yang
+/// sama sudah dua kali menggigit modul keuangan; Task 6 sudah mengonversi
+/// [ingredientsProvider]). Task 7 (layar entri resep) memakai provider ini
+/// dan menyimpan resep lewat [StockRepository.saveRecipe] — tanpa
+/// `autoDispose`, kunjungan KEDUA ke layar entri resep menu yang sama
+/// (pop lalu push lagi) akan menemukan `AsyncData` basi dari kunjungan
+/// pertama, bukan resep yang baru saja disimpan. Pemanggil `saveRecipe`
+/// WAJIB `ref.invalidate(menuRecipeProvider(menuItemId))` setelah sukses.
+final menuRecipeProvider =
+    FutureProvider.family.autoDispose<MenuRecipe, String>((ref, menuItemId) {
   return ref.watch(stockRepositoryProvider).fetchRecipe(menuItemId);
 });
 

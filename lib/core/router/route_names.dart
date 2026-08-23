@@ -152,4 +152,18 @@ class RouteNames {
   /// Rute didaftarkan di `app_router.dart`.
   static const String stockIngredients = 'stock-ingredients';
   static const String stockIngredientsPath = '/profile/stock/ingredients';
+
+  /// Daftar menu (58 buah) dengan penanda sudah/belum ada resep, diurutkan
+  /// paling laris dulu (Manajemen Stok Fase A, Task 7). BELUM ada tautan
+  /// navigasi dari layar mana pun (sama seperti [stockIngredients]),
+  /// dijangkau lewat `context.pushNamed(RouteNames.stockRecipeList)`.
+  /// Rute didaftarkan di `app_router.dart`.
+  static const String stockRecipeList = 'stock-recipe-list';
+  static const String stockRecipeListPath = '/profile/stock/recipe';
+
+  /// Entri resep satu menu (Manajemen Stok Fase A, Task 7) — dijangkau dari
+  /// [stockRecipeList] lewat `context.pushNamed(RouteNames.stockRecipe,
+  /// pathParameters: {'menuItemId': id})`. Rute didaftarkan di `app_router.dart`.
+  static const String stockRecipe = 'stock-recipe';
+  static const String stockRecipePath = '/profile/stock/recipe/:menuItemId';
 }

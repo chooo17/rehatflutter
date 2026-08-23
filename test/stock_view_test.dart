@@ -1,6 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:rehat_app/features/admin/data/admin_report_repository.dart';
 import 'package:rehat_app/features/stock/application/stock_view.dart';
 import 'package:rehat_app/features/stock/data/stock_repository.dart';
+import 'package:rehat_app/shared/models/menu_item_model.dart';
 
 /// Menguji logika penyajian MURNI fitur Manajemen Stok (Task 5) — tanpa
 /// merender widget apa pun: label satuan, format harga per satuan, validasi
@@ -197,6 +199,158 @@ void main() {
 
       final lower = hppComparisonSentence(_row(hasStored: true, storedCostPrice: 10000, delta: -2500, pct: -25.0));
       expect(lower, contains('2.500'));
+    });
+  });
+
+  group('sortMenusByPopularity (Task 7 — daftar menu layar Entri Resep)', () {
+    MenuItemModel menu(String id, String name, {int costPrice = 0}) => MenuItemModel(
+          id: id,
+          name: name,
+          price: 20000,
+          costPrice: costPrice,
+        );
+
+    test('menu di topItems ditaruh di atas, mengikuti URUTAN backend (BUKAN diurutkan ulang)', () {
+      // Backend sudah mengurutkan berdasar quantity descending — fungsi ini
+      // TIDAK boleh menyusun ulang berdasar field lain (mis. quantity) karena
+      // ties/rounding adalah keputusan backend.
+      final rows = sortMenusByPopularity(
+        menus: [menu('c', 'Cappuccino'), menu('a', 'Americano'), menu('l', 'Latte')],
+        topItems: const [
+          TopItem(name: 'Latte', quantity: 50, revenue: 0),
+          TopItem(name: 'Cappuccino', quantity: 30, revenue: 0),
+        ],
+        hppRows: const [],
+      );
+      expect(rows.map((r) => r.id).toList(), ['l', 'c', 'a'],
+          reason: 'Latte & Cappuccino ada di topItems (urutan backend dipertahankan), '
+              'Americano tak ada di topItems jadi taruh terakhir');
+    });
+
+    test('menu TIDAK di topItems ditaruh setelah yang ada, diurutkan ALFABETIS', () {
+      final rows = sortMenusByPopularity(
+        menus: [menu('z', 'Zebra Mocha'), menu('a', 'Avocado Coffee'), menu('m', 'Matcha')],
+        topItems: const [TopItem(name: 'Matcha', quantity: 10, revenue: 0)],
+        hppRows: const [],
+      );
+      expect(rows.map((r) => r.name).toList(), ['Matcha', 'Avocado Coffee', 'Zebra Mocha']);
+    });
+
+    test('join key adalah nama PERSIS (exact match) — nama beda sama sekali tak cocok', () {
+      final rows = sortMenusByPopularity(
+        menus: [menu('a', 'Kopi Susu'), menu('b', 'Es Teh')],
+        topItems: const [TopItem(name: 'kopi susu', quantity: 99, revenue: 0)], // beda kapital
+        hppRows: const [],
+      );
+      // Tak ada yang cocok (exact match, case-sensitive) -> keduanya jatuh ke
+      // jalur alfabetis.
+      expect(rows.map((r) => r.name).toList(), ['Es Teh', 'Kopi Susu']);
+    });
+
+    test('hasRecipe diambil dari HppRow.complete, dicocokkan lewat menuItemId', () {
+      final rows = sortMenusByPopularity(
+        menus: [menu('a', 'A'), menu('b', 'B')],
+        topItems: const [],
+        hppRows: const [
+          HppRow(menuItemId: 'a', complete: true),
+          HppRow(menuItemId: 'b', complete: false),
+        ],
+      );
+      final byId = {for (final r in rows) r.id: r};
+      expect(byId['a']!.hasRecipe, isTrue);
+      expect(byId['b']!.hasRecipe, isFalse);
+    });
+
+    test('menu TANPA baris HppRow sama sekali diperlakukan hasRecipe FALSE (aman, bukan crash)', () {
+      final rows = sortMenusByPopularity(
+        menus: [menu('a', 'A')],
+        topItems: const [],
+        hppRows: const [], // 'a' tidak muncul sama sekali
+      );
+      expect(rows.single.hasRecipe, isFalse);
+    });
+
+    test('costPrice ikut dibawa apa adanya dari MenuItemModel', () {
+      final rows = sortMenusByPopularity(
+        menus: [menu('a', 'A', costPrice: 7500)],
+        topItems: const [],
+        hppRows: const [],
+      );
+      expect(rows.single.costPrice, 7500);
+    });
+  });
+
+  group('computeMenuHpp (Task 7 — port menuHpp dari stockCalc.js backend)', () {
+    test('baris umum (temperature null) masuk hitungan KEDUA varian', () {
+      final lines = [const LocalRecipeLine(qtyBase: 200, costPerBase: 5, temperature: null)]; // 1000
+      expect(computeMenuHpp(lines, 'hot'), 1000);
+      expect(computeMenuHpp(lines, 'iced'), 1000);
+    });
+
+    test(
+        'GIGI WAJIB: baris khusus hot TIDAK masuk hitungan iced, dan sebaliknya '
+        '(hot & iced HARUS menghasilkan total BERBEDA & benar atribusinya — '
+        'menukar cabang if di implementasi wajib membuat test ini gagal)', () {
+      final lines = [
+        const LocalRecipeLine(qtyBase: 100, costPerBase: 3, temperature: 'hot'), // 300, hanya hot
+        const LocalRecipeLine(qtyBase: 50, costPerBase: 8, temperature: 'iced'), // 400, hanya iced
+        const LocalRecipeLine(qtyBase: 10, costPerBase: 10, temperature: null), // 100, keduanya
+      ];
+      final hot = computeMenuHpp(lines, 'hot');
+      final iced = computeMenuHpp(lines, 'iced');
+      expect(hot, 400, reason: '300 (baris hot) + 100 (baris umum) = 400');
+      expect(iced, 500, reason: '400 (baris iced) + 100 (baris umum) = 500');
+      expect(hot, isNot(equals(iced)), reason: 'hot & iced wajib beda karena baris khusus beda nilai');
+    });
+
+    test('dibulatkan SEKALI di akhir (bukan per baris) — pecahan menumpuk benar', () {
+      // 3 baris @ 0.4 masing-masing -> jumlah 1.2, dibulatkan sekali jadi 1.
+      // Bila dibulatkan PER BARIS dulu (masing-masing round ke 0), hasilnya
+      // salah jadi 0.
+      final lines = [
+        const LocalRecipeLine(qtyBase: 1, costPerBase: 0.4, temperature: null),
+        const LocalRecipeLine(qtyBase: 1, costPerBase: 0.4, temperature: null),
+        const LocalRecipeLine(qtyBase: 1, costPerBase: 0.4, temperature: null),
+      ];
+      expect(computeMenuHpp(lines, 'hot'), 1);
+    });
+
+    test('daftar baris kosong -> 0', () {
+      expect(computeMenuHpp(const [], 'hot'), 0);
+    });
+  });
+
+  group('computeHppDelta (Task 7 — sentinel null vs 0, mirip hppDelta backend)', () {
+    test(
+        'GIGI WAJIB: storedCostPrice NULL -> delta & pct NULL (bukan 0) — '
+        'tak boleh menampilkan selisih PALSU untuk menu tanpa cost_price', () {
+      final r = computeHppDelta(computed: 5000, storedCostPrice: null);
+      expect(r.hasStored, isFalse);
+      expect(r.delta, isNull);
+      expect(r.pct, isNull);
+    });
+
+    test(
+        'GIGI WAJIB: storedCostPrice 0 (belum pernah diisi) -> hasStored FALSE, '
+        'delta & pct NULL juga (0 BUKAN nilai valid untuk dibandingkan)', () {
+      final r = computeHppDelta(computed: 5000, storedCostPrice: 0);
+      expect(r.hasStored, isFalse);
+      expect(r.delta, isNull);
+      expect(r.pct, isNull);
+    });
+
+    test('storedCostPrice > 0 -> hasStored true, delta & pct dihitung', () {
+      final r = computeHppDelta(computed: 8500, storedCostPrice: 8000);
+      expect(r.hasStored, isTrue);
+      expect(r.delta, 500);
+      expect(r.pct, closeTo(6.25, 0.001));
+    });
+
+    test('computed lebih rendah dari stored -> delta negatif', () {
+      final r = computeHppDelta(computed: 6000, storedCostPrice: 10000);
+      expect(r.hasStored, isTrue);
+      expect(r.delta, -4000);
+      expect(r.pct, closeTo(-40.0, 0.001));
     });
   });
 }

@@ -68,4 +68,34 @@ void main() {
     final uri = adapter.lastOptions!.uri;
     expect(uri.queryParameters['end'], '2026-07-10');
   });
+
+  // Task 7 (Manajemen Stok — layar Entri Resep): `top_limit` dipakai untuk
+  // menarik lebih dari 5 item terlaris (mis. 30, cukup untuk "~21 menu = 80%
+  // omzet") supaya daftar menu bisa diurutkan paling laris dulu. Backend
+  // (commit 72516fa) default 5 bila parameter ini tak dikirim sama sekali —
+  // dashboard existing (tanpa topLimit) TIDAK boleh mulai mengirim query ini
+  // diam-diam.
+  test('fetchSales mengirim query `top_limit` saat topLimit diisi', () async {
+    await repo.fetchSales(topLimit: 30).timeout(const Duration(seconds: 10));
+
+    final uri = adapter.lastOptions!.uri;
+    expect(uri.queryParameters['top_limit'], '30');
+  });
+
+  test('fetchSales TIDAK mengirim query `top_limit` saat topLimit null (default dashboard existing)', () async {
+    await repo.fetchSales().timeout(const Duration(seconds: 10));
+
+    final uri = adapter.lastOptions!.uri;
+    expect(uri.queryParameters.containsKey('top_limit'), isFalse);
+  });
+
+  test('fetchSales meneruskan top_items sejumlah yang backend kembalikan (respons diuraikan apa adanya)', () async {
+    adapter.body = '{"success":true,"data":{"summary":{},"series":[],'
+        '"top_items":[{"name":"Latte","quantity":50,"revenue":0},'
+        '{"name":"Kopi Susu","quantity":40,"revenue":0}]}}';
+
+    final report = await repo.fetchSales(topLimit: 30).timeout(const Duration(seconds: 10));
+
+    expect(report.topItems.map((t) => t.name).toList(), ['Latte', 'Kopi Susu']);
+  });
 }
