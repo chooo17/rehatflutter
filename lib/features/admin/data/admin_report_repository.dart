@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/constants/api_constants.dart';
@@ -297,11 +298,18 @@ class AdminReportRepository {
   AdminReportRepository({required DioClient client}) : _client = client;
   final DioClient _client;
 
-  /// [date] (YYYY-MM-DD) menang atas [range] bila diisi.
-  Future<SalesReport> fetchSales({String range = '7d', String? date}) async {
+  /// [date] (YYYY-MM-DD) menang atas [range] bila diisi. [endDate] (opsional,
+  /// juga YYYY-MM-DD) mengubah [date] jadi awal rentang kustom — WAJIB
+  /// dikirim bersama [date], diabaikan backend bila [date] kosong.
+  Future<SalesReport> fetchSales(
+      {String range = '7d', String? date, String? endDate}) async {
     final res = await _client.get<dynamic>(
       ApiConstants.adminSalesReport,
-      query: {'range': range, if (date != null) 'date': date},
+      query: {
+        'range': range,
+        if (date != null) 'date': date,
+        if (endDate != null) 'end': endDate,
+      },
     );
     return SalesReport.fromJson(_unwrap(res.data));
   }
@@ -321,10 +329,15 @@ class AdminReportRepository {
     return out;
   }
 
-  Future<ExpenseList> fetchExpenses({String range = '7d', String? date}) async {
+  Future<ExpenseList> fetchExpenses(
+      {String range = '7d', String? date, String? endDate}) async {
     final res = await _client.get<dynamic>(
       ApiConstants.adminExpenses,
-      query: {'range': range, if (date != null) 'date': date},
+      query: {
+        'range': range,
+        if (date != null) 'date': date,
+        if (endDate != null) 'end': endDate,
+      },
     );
     final data = _unwrap(res.data);
     final items = (data['items'] as List?) ?? const [];
@@ -381,6 +394,11 @@ final adminReportRepositoryProvider = Provider<AdminReportRepository>((ref) {
 /// Tanggal spesifik yang dipilih (null = pakai pill rentang).
 final salesDateProvider = StateProvider<DateTime?>((ref) => null);
 
+/// Rentang tanggal kustom yang dipilih (null = pakai pill/tanggal tunggal).
+/// Menang atas [salesDateProvider] & [salesRangeProvider] bila diisi (lihat
+/// wiring saling meng-null-kan di admin_dashboard_screen.dart).
+final salesDateRangeProvider = StateProvider<DateTimeRange?>((ref) => null);
+
 String _fmtDate(DateTime d) =>
     '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
@@ -391,9 +409,13 @@ final salesRangeProvider = StateProvider<String>((ref) => '7d');
 final salesReportProvider = FutureProvider<SalesReport>((ref) {
   final range = ref.watch(salesRangeProvider);
   final date = ref.watch(salesDateProvider);
+  final dateRange = ref.watch(salesDateRangeProvider);
   return ref.watch(adminReportRepositoryProvider).fetchSales(
         range: range,
-        date: date != null ? _fmtDate(date) : null,
+        date: dateRange != null
+            ? _fmtDate(dateRange.start)
+            : (date != null ? _fmtDate(date) : null),
+        endDate: dateRange != null ? _fmtDate(dateRange.end) : null,
       );
 });
 
@@ -401,9 +423,13 @@ final salesReportProvider = FutureProvider<SalesReport>((ref) {
 final expensesProvider = FutureProvider<ExpenseList>((ref) {
   final range = ref.watch(salesRangeProvider);
   final date = ref.watch(salesDateProvider);
+  final dateRange = ref.watch(salesDateRangeProvider);
   return ref.watch(adminReportRepositoryProvider).fetchExpenses(
         range: range,
-        date: date != null ? _fmtDate(date) : null,
+        date: dateRange != null
+            ? _fmtDate(dateRange.start)
+            : (date != null ? _fmtDate(date) : null),
+        endDate: dateRange != null ? _fmtDate(dateRange.end) : null,
       );
 });
 
