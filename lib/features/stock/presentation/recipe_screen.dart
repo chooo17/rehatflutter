@@ -219,6 +219,12 @@ class _RecipeScreenState extends ConsumerState<RecipeScreen> {
                 .toList(),
           );
       ref.invalidate(menuRecipeProvider(widget.menuItemId));
+      // RecipeListScreen tetap ter-mount di BAWAH layar ini (push, bukan
+      // replace) dan membaca hppComparisonProvider untuk badge "sudah/belum
+      // ada resep" — tanpa invalidate ini, badge itu tetap menampilkan
+      // snapshot BASI (belum ada resep) sampai pull-to-refresh manual,
+      // padahal resep baru saja tersimpan sukses.
+      ref.invalidate(hppComparisonProvider);
       if (mounted) {
         ScaffoldMessenger.of(context)
             .showSnackBar(const SnackBar(content: Text('Resep tersimpan')));

@@ -26,6 +26,17 @@ class _FakeStockRepository extends StockRepository {
   final List<RecipeLine> initialLines;
   final List<List<RecipeLineInput>> saveCalls = [];
 
+  /// Jumlah panggilan `fetchHppComparison` — dipakai untuk membuktikan
+  /// `hppComparisonProvider` benar-benar DIBANGUN ULANG (bukan cuma
+  /// `menuRecipeProvider` milik menu ini sendiri) setelah `_save()` sukses.
+  int fetchHppComparisonCalls = 0;
+
+  @override
+  Future<List<HppRow>> fetchHppComparison() async {
+    fetchHppComparisonCalls++;
+    return const [];
+  }
+
   @override
   Future<List<Ingredient>> fetchIngredients({bool? activeOnly, String? abc}) async => [
         const Ingredient(
@@ -270,6 +281,69 @@ void main() {
     expect(sent.single.ingredientId, 'ing-kopi');
     expect(sent.single.qtyBase, 15.0);
     expect(find.text('Resep tersimpan'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+      'simpan resep sukses → hppComparisonProvider ikut di-invalidate '
+      '(bukan cuma menuRecipeProvider), supaya badge status resep di '
+      'RecipeListScreen yang tetap ter-mount di bawahnya tidak basi',
+      (tester) async {
+    final repo = _FakeStockRepository();
+    final container = ProviderContainer(
+      overrides: [
+        stockRepositoryProvider.overrideWithValue(repo),
+        allMenuItemsProvider.overrideWith((ref) async => [
+              const MenuItemModel(id: 'menu-1', name: 'Kopi Susu Gula Aren', price: 20000),
+            ]),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    // Priming: sama seperti RecipeListScreen yang tetap ter-mount di BAWAH
+    // RecipeScreen (push, bukan replace) dan sudah membaca provider ini
+    // SEBELUM RecipeScreen dibuka.
+    await container.read(hppComparisonProvider.future);
+    expect(repo.fetchHppComparisonCalls, 1);
+
+    await setPhoneSize(tester);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          theme: AppTheme.build(Brightness.light),
+          home: const RecipeScreen(menuItemId: 'menu-1'),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    await tester.tap(find.text('Tambah Bahan'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(DropdownButtonFormField<String>, 'Bahan'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Kopi Arabika').last);
+    await tester.pumpAndSettle();
+    await tester.enterText(find.widgetWithText(TextFormField, 'Takaran'), '15');
+    await tester.pump();
+
+    await tester.ensureVisible(find.text('Simpan Resep'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Simpan Resep'));
+    await tester.pumpAndSettle();
+
+    expect(repo.saveCalls.length, 1);
+
+    // Baca ulang lewat container (bukan lewat widget — RecipeListScreen
+    // tidak ter-mount di test ini) untuk memastikan provider itu sendiri
+    // BENAR-BENAR dibangun ulang, bukan sekadar tak error di layar ini.
+    await container.read(hppComparisonProvider.future);
+    expect(repo.fetchHppComparisonCalls, 2,
+        reason: 'RecipeScreen._save() wajib ref.invalidate(hppComparisonProvider) '
+            'juga, bukan cuma menuRecipeProvider(widget.menuItemId) — tanpa itu '
+            'badge "sudah/belum ada resep" di RecipeListScreen tetap basi sampai '
+            'pull-to-refresh manual walau resep baru saja tersimpan sukses');
     expect(tester.takeException(), isNull);
   });
 
