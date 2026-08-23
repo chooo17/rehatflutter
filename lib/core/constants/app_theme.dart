@@ -39,10 +39,16 @@ class AppTheme {
       // Transisi halaman ringan. Default M3 (ZoomPageTransitionsBuilder)
       // melakukan scale+fade+clip tiap frame → berat saat pindah halaman.
       // FadeUpwards hanya fade + geser tipis → jauh lebih murah, tetap mulus.
+      // Dulu hanya android/iOS yang di-override — versi web yang diakses dari
+      // browser desktop terdeteksi sebagai windows/linux/macOS, jadi tetap
+      // jatuh ke ZoomPageTransitionsBuilder default (berat) tanpa disadari.
       pageTransitionsTheme: const PageTransitionsTheme(
         builders: {
           TargetPlatform.android: FadeUpwardsPageTransitionsBuilder(),
           TargetPlatform.iOS: FadeUpwardsPageTransitionsBuilder(),
+          TargetPlatform.windows: FadeUpwardsPageTransitionsBuilder(),
+          TargetPlatform.macOS: FadeUpwardsPageTransitionsBuilder(),
+          TargetPlatform.linux: FadeUpwardsPageTransitionsBuilder(),
         },
       ),
       appBarTheme: AppBarTheme(
