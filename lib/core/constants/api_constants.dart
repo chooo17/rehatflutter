@@ -133,6 +133,12 @@ class ApiConstants {
   static const String financeWithdraw = '/admin/finance/withdraw';
   static const String financeAllocate = '/admin/finance/allocate';
 
+  // Stock / bahan & resep (khusus pemilik, Manajemen Stok Fase A) --------
+  static const String stockIngredients = '/admin/stock/ingredients';
+  static String stockIngredient(String id) => '/admin/stock/ingredients/$id';
+  static String stockRecipe(String menuItemId) => '/admin/stock/recipes/$menuItemId';
+  static const String stockHppComparison = '/admin/stock/hpp-comparison';
+
   // Notifications -------------------------------------------------------
   static const String notifications = '/notifications';
   static const String notificationsReadAll = '/notifications/read-all';
