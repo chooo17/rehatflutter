@@ -157,6 +157,8 @@ Pola verifikasi umum: skrip sekali-pakai di folder backend pakai `supabaseAdmin`
 - **Pos `personal` DIKECUALIKAN dari biaya di Laba Rugi** (`splitByBucket`/`sumNonRestockBetween`) — itu prive pemilik, bukan biaya usaha; memasukkannya membuat laba bersih terlihat lebih kecil dari kenyataan dan `breakEvenDaily` naik palsu. Tapi ia **tetap memotong amplop pribadi**. Akibatnya ada DUA jalur untuk uang pribadi (`POST /admin/finance/withdraw` bucket personal, dan mencatat pengeluaran bucket personal) — keduanya memotong amplop yang sama dan keduanya di luar P&L.
 - **Fallback yang menjatuhkan kolom `bucket` di `createExpense` SUDAH DIBUANG.** Dulu bila insert gagal menyebut kolom `bucket`, ia mengulang tanpa kolom itu → baris tersimpan `bucket = NULL`. Itu penyebab 6 baris ber-`bucket` kosong di produksi (9-10 Agt 2026, Rp144.000). Sejak `bucket` menentukan amplop, fallback itu menghasilkan **dua buku berbeda**: amplop terpotong sesuai pos yang dimaksud, tapi `splitByBucket` membaca NULL sebagai restock. Migrasi 016 sudah terpasang & terverifikasi — fallback itu kini hanya menyembunyikan kegagalan.
 - **Pengeluaran bucket `personal` TETAP memotong amplop pribadi TAPI DIKECUALIKAN dari Laba Rugi** — `expenseService.splitByBucket` memisahkan `personal` dari `nonRestock` (yang masuk `variableExpenses` P&L). Alasannya: itu prive pemilik, bukan biaya usaha. Ada DUA jalur uang pribadi yang keduanya memotong amplop `personal` sekaligus keduanya di luar P&L: `POST /admin/finance/withdraw` (bucket personal) dan pengeluaran ber-bucket `personal`.
+- **`ingredients.cost_per_base`/`purchase_price`/`units_per_purchase`/`min_stock` SENGAJA pecahan** (`numeric(14,4)`) — pengecualian yang disengaja dari aturan "uang tetap rupiah bulat" di §5h. Es batu Rp35.000/10kg = Rp3,5/gram; dibulatkan jadi Rp4/gram meleset 14%. Pembulatan ke rupiah bulat HANYA terjadi di angka akhir (HPP per menu — `stockCalc.menuHpp` di backend & `computeMenuHpp` di Flutter keduanya membulatkan **sekali di akhir**, bukan per baris resep; membulatkan per baris adalah bug class yang sudah pernah lolos test krn fixture-nya kebetulan bertotal bulat).
+- **Perbandingan HPP: `pct`/`delta` `null` ≠ `0`.** `hppDelta` (backend) dan padanannya di Flutter (`HppRow`/`computeHppDelta`, §5h) sengaja membedakan "belum ada `cost_price` lama untuk dibandingkan" (`hasStored:false`, `pct`/`delta`: **`null`**) dari "HPP terhitung sama persis dgn `cost_price` lama" (`pct:0`, valid & legit). Jangan koersi `null` jadi `0` di layer mana pun — pola sentinel yang sama dgn `breakEvenDaily`/`FinanceGuards` di modul keuangan, dan sudah berulang kali jadi sumber cacat rambu uang di proyek ini.
 
 ---
 
@@ -268,6 +270,28 @@ Lanjutan Modul Keuangan Tahap 1 (§8). Omzet harian dipecah **waterfall** ke 5 p
 
 ---
 
+## 5h. Manajemen Stok Fase A (bahan, resep, HPP terhitung) — KHUSUS PEMILIK
+
+Dua tabel baru (`ingredients` = master bahan, `recipes` = resep per menu) memungkinkan HPP tiap menu **dihitung** dari resep × harga bahan, lalu dibandingkan dengan `menu_items.cost_price` yang selama ini diisi tangan — layar yang menjawab "apakah tebakan HPP saya selama ini benar". **Fase A murni alat ukur**: tidak ada satu pun angka yang sedang berjalan (laba rugi, laporan penjualan, amplop) yang berubah — semuanya masih memakai `cost_price` lama sampai pemilik memutuskan lain. Migrasi 019 (`ingredients`+`recipes`) & 020 (`ingredients.purchase_price`) — status di §3.
+
+**Endpoint** (owner-only, `authenticate`+`requireFinanceAccess`, balas 404 utk non-pemilik — sama pola dgn `/admin/finance/*`, **jangan pakai `adminAccess`**):
+- `GET/POST /admin/stock/ingredients`, `PATCH/DELETE /admin/stock/ingredients/:id` (DELETE = **nonaktifkan**, BUKAN hapus baris — `recipes.ingredient_id` pakai `ON DELETE RESTRICT`, bahan yang dipakai resep tak boleh hilang)
+- `GET/PUT /admin/stock/recipes/:menuItemId` (PUT mengganti SELURUH resep menu itu — hapus-lalu-sisip, bukan menambah baris ke resep lama)
+- `GET /admin/stock/hpp-comparison` — seluruh menu sekaligus, dipaginasi internal (bukan lewat query klien)
+
+**Layar Flutter** (semua di balik `requireFinanceAccess`; **Perbandingan HPP adalah hub modul ini** — satu-satunya yang ditautkan dari Ringkasan Keuangan, dari situ 2 tombol keluar ke Bahan & Resep):
+- **Perbandingan HPP** (`hpp-comparison`, `/profile/stock/hpp-comparison`, `hpp_comparison_screen.dart`) — deliverable utama: per menu `cost_price` lama vs HPP terhitung (panas/dingin) vs selisih, diurut **selisih ABSOLUT terbesar di atas** (baik HPP kemahalan maupun kemurahan sama-sama layak perhatian pemilik); tiga keadaan (belum ada resep / belum ada `cost_price` / selisih nyata termasuk nol) tampil sbg subtree widget yang beda, bukan cuma teks "Rp0" yang sama. Ringkasan dampak gabungan **ditimbang porsi terjual 30 hari** (`Σ(qty×delta)/Σqty`, bukan rata-rata polos — menu laris berbobot lebih besar; penyebut 0 → "belum cukup data", bukan `Rp0`).
+- **Master Bahan** (`stock-ingredients`, `/profile/stock/ingredients`, `ingredients_screen.dart`) — CRUD bahan (Nama · satuan dasar g/ml/pcs · satuan beli bebas · isi & harga per satuan beli · golongan ABC · stok minimum), pratinjau **harga per satuan dasar** terhitung langsung saat mengetik (mis. "Rp150/gram") supaya salah konversi ketahuan seketika.
+- **Resep** — dua rute: `stock-recipe-list` (`/profile/stock/recipe`, daftar seluruh menu + lencana sudah/belum ada resep, diurut **paling laris dulu** supaya menu penyumbang omzet terbesar didata lebih awal) dan `stock-recipe` (`/profile/stock/recipe/:menuItemId`, entri per menu — pilih bahan, takaran, suhu opsional hot/iced; HPP terhitung tampil langsung saat takaran diubah, dua versi berdampingan dgn `cost_price` lama).
+
+**Ranking "paling laris"** (dipakai layar Resep & dampak gabungan Perbandingan HPP) memakai `GET /admin/reports/sales?top_limit=N` — parameter **baru**, default tetap **5** (byte-identik utk pemanggil lama spt kartu "Item Terlaris" di dashboard admin, yang me-render `topItems` TANPA batas sendiri). Layar Resep pakai `topLimit:30` (cukup utk urutan prioritas), layar Perbandingan HPP pakai `topLimit:100` (batas maksimum server — cakupan PENUH ~58 menu, wajib utk dampak gabungan supaya tak ada menu yang bobotnya salah kebaca 0 krn tersisih dari sample). **Jangan pernah campur pakai kedua provider ini** — beda cakupan, beda tujuan.
+
+**Repository**: `StockRepository` (`stock_repository.dart`) — model (`Ingredient`, `RecipeLine`, `MenuRecipe`, `HppRow`) + repo + provider, mengikuti persis pola `FinanceRepository`. `ingredientsProvider`/`menuRecipeProvider` keduanya `autoDispose` (pelajaran dari `financeOverviewProvider`/`ledgerProvider` — tanpa itu, kunjungan kedua ke layar menampilkan data basi).
+
+**Status**: kode **selesai** di branch `feat/stok-fase-a` (backend + Flutter, kedua repo) — **belum di-push, belum deploy, belum ada data bahan/resep produksi**. Lihat §8.
+
+---
+
 ## 6. Endpoint Backend (peta ringkas)
 
 - **Auth**: `POST /auth/{register,verify-otp,login,resend-otp,refresh,logout}` (identifier-based, camelCase token).
@@ -276,8 +300,9 @@ Lanjutan Modul Keuangan Tahap 1 (§8). Omzet harian dipecah **waterfall** ke 5 p
 - **Order**: `POST /orders`, `GET /orders`, `/orders/:id`, `POST /orders/:id/{pay,qris,reorder,pay-balance}`, `POST /admin/orders`, `POST /admin/orders/:id/pay-balance`, `PATCH /orders/:id/status`.
 - **Loyalty/Spin/Voucher/Favorites/Notifications**: `GET /loyalty`, `/loyalty/history`, `/spin`, `/spin/status`, `/vouchers`, `/vouchers/validate`, `/favorites`, `/notifications`, `POST /admin/broadcast`.
 - **Referral/Wallet**: `GET /referrals/me`, `POST /referrals/apply`, `GET /wallet`, `POST /wallet/topup`.
-- **Admin reports**: `/admin/reports/{sales,calendar,closing,analytics}`, `/admin/customers/segments`, `/admin/expenses`.
+- **Admin reports**: `/admin/reports/{sales,calendar,closing,analytics}` (`sales` terima `?top_limit=N`, default 5, lihat §5h), `/admin/customers/segments`, `/admin/expenses`.
 - **Admin finance** (KHUSUS PEMILIK, lihat §4 & §5g): `GET /admin/finance/ping`, `GET/POST /admin/finance/fixed-costs`, `DELETE /admin/finance/fixed-costs/:id`, `GET /admin/finance/pnl?month=YYYY-MM` (Tahap 1); `POST /admin/finance/allocate` (default HARI INI — berbahaya, lihat §4), `GET /admin/finance/overview`, `POST /admin/finance/withdraw`, `GET /admin/finance/ledger` (Tahap 2). Semua di belakang `authenticate` + `requireFinanceAccess` (404 utk non-pemilik).
+- **Admin stock** (KHUSUS PEMILIK, lihat §5h): `GET/POST /admin/stock/ingredients`, `PATCH/DELETE /admin/stock/ingredients/:id`, `GET/PUT /admin/stock/recipes/:menuItemId`, `GET /admin/stock/hpp-comparison`. Sama guard dgn admin finance.
 - **Payments webhook**: `POST /payments/doku/notify` (cabang `TOPUP-*` → kredit saldo; selain itu → order paid).
 
 Detail model & validasi ada di kode (`src/routes/index.js`, `src/services/*`). Enum `notif_type` & `voucher_source` ketat — nilai tak dikenal di-coerce/gagal senyap.
@@ -294,7 +319,7 @@ Detail model & validasi ada di kode (`src/routes/index.js`, `src/services/*`). E
 3. **CRUD Menu di panel admin** — saat ini **belum ada layar "Tambah Menu"**; menu baru harus di-INSERT langsung ke tabel `menu_items` di Supabase (yang tersedia baru edit HPP/harga/ketersediaan via `PATCH /menu/items/:id` + unggah gambar). Perlu: tambah/ubah/arsipkan menu, pilih kategori, atur `sort_order`, deskripsi, & opsi. *(disepakati: nanti)*
 4. **Penukaran stamp digital** — tombol "Tukar kopi gratis" → voucher 100% + reset 9 stamp (kini manual). *(disepakati: nanti)*
 5. **Belanja poin** — poin → voucher/diskon (kini poin cuma tier). *(disepakati: nanti)*
-6. **Manajemen stok** — catat stok, kurangi otomatis, "habis" otomatis + peringatan.
+6. **Manajemen stok** — **Fase A (bahan, resep, HPP terhitung vs `cost_price`) selesai, lihat §5h** (branch `feat/stok-fase-a`, belum merge/deploy). Belum ada: catat **kuantitas** stok aktual, pengurangan otomatis saat order, status "habis" otomatis + peringatan — itu Fase B/C berikutnya.
 7. **Kitchen Display System (KDS)** + waktu penyajian.
 8. **Pra-pesan terjadwal**, **QR pesan-dari-meja** (dine-in), **langganan kopi**, **tip barista**.
 
@@ -319,7 +344,8 @@ Detail model & validasi ada di kode (`src/routes/index.js`, `src/services/*`). E
 - ✅ **Modul Keuangan Tahap 2 (amplop alokasi, lihat §5g) selesai di branch `feat/keuangan-tahap2`** (backend + Flutter, kedua repo) — **belum di-push, belum deploy**. Tidak menambah migrasi. Sanity produksi 2026-08-09: alokasi harian idempoten (5 baris ledger, Σ persis omzet hari itu), `breakEvenDaily` Rp462.128 (basis Juli 2026 penuh), `runwayDays` 1, `personalWithdrawBlocked` true. Backend 133/133 test, Flutter 281/281 test, keduanya lulus tanpa kredensial.
 - ⏳ **Tahap 3 (auto-kalibrasi: shrinkage `w=n/(n+30)`, deadband 2 poin persen, batas gerak ±3 poin/bulan, wizard kalibrasi) belum dikerjakan.**
 - ⏳ **Utang Tahap 2 yang sengaja ditunda:** tak ada endpoint koreksi/pembatalan baris `finance_ledger` (hanya SQL manual Supabase); tak ada batas atas `amount` penarikan; paginasi `getFinanceOverview` masih offset (keyset hanya di `listLedger`); `runwayDays` boleh negatif tanpa dibatasi; `grossMarginPct` dibulatkan ke integer oleh `pct()`.
-- ⏳ **Belum:** keystore rilis + AAB, manajemen stok, refund QRIS/Saldo beraudit.
+- ✅ **Manajemen Stok Fase A (bahan, resep, HPP terhitung, lihat §5h) selesai di branch `feat/stok-fase-a`** (backend + Flutter, kedua repo) — **belum di-push, belum deploy, belum ada data bahan/resep produksi**. Tidak menambah migrasi selain 019/020 (§3). Tidak ada satu pun angka berjalan yang berubah — laba rugi/laporan/amplop semua masih pakai `cost_price` lama sampai pemilik memutuskan lain. Backend & Flutter test hijau, `analyze --fatal-infos` bersih.
+- ⏳ **Belum:** keystore rilis + AAB, kuantitas stok aktual (Fase B/C manajemen stok), refund QRIS/Saldo beraudit.
 
 ### Cara cepat verifikasi skema/DB (tanpa psql)
 Buat skrip sekali pakai **di dalam folder backend** (agar `node_modules` ter-resolve), pakai client yang sudah ada:
