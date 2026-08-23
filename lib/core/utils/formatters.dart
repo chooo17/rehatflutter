@@ -35,4 +35,17 @@ class Formatters {
   /// Format jam saja menjadi "14:30" (WIB).
   static String jam(DateTime date) =>
       DateFormat('HH:mm', 'id_ID').format(toWib(date));
+
+  /// Format rentang tanggal menjadi "23 Agu – 30 Agu 2026" (WIB). Tahun pada
+  /// tanggal awal disembunyikan bila sama dengan tahun akhir (ringkas untuk
+  /// tombol filter rentang di Laporan Penjualan).
+  static String rentang(DateTime start, DateTime end) {
+    final s = toWib(start);
+    final e = toWib(end);
+    final startFmt = s.year == e.year
+        ? DateFormat('d MMM', 'id_ID').format(s)
+        : DateFormat('d MMM yyyy', 'id_ID').format(s);
+    final endFmt = DateFormat('d MMM yyyy', 'id_ID').format(e);
+    return '$startFmt – $endFmt';
+  }
 }
