@@ -1,4 +1,11 @@
+import 'dart:convert';
+
+import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:rehat_app/core/constants/api_constants.dart';
+import 'package:rehat_app/core/network/api_exception.dart';
+import 'package:rehat_app/core/network/dio_client.dart';
+import 'package:rehat_app/core/storage/secure_storage.dart';
 import 'package:rehat_app/features/stock/data/stock_repository.dart';
 
 /// Menguji parsing model Manajemen Stok Fase A: tahan nilai null/hilang,
@@ -6,6 +13,58 @@ import 'package:rehat_app/features/stock/data/stock_repository.dart';
 /// - `HppRow.pct` null terbaca NULL (bukan 0.0) saat `hasStored` false.
 /// - `Ingredient.costPerBase` pecahan (3.5) terbaca UTUH, tidak dibulatkan.
 /// - `MenuRecipe.complete` mengikuti field JSON `complete`, bukan hardcode true.
+///
+/// Grup `StockRepository network methods (Task 6)` di bawah menguji
+/// `createIngredient`/`updateIngredient`/`deactivateIngredient` — ditulis
+/// RETROAKTIF (implementasi datang lebih dulu dari implementer sebelumnya,
+/// terputus sesi sebelum sempat menulis test). Pola adapter Dio palsu sama
+/// dengan `admin_report_repository_expense_test.dart`: menangkap
+/// `RequestOptions` SUNGGUHAN yang dikirim (method, path, body) dan
+/// membalas respons berskenario, supaya bug seperti "field bucket hilang
+/// dari payload" tidak lolos di belakang fake repository manapun.
+
+/// Adapter Dio palsu yang menangkap request TERAKHIR dan membalas dengan
+/// status/body yang diskenariokan per test.
+class _ScriptedAdapter implements HttpClientAdapter {
+  _ScriptedAdapter({required this.statusCode, required this.body});
+
+  final int statusCode;
+  final Map<String, dynamic> body;
+
+  RequestOptions? lastOptions;
+
+  @override
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<List<int>>? requestStream,
+    Future<void>? cancelFuture,
+  ) async {
+    lastOptions = options;
+    return ResponseBody.fromString(
+      jsonEncode(body),
+      statusCode,
+      headers: {
+        Headers.contentTypeHeader: [Headers.jsonContentType],
+      },
+    );
+  }
+
+  @override
+  void close({bool force = false}) {}
+}
+
+/// `AuthInterceptor` (dipasang otomatis oleh `DioClient`) membaca token
+/// lewat `flutter_secure_storage`, yang memanggil MethodChannel platform
+/// asli — di `flutter test` tanpa mock itu menggantung selamanya (bukan
+/// error, bukan timeout). Test di sini hanya peduli pada request/response
+/// yang lewat `_ScriptedAdapter`, jadi interceptor auth dilepas dulu (sama
+/// pola dengan `admin_report_repository_expense_test.dart`).
+DioClient _clientWith(_ScriptedAdapter adapter) {
+  final client = DioClient(storage: SecureStorage());
+  client.raw.interceptors.clear();
+  client.raw.httpClientAdapter = adapter;
+  return client;
+}
 
 void main() {
   group('Ingredient.fromJson', () {
@@ -237,6 +296,215 @@ void main() {
       expect(row.pct, isNull);
       expect(row.complete, isFalse);
       expect(row.hasStored, isFalse);
+    });
+  });
+
+  group('StockRepository network methods (Task 6)', () {
+    test(
+        'createIngredient mengirim payload lengkap (nama & satuan beli TRIM) '
+        'ke POST /admin/stock/ingredients & mengurai respons 201', () async {
+      final adapter = _ScriptedAdapter(statusCode: 201, body: {
+        'success': true,
+        'data': {
+          'id': 'ing-9',
+          'name': 'Kopi Arabika',
+          'base_unit': 'g',
+          'purchase_unit': 'kg',
+          'units_per_purchase': 1000,
+          'purchase_price': 150000,
+          'cost_per_base': 150,
+          'min_stock': 500,
+          'abc_class': 'A',
+          'is_active': true,
+        },
+      });
+      final repo = StockRepository(client: _clientWith(adapter));
+
+      final result = await repo
+          .createIngredient(
+            name: '  Kopi Arabika  ',
+            baseUnit: 'g',
+            purchaseUnit: ' kg ',
+            unitsPerPurchase: 1000,
+            purchasePrice: 150000,
+            minStock: 500,
+            abcClass: 'A',
+          )
+          .timeout(const Duration(seconds: 10));
+
+      final sent = adapter.lastOptions!;
+      expect(sent.method, 'POST');
+      expect(sent.path, ApiConstants.stockIngredients);
+      final data = sent.data as Map;
+      expect(data['name'], 'Kopi Arabika', reason: 'nama wajib di-trim sebelum dikirim');
+      expect(data['base_unit'], 'g');
+      expect(data['purchase_unit'], 'kg', reason: 'satuan beli wajib di-trim sebelum dikirim');
+      expect(data['units_per_purchase'], 1000);
+      expect(data['purchase_price'], 150000);
+      expect(data['min_stock'], 500);
+      expect(data['abc_class'], 'A');
+
+      expect(result.id, 'ing-9');
+      expect(result.costPerBase, 150.0);
+      expect(result.abcClass, 'A');
+    });
+
+    test(
+        'createIngredient TIDAK mengirim min_stock/abc_class saat tak diisi '
+        '(field opsional — backend yang menentukan default)', () async {
+      final adapter = _ScriptedAdapter(statusCode: 201, body: {
+        'success': true,
+        'data': {'id': 'ing-1', 'name': 'Gula'},
+      });
+      final repo = StockRepository(client: _clientWith(adapter));
+
+      await repo
+          .createIngredient(
+            name: 'Gula',
+            baseUnit: 'g',
+            purchaseUnit: 'kg',
+            unitsPerPurchase: 1000,
+            purchasePrice: 15000,
+          )
+          .timeout(const Duration(seconds: 10));
+
+      final data = adapter.lastOptions!.data as Map;
+      expect(data.containsKey('min_stock'), isFalse);
+      expect(data.containsKey('abc_class'), isFalse);
+    });
+
+    test(
+        'GIGI WAJIB: createIngredient 409 INGREDIENT_DUPLICATE_NAME dilempar '
+        'sebagai ApiException apa adanya (code & message Bahasa Indonesia utuh)',
+        () async {
+      final adapter = _ScriptedAdapter(statusCode: 409, body: {
+        'success': false,
+        'error': {
+          'code': 'INGREDIENT_DUPLICATE_NAME',
+          'message': 'Nama bahan sudah dipakai.',
+        },
+      });
+      final repo = StockRepository(client: _clientWith(adapter));
+
+      await expectLater(
+        repo
+            .createIngredient(
+              name: 'Kopi Arabika',
+              baseUnit: 'g',
+              purchaseUnit: 'kg',
+              unitsPerPurchase: 1000,
+              purchasePrice: 150000,
+            )
+            .timeout(const Duration(seconds: 10)),
+        throwsA(
+          isA<ApiException>()
+              .having((e) => e.statusCode, 'statusCode', 409)
+              .having((e) => e.code, 'code', 'INGREDIENT_DUPLICATE_NAME')
+              .having((e) => e.message, 'message', 'Nama bahan sudah dipakai.'),
+        ),
+      );
+    });
+
+    test(
+        'updateIngredient (PATCH) mengirim HANYA field yang diisi (partial) '
+        'ke path bahan yang benar & mengurai respons 200', () async {
+      final adapter = _ScriptedAdapter(statusCode: 200, body: {
+        'success': true,
+        'data': {
+          'id': 'ing-1',
+          'name': 'Kopi Arabika',
+          'purchase_price': 160000,
+          'cost_per_base': 160,
+        },
+      });
+      final repo = StockRepository(client: _clientWith(adapter));
+
+      final result = await repo
+          .updateIngredient('ing-1', purchasePrice: 160000)
+          .timeout(const Duration(seconds: 10));
+
+      final sent = adapter.lastOptions!;
+      expect(sent.method, 'PATCH');
+      expect(sent.path, ApiConstants.stockIngredient('ing-1'));
+      final data = sent.data as Map;
+      expect(data.keys, ['purchase_price'],
+          reason: 'field lain yang TIDAK diisi tidak boleh ikut terkirim — '
+              'backend membalas 400 EMPTY_PATCH hanya bila BENAR-BENAR kosong, '
+              'tapi mengirim field yang tak dimaksud bisa menimpa nilai lain '
+              'secara tak sengaja');
+      expect(result.costPerBase, 160.0);
+    });
+
+    test('updateIngredient isActive:true mengirim is_active untuk reaktivasi bahan nonaktif',
+        () async {
+      final adapter = _ScriptedAdapter(statusCode: 200, body: {
+        'success': true,
+        'data': {'id': 'ing-1', 'name': 'Kopi Arabika', 'is_active': true},
+      });
+      final repo = StockRepository(client: _clientWith(adapter));
+
+      final result = await repo
+          .updateIngredient('ing-1', isActive: true)
+          .timeout(const Duration(seconds: 10));
+
+      final data = adapter.lastOptions!.data as Map;
+      expect(data['is_active'], true);
+      expect(result.isActive, isTrue);
+    });
+
+    test(
+        'updateIngredient 404 INGREDIENT_NOT_FOUND dilempar sebagai ApiException apa adanya',
+        () async {
+      final adapter = _ScriptedAdapter(statusCode: 404, body: {
+        'success': false,
+        'error': {'code': 'INGREDIENT_NOT_FOUND', 'message': 'Bahan tidak ditemukan.'},
+      });
+      final repo = StockRepository(client: _clientWith(adapter));
+
+      await expectLater(
+        repo.updateIngredient('missing', purchasePrice: 1000).timeout(const Duration(seconds: 10)),
+        throwsA(
+          isA<ApiException>()
+              .having((e) => e.statusCode, 'statusCode', 404)
+              .having((e) => e.code, 'code', 'INGREDIENT_NOT_FOUND'),
+        ),
+      );
+    });
+
+    test(
+        'deactivateIngredient mengirim DELETE ke path bahan (menonaktifkan, '
+        'BUKAN menghapus baris — dibuktikan lewat method HTTP & path yang '
+        'benar-benar dikirim)', () async {
+      final adapter = _ScriptedAdapter(statusCode: 200, body: {
+        'success': true,
+        'data': {'id': 'ing-1', 'name': 'Kopi Arabika', 'is_active': false},
+      });
+      final repo = StockRepository(client: _clientWith(adapter));
+
+      await repo.deactivateIngredient('ing-1').timeout(const Duration(seconds: 10));
+
+      final sent = adapter.lastOptions!;
+      expect(sent.method, 'DELETE');
+      expect(sent.path, ApiConstants.stockIngredient('ing-1'));
+    });
+
+    test(
+        'deactivateIngredient 404 INGREDIENT_NOT_FOUND dilempar sebagai ApiException apa adanya',
+        () async {
+      final adapter = _ScriptedAdapter(statusCode: 404, body: {
+        'success': false,
+        'error': {'code': 'INGREDIENT_NOT_FOUND', 'message': 'Bahan tidak ditemukan.'},
+      });
+      final repo = StockRepository(client: _clientWith(adapter));
+
+      await expectLater(
+        repo.deactivateIngredient('missing').timeout(const Duration(seconds: 10)),
+        throwsA(
+          isA<ApiException>()
+              .having((e) => e.statusCode, 'statusCode', 404)
+              .having((e) => e.code, 'code', 'INGREDIENT_NOT_FOUND'),
+        ),
+      );
     });
   });
 }

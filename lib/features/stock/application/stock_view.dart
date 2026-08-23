@@ -39,6 +39,28 @@ String? unitsPerPurchaseError(double value) {
   return null;
 }
 
+/// Pratinjau harga per satuan dasar **saat mengetik** di form entri bahan
+/// (brief Task 6 — "supaya salah konversi 1000× ketahuan saat itu juga,
+/// bukan setelah merusak nilai stok"). Dihitung dari input MENTAH form
+/// (belum tersimpan), BUKAN dari `Ingredient.costPerBase` — kolom itu
+/// hanya ada SETELAH baris tersimpan & dihitung ulang server.
+///
+/// `null` selama [unitsPerPurchase] belum valid (`<= 0`, termasuk saat
+/// kolom masih kosong dan ter-parse ke 0) — supaya form tidak menampilkan
+/// pratinjau hasil pembagian-oleh-nol/tak terhingga saat pengguna belum
+/// selesai mengetik. Sengaja memakai ambang yang sama dengan
+/// [unitsPerPurchaseError], tapi TIDAK memanggilnya — pemanggil (widget)
+/// tetap wajib menjalankan [unitsPerPurchaseError] sendiri untuk pesan
+/// validasi submit; fungsi ini murni untuk teks pratinjau.
+String? livePricePreview({
+  required double purchasePrice,
+  required double unitsPerPurchase,
+  required String baseUnit,
+}) {
+  if (unitsPerPurchase <= 0) return null;
+  return formatCostPerUnit(purchasePrice / unitsPerPurchase, baseUnit);
+}
+
 /// Tiga (empat termasuk "sama") keadaan kalimat pembanding HPP resep vs
 /// `cost_price` manual lama untuk satu menu (`HppRow`).
 enum HppComparisonState {

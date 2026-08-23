@@ -145,4 +145,11 @@ class RouteNames {
   /// Rute didaftarkan di `app_router.dart`.
   static const String financeLedger = 'finance-ledger';
   static const String financeLedgerPath = '/profile/finance/ledger';
+
+  /// Master bahan (Manajemen Stok Fase A, Task 6) — BELUM ada tautan
+  /// navigasi dari layar mana pun (itu cakupan Task 8), dijangkau lewat
+  /// `context.pushNamed(RouteNames.stockIngredients)`.
+  /// Rute didaftarkan di `app_router.dart`.
+  static const String stockIngredients = 'stock-ingredients';
+  static const String stockIngredientsPath = '/profile/stock/ingredients';
 }

@@ -75,6 +75,80 @@ void main() {
     });
   });
 
+  group('livePricePreview (Task 6 — pratinjau harga per satuan dasar saat mengetik)', () {
+    test(
+        'GIGI WAJIB: kopi 1 kg Rp150.000 → pratinjau "Rp 150/gram" '
+        '(supaya salah konversi 1000x ketahuan saat mengetik, bukan setelah '
+        'merusak nilai stok — brief Task 6)', () {
+      final s = livePricePreview(
+        purchasePrice: 150000,
+        unitsPerPurchase: 1000,
+        baseUnit: 'g',
+      );
+      expect(s, formatCostPerUnit(150, 'g'));
+      expect(s, contains('150'));
+      expect(s, contains('gram'));
+    });
+
+    test('null selama isi per satuan beli belum valid (<= 0) — bukan hasil bagi-nol/infinity', () {
+      expect(
+        livePricePreview(purchasePrice: 150000, unitsPerPurchase: 0, baseUnit: 'g'),
+        isNull,
+      );
+      expect(
+        livePricePreview(purchasePrice: 150000, unitsPerPurchase: -5, baseUnit: 'g'),
+        isNull,
+      );
+    });
+
+    test('kolom isi per satuan beli masih kosong (ter-parse ke 0 oleh pemanggil) → null juga', () {
+      // Widget form mem-parse text field kosong jadi 0 sebelum memanggil
+      // fungsi ini -- kasus ini menegaskan ambang yang sama berlaku, bukan
+      // exception saat pengguna belum selesai mengetik.
+      expect(
+        livePricePreview(purchasePrice: 0, unitsPerPurchase: 0, baseUnit: 'g'),
+        isNull,
+      );
+    });
+
+    test('mengikuti satuan dasar yang dipilih (ml, pcs) — bukan selalu gram', () {
+      final ml = livePricePreview(purchasePrice: 24000, unitsPerPurchase: 1000, baseUnit: 'ml');
+      expect(ml, contains('mililiter'));
+      expect(ml, contains('24'));
+
+      final pcs = livePricePreview(purchasePrice: 50000, unitsPerPurchase: 100, baseUnit: 'pcs');
+      expect(pcs, contains('pcs'));
+      expect(pcs, contains('500'));
+    });
+
+    test('pecahan (es batu Rp35.000/10kg = Rp3,5/g) tidak dibulatkan sebelum diformat', () {
+      final s = livePricePreview(purchasePrice: 35000, unitsPerPurchase: 10000, baseUnit: 'g');
+      // formatCostPerUnit membulatkan TAMPILAN lewat Formatters.rupiah
+      // (decimalDigits:0) -> "Rp 4/gram", TAPI nilai yang dibagi sebelum
+      // sampai ke situ tetap 3.5 utuh (bukan .round() manual di
+      // livePricePreview sendiri) -- disamakan langsung terhadap
+      // formatCostPerUnit(3.5, 'g') supaya titik pembulatan tunggal terjaga.
+      expect(s, formatCostPerUnit(3.5, 'g'));
+    });
+
+    test('TIDAK memanggil ambang unitsPerPurchaseError sendiri — pemanggil tetap wajib '
+        'menjalankannya terpisah untuk pesan validasi submit', () {
+      // Bukti tak-langsung: livePricePreview mengembalikan non-null persis
+      // pada unitsPerPurchase yang membuat unitsPerPurchaseError null juga
+      // (>0) -- keduanya SEPAKAT pada ambang yang sama walau independen.
+      expect(unitsPerPurchaseError(1000), isNull);
+      expect(
+        livePricePreview(purchasePrice: 1000, unitsPerPurchase: 1000, baseUnit: 'g'),
+        isNotNull,
+      );
+      expect(unitsPerPurchaseError(0), isNotNull);
+      expect(
+        livePricePreview(purchasePrice: 1000, unitsPerPurchase: 0, baseUnit: 'g'),
+        isNull,
+      );
+    });
+  });
+
   group('hppComparisonState & hppComparisonSentence — tiga keadaan wajib', () {
     test('keadaan 1: belum ada cost_price (hasStored false) → noStoredPrice', () {
       final row = _row(hasStored: false, storedCostPrice: null, pct: null, delta: 100);

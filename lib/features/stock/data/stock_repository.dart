@@ -303,13 +303,93 @@ class StockRepository {
         .map((e) => HppRow.fromJson(Map<String, dynamic>.from(e)))
         .toList();
   }
+
+  /// Buat bahan baru (Task 6 — layar Master Bahan). Backend membalas 201
+  /// dengan baris lengkap, bentuk SAMA dengan item [fetchIngredients] —
+  /// diuraikan langsung ke [Ingredient], beda dari [saveRecipe] yang
+  /// sengaja `void` karena bentuk responsnya berbeda dari [fetchRecipe].
+  ///
+  /// Error 400 (validasi field), 409 `INGREDIENT_DUPLICATE_NAME`, dan 409
+  /// `INGREDIENT_INACTIVE_EXISTS` (bahan nonaktif bernama sama sudah ada —
+  /// pesannya mengarahkan pemanggil memakai [updateIngredient] dengan
+  /// `isActive: true` alih-alih membuat baris baru) dilempar sebagai
+  /// [ApiException] apa adanya — `message`-nya sudah Bahasa Indonesia dan
+  /// siap ditampilkan ke pengguna, sama pola dengan
+  /// `FinanceRepository.withdraw`.
+  Future<Ingredient> createIngredient({
+    required String name,
+    required String baseUnit,
+    required String purchaseUnit,
+    required double unitsPerPurchase,
+    required double purchasePrice,
+    double? minStock,
+    String? abcClass,
+  }) async {
+    final res = await _client.post<dynamic>(ApiConstants.stockIngredients, data: {
+      'name': name.trim(),
+      'base_unit': baseUnit,
+      'purchase_unit': purchaseUnit.trim(),
+      'units_per_purchase': unitsPerPurchase,
+      'purchase_price': purchasePrice,
+      if (minStock != null) 'min_stock': minStock,
+      if (abcClass != null && abcClass.isNotEmpty) 'abc_class': abcClass,
+    });
+    return Ingredient.fromJson(_unwrap(res.data));
+  }
+
+  /// Perbarui bahan (partial update — hanya field yang diisi yang dikirim).
+  /// Backend membalas 400 `EMPTY_PATCH` bila tak ada field sama sekali
+  /// (jangan panggil tanpa mengisi minimal satu parameter selain [id]).
+  /// Kirim `isActive: true` untuk mengaktifkan kembali bahan yang
+  /// dinonaktifkan — lihat catatan `INGREDIENT_INACTIVE_EXISTS` di
+  /// [createIngredient].
+  Future<Ingredient> updateIngredient(
+    String id, {
+    String? name,
+    String? baseUnit,
+    String? purchaseUnit,
+    double? unitsPerPurchase,
+    double? purchasePrice,
+    double? minStock,
+    String? abcClass,
+    bool? isActive,
+  }) async {
+    final res = await _client.patch<dynamic>(ApiConstants.stockIngredient(id), data: {
+      if (name != null) 'name': name.trim(),
+      if (baseUnit != null) 'base_unit': baseUnit,
+      if (purchaseUnit != null) 'purchase_unit': purchaseUnit.trim(),
+      if (unitsPerPurchase != null) 'units_per_purchase': unitsPerPurchase,
+      if (purchasePrice != null) 'purchase_price': purchasePrice,
+      if (minStock != null) 'min_stock': minStock,
+      if (abcClass != null) 'abc_class': abcClass,
+      if (isActive != null) 'is_active': isActive,
+    });
+    return Ingredient.fromJson(_unwrap(res.data));
+  }
+
+  /// Nonaktifkan bahan (`is_active=false`) — backend TIDAK menghapus baris
+  /// (lihat dokumentasi kontrak di brief Task 6). `void` sama pola dengan
+  /// `FinanceRepository.deleteFixedCost`; pemanggil wajib meng-invalidate
+  /// [ingredientsProvider] sendiri setelah sukses.
+  Future<void> deactivateIngredient(String id) async {
+    await _client.delete<dynamic>(ApiConstants.stockIngredient(id));
+  }
 }
 
 final stockRepositoryProvider = Provider<StockRepository>((ref) {
   return StockRepository(client: ref.watch(dioClientProvider));
 });
 
-final ingredientsProvider = FutureProvider<List<Ingredient>>((ref) {
+/// **`autoDispose`** — sama alasan dengan `financeOverviewProvider` /
+/// `ledgerProvider` di `finance_repository.dart` (lihat komentar di sana
+/// untuk cerita lengkap): tanpa ini, kunjungan KEDUA ke layar Master Bahan
+/// (pop lalu push lagi lewat router) menemukan provider ini SUDAH
+/// `AsyncData` dari kunjungan sebelumnya, sehingga daftar bahan yang baru
+/// saja dibuat/diubah/dinonaktifkan di kunjungan pertama tidak pernah
+/// muncul di kunjungan kedua tanpa pull-to-refresh manual. `autoDispose`
+/// membuang provider begitu layar tak lagi punya listener, sehingga
+/// kunjungan berikutnya SELALU memicu fetch baru.
+final ingredientsProvider = FutureProvider.autoDispose<List<Ingredient>>((ref) {
   return ref.watch(stockRepositoryProvider).fetchIngredients();
 });
 
