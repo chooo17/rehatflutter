@@ -25,6 +25,7 @@ class AdminDashboardScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final range = ref.watch(salesRangeProvider);
     final date = ref.watch(salesDateProvider);
+    final dateRange = ref.watch(salesDateRangeProvider);
     final async = ref.watch(salesReportProvider);
 
     Future<void> pickDate() async {
@@ -35,7 +36,32 @@ class AdminDashboardScreen extends ConsumerWidget {
         firstDate: DateTime(now.year - 2),
         lastDate: now,
       );
-      if (picked != null) ref.read(salesDateProvider.notifier).state = picked;
+      if (picked != null) {
+        ref.read(salesDateProvider.notifier).state = picked;
+        ref.read(salesDateRangeProvider.notifier).state = null;
+      }
+    }
+
+    Future<void> pickDateRange() async {
+      final now = DateTime.now();
+      final messenger = ScaffoldMessenger.of(context);
+      final picked = await showDateRangePicker(
+        context: context,
+        initialDateRange: dateRange,
+        firstDate: DateTime(now.year - 2),
+        lastDate: now,
+      );
+      if (picked == null) return;
+      final spanDays = picked.end.difference(picked.start).inDays + 1;
+      if (spanDays > 90) {
+        messenger
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+              const SnackBar(content: Text('Rentang maksimal 90 hari')));
+        return;
+      }
+      ref.read(salesDateRangeProvider.notifier).state = picked;
+      ref.read(salesDateProvider.notifier).state = null;
     }
 
     return Scaffold(
@@ -64,14 +90,15 @@ class AdminDashboardScreen extends ConsumerWidget {
                           onPressed: () {
                             ref.read(salesRangeProvider.notifier).state = value;
                             ref.read(salesDateProvider.notifier).state = null;
+                            ref.read(salesDateRangeProvider.notifier).state = null;
                           },
-                          accent: value == range && date == null,
+                          accent: value == range && date == null && dateRange == null,
                           radius: 11,
                           padding: const EdgeInsets.symmetric(vertical: 10),
                           child: Text(
                             label,
                             style: AppTextStyles.caption.copyWith(
-                              color: value == range && date == null
+                              color: value == range && date == null && dateRange == null
                                   ? Colors.white
                                   : AppColors.textSecondary,
                               fontWeight: FontWeight.w700,
@@ -84,7 +111,8 @@ class AdminDashboardScreen extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 10),
-            // Pilih tanggal spesifik.
+            // Pilih tanggal spesifik ATAU rentang tanggal kustom (saling
+            // menggantikan pill di atas & satu sama lain).
             Row(
               children: [
                 Expanded(
@@ -102,15 +130,18 @@ class AdminDashboardScreen extends ConsumerWidget {
                                 ? Colors.white
                                 : AppColors.textSecondary),
                         const SizedBox(width: 8),
-                        Text(
-                          date != null
-                              ? Formatters.tanggal(date)
-                              : 'Pilih tanggal',
-                          style: AppTextStyles.caption.copyWith(
-                            color: date != null
-                                ? Colors.white
-                                : AppColors.textSecondary,
-                            fontWeight: FontWeight.w700,
+                        Flexible(
+                          child: Text(
+                            date != null
+                                ? Formatters.tanggal(date)
+                                : 'Pilih tanggal',
+                            overflow: TextOverflow.ellipsis,
+                            style: AppTextStyles.caption.copyWith(
+                              color: date != null
+                                  ? Colors.white
+                                  : AppColors.textSecondary,
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
                         ),
                       ],
@@ -124,6 +155,50 @@ class AdminDashboardScreen extends ConsumerWidget {
                         ref.read(salesDateProvider.notifier).state = null,
                     icon: const Icon(Icons.close_rounded),
                     tooltip: 'Hapus filter tanggal',
+                  ),
+                ],
+                const SizedBox(width: 8),
+                Expanded(
+                  child: NeuButton(
+                    onPressed: pickDateRange,
+                    accent: dateRange != null,
+                    radius: 12,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.date_range_rounded,
+                            size: 16,
+                            color: dateRange != null
+                                ? Colors.white
+                                : AppColors.textSecondary),
+                        const SizedBox(width: 8),
+                        Flexible(
+                          child: Text(
+                            dateRange != null
+                                ? Formatters.rentang(
+                                    dateRange.start, dateRange.end)
+                                : 'Rentang tanggal',
+                            overflow: TextOverflow.ellipsis,
+                            style: AppTextStyles.caption.copyWith(
+                              color: dateRange != null
+                                  ? Colors.white
+                                  : AppColors.textSecondary,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                if (dateRange != null) ...[
+                  const SizedBox(width: 8),
+                  IconButton(
+                    onPressed: () =>
+                        ref.read(salesDateRangeProvider.notifier).state = null,
+                    icon: const Icon(Icons.close_rounded),
+                    tooltip: 'Hapus filter rentang',
                   ),
                 ],
               ],

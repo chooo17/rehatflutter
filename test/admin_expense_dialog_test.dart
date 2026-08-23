@@ -38,7 +38,7 @@ class _FakeAdminReportRepository extends AdminReportRepository {
   Completer<void>? deleteExpensePending;
 
   @override
-  Future<SalesReport> fetchSales({String range = '7d', String? date}) async =>
+  Future<SalesReport> fetchSales({String range = '7d', String? date, String? endDate}) async =>
       const SalesReport(
         range: '7d',
         revenue: 0,
@@ -58,7 +58,7 @@ class _FakeAdminReportRepository extends AdminReportRepository {
       );
 
   @override
-  Future<ExpenseList> fetchExpenses({String range = '7d', String? date}) async =>
+  Future<ExpenseList> fetchExpenses({String range = '7d', String? date, String? endDate}) async =>
       expensesToReturn;
 
   @override
