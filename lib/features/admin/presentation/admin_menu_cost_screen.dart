@@ -155,6 +155,7 @@ class _CostRowState extends ConsumerState<_CostRow> {
       ref.invalidate(allMenuItemsProvider);
       ref.invalidate(menuCatalogProvider);
       ref.invalidate(salesReportProvider);
+      ref.invalidate(salesCalendarProvider);
       if (!mounted) return;
       messenger
         ..hideCurrentSnackBar()

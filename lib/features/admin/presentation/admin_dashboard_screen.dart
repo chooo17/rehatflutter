@@ -711,11 +711,13 @@ class _ExpensesSection extends ConsumerWidget {
         );
     ref.invalidate(expensesProvider);
     ref.invalidate(salesReportProvider);
+    ref.invalidate(salesCalendarProvider);
   }
 
   void _onDeleted(WidgetRef ref) {
     ref.invalidate(expensesProvider);
     ref.invalidate(salesReportProvider);
+    ref.invalidate(salesCalendarProvider);
   }
 
   @override
