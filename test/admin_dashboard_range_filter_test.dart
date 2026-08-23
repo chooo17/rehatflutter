@@ -170,9 +170,28 @@ void main() {
 
     await _mountDashboard(tester, container);
 
-    expect(container.read(salesDateRangeProvider), isNull);
+    // Seed dengan rentang yang SUDAH tersimpan sebelum mencoba rentang >90
+    // hari -- tanpa ini, assert "masih null" di bawah tak bisa membedakan
+    // "guard menjaga rentang lama" dari "provider kebetulan mulai & berakhir
+    // null". Beda dari rentang 121 hari yang ditolak di bawah supaya
+    // perbandingan akhir benar-benar berarti.
+    final now = DateTime.now();
+    final seededRange = DateTimeRange(
+      start: DateTime(now.year - 1, 6, 1),
+      end: DateTime(now.year - 1, 6, 5),
+    );
+    container.read(salesDateRangeProvider.notifier).state = seededRange;
+    await tester.pump();
+    await tester.pump();
 
-    await tester.tap(find.text('Rentang tanggal'));
+    expect(container.read(salesDateRangeProvider), isNotNull,
+        reason: 'sanity check -- rentang harus tersimpan dulu sebelum '
+            'rentang >90 hari dicoba');
+
+    // Tap lewat ikon (bukan find.text('Rentang tanggal')) -- begitu
+    // dateRange terisi, label tombol berganti jadi Formatters.rentang(...)
+    // (lihat admin_dashboard_screen.dart baris ~190), ikonnya tetap sama.
+    await tester.tap(find.byIcon(Icons.date_range_rounded));
     await tester.pumpAndSettle();
 
     // Beralih dari kalender ke mode input teks (ikon edit Material 3) --
@@ -200,10 +219,14 @@ void main() {
     await tester.tap(find.text('OK'));
     await tester.pumpAndSettle();
 
-    expect(container.read(salesDateRangeProvider), isNull,
+    expect(container.read(salesDateRangeProvider), equals(seededRange),
         reason: 'rentang >90 hari tidak boleh pernah ditulis ke '
             'salesDateRangeProvider -- guard `if (spanDays > 90)` di '
-            'pickDateRange() wajib return lebih dulu');
+            'pickDateRange() wajib return lebih dulu, jadi rentang yang '
+            'SUDAH tersimpan sebelumnya harus tetap PERSIS sama (bukan '
+            'cuma non-null) -- ini yang membedakan guard yang benar dari '
+            'regresi `state = null` yang terangkat ke atas pengecekan '
+            'spanDays');
     expect(find.text('Rentang maksimal 90 hari'), findsOneWidget,
         reason: 'SnackBar penolakan wajib tampil supaya pengguna tahu '
             'kenapa rentang tak berubah');
