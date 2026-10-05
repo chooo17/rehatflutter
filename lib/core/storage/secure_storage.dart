@@ -2,16 +2,23 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
+/// Satu-satunya konfigurasi [FlutterSecureStorage] yang boleh dipakai di app.
+///
+/// WAJIB dipakai di SEMUA tempat (jangan `const FlutterSecureStorage()` polos).
+/// Di Android, instance ber-`encryptedSharedPreferences: true` memigrasi lalu
+/// MENGHAPUS semua kunci milik instance non-encrypted setiap kali dipakai —
+/// akibatnya template struk/logo/printer "kembali ke awal" setelah app ditutup.
+const FlutterSecureStorage appSecureStorage = FlutterSecureStorage(
+  aOptions: AndroidOptions(encryptedSharedPreferences: true),
+  iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock),
+);
+
 /// Penyimpanan aman untuk token JWT & data sensitif.
 ///
 /// Menggunakan Keychain (iOS) dan EncryptedSharedPreferences (Android).
 class SecureStorage {
   SecureStorage([FlutterSecureStorage? storage])
-      : _storage = storage ??
-            const FlutterSecureStorage(
-              aOptions: AndroidOptions(encryptedSharedPreferences: true),
-              iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock),
-            );
+      : _storage = storage ?? appSecureStorage;
 
   final FlutterSecureStorage _storage;
 

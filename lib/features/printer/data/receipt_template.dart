@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:image/image.dart' as img;
 
+import '../../../core/storage/secure_storage.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../shared/models/order_model.dart';
 
@@ -76,7 +77,7 @@ String renderReceipt(String template, OrderModel order) {
 /// Penyimpanan template struk (lokal per-perangkat, dapat diedit admin).
 class ReceiptTemplateController extends AsyncNotifier<String> {
   static const _key = 'receipt_template_v1';
-  final FlutterSecureStorage _storage = const FlutterSecureStorage();
+  final FlutterSecureStorage _storage = appSecureStorage;
 
   @override
   Future<String> build() async {
@@ -109,7 +110,7 @@ final receiptTemplateProvider =
 /// tengah paling atas nota. `null` = tanpa logo.
 class ReceiptLogoController extends AsyncNotifier<Uint8List?> {
   static const _key = 'receipt_logo_v1';
-  final FlutterSecureStorage _storage = const FlutterSecureStorage();
+  final FlutterSecureStorage _storage = appSecureStorage;
 
   @override
   Future<Uint8List?> build() async {

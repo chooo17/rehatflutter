@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
+import '../../../core/storage/secure_storage.dart';
 import '../../../core/utils/app_lifecycle.dart';
 import '../../../shared/models/order_model.dart';
 import '../data/printer_bridge.dart';
@@ -43,7 +44,7 @@ final printerBridgeProvider =
 class PrinterController extends Notifier<PrinterState> {
   static const _kAddr = 'printer_address';
   static const _kName = 'printer_name';
-  final FlutterSecureStorage _storage = const FlutterSecureStorage();
+  final FlutterSecureStorage _storage = appSecureStorage;
   late final PrinterBridge _bridge;
 
   @override
