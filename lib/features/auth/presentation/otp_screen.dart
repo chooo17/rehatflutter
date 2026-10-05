@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/router/route_names.dart';
+import '../../../core/utils/responsive.dart';
 import '../../../shared/widgets/otp_boxes.dart';
 import '../../../shared/widgets/primary_button.dart';
 import '../application/auth_controller.dart';
@@ -136,7 +137,9 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
         ),
       ),
       body: SafeArea(
-        child: SingleChildScrollView(
+        child: ResponsiveCenter(
+          maxWidth: 480,
+          child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(24, 8, 24, 32),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -214,6 +217,7 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
               ),
             ],
           ).animate().fadeIn(duration: 350.ms),
+        ),
         ),
       ),
     );

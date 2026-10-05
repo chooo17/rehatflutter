@@ -7,6 +7,7 @@ import '../../../core/constants/app_radius.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/router/route_names.dart';
 import '../../../core/utils/formatters.dart';
+import '../../../core/utils/responsive.dart';
 import '../../../shared/models/order_model.dart';
 import '../../../shared/models/voucher_model.dart';
 import '../../../shared/widgets/neu.dart';
@@ -74,12 +75,17 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Pembayaran')),
       body: items.isEmpty
-          ? Center(
-              child: Text('Keranjang kosong.',
-                  style: AppTextStyles.bodyMedium
-                      .copyWith(color: AppColors.textSecondary)),
+          ? ResponsiveCenter(
+              maxWidth: 640,
+              child: Center(
+                child: Text('Keranjang kosong.',
+                    style: AppTextStyles.bodyMedium
+                        .copyWith(color: AppColors.textSecondary)),
+              ),
             )
-          : ListView(
+          : ResponsiveCenter(
+              maxWidth: 640,
+              child: ListView(
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
               children: [
                 if (isGuest) ...[
@@ -216,6 +222,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                   ),
                 ),
               ],
+            ),
             ),
       bottomNavigationBar: items.isEmpty
           ? null

@@ -49,34 +49,39 @@ class MainShell extends ConsumerWidget {
       // lembut agar terasa "melayang" di atas konten.
       bottomNavigationBar: SafeArea(
         top: false,
-        child: Container(
-          margin: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(26),
-            border: Border.all(color: AppColors.border),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.espresso.withValues(alpha: 0.12),
-                blurRadius: 18,
-                offset: const Offset(0, 6),
-              ),
-            ],
-          ),
-          child: Row(
-            children: [
-              for (final t in tabs)
-                Expanded(
-                  child: _NavItem(
-                    icon: t.icon,
-                    selectedIcon: t.selectedIcon,
-                    label: t.label,
-                    selected: navigationShell.currentIndex == t.branch,
-                    onTap: () => _onTap(t.branch),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 480),
+            child: Container(
+              margin: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(26),
+                border: Border.all(color: AppColors.border),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.espresso.withValues(alpha: 0.12),
+                    blurRadius: 18,
+                    offset: const Offset(0, 6),
                   ),
-                ),
-            ],
+                ],
+              ),
+              child: Row(
+                children: [
+                  for (final t in tabs)
+                    Expanded(
+                      child: _NavItem(
+                        icon: t.icon,
+                        selectedIcon: t.selectedIcon,
+                        label: t.label,
+                        selected: navigationShell.currentIndex == t.branch,
+                        onTap: () => _onTap(t.branch),
+                      ),
+                    ),
+                ],
+              ),
+            ),
           ),
         ),
       ),

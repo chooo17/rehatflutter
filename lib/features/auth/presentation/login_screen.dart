@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/router/route_names.dart';
+import '../../../core/utils/responsive.dart';
 import '../../../shared/widgets/app_text_field.dart';
 import '../../../shared/widgets/neu.dart';
 import '../../../shared/widgets/primary_button.dart';
@@ -58,7 +59,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
     return Scaffold(
       body: SafeArea(
-        child: SingleChildScrollView(
+        child: ResponsiveCenter(
+          maxWidth: 480,
+          child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(24, 32, 24, 32),
           child: Form(
             key: _formKey,
@@ -187,6 +190,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   curve: Curves.easeOut,
                 ),
           ),
+        ),
         ),
       ),
     );

@@ -23,7 +23,9 @@ extension ResponsiveContext on BuildContext {
     final w = screenWidth;
     if (w < 600) return 2;
     if (w < 840) return 3;
-    return 4;
+    if (w < 1280) return 4;
+    if (w < 1600) return 5;
+    return 6;
   }
 }
 

@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/router/route_names.dart';
+import '../../../core/utils/responsive.dart';
 import '../../../shared/widgets/app_text_field.dart';
 import '../../../shared/widgets/otp_boxes.dart';
 import '../../../shared/widgets/primary_button.dart';
@@ -150,7 +151,9 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
         ),
       ),
       body: SafeArea(
-        child: SingleChildScrollView(
+        child: ResponsiveCenter(
+          maxWidth: 480,
+          child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(24, 8, 24, 32),
           child: Form(
             key: _formKey,
@@ -273,6 +276,7 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
                 ),
               ],
             ).animate().fadeIn(duration: 350.ms),
+          ),
           ),
         ),
       ),

@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/utils/formatters.dart';
+import '../../../core/utils/responsive.dart';
 import '../../../shared/widgets/app_text_field.dart';
 import '../../../shared/widgets/primary_button.dart';
 import '../application/auth_controller.dart';
@@ -73,7 +74,9 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
 
     return Scaffold(
       body: SafeArea(
-        child: SingleChildScrollView(
+        child: ResponsiveCenter(
+          maxWidth: 480,
+          child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(24, 32, 24, 32),
           child: Form(
             key: _formKey,
@@ -160,6 +163,7 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
                 ),
               ],
             ).animate().fadeIn(duration: 350.ms),
+          ),
           ),
         ),
       ),

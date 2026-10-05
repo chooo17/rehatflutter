@@ -12,7 +12,6 @@ import 'core/router/app_router.dart';
 import 'core/theme/theme_controller.dart';
 import 'core/utils/app_lifecycle.dart';
 import 'shared/widgets/neu.dart';
-import 'shared/widgets/responsive_shell.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -117,9 +116,7 @@ class _RehatAppState extends ConsumerState<RehatApp>
               theme: AppTheme.build(brightness),
               builder: (context, child) => NeuThemeScope(
                 mode: mode,
-                child: ResponsiveShell(
-                  child: child ?? const SizedBox.shrink(),
-                ),
+                child: child ?? const SizedBox.shrink(),
               ),
               routerConfig: router,
               locale: const Locale('id', 'ID'),
