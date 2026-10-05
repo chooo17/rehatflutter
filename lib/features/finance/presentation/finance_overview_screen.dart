@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/app_colors.dart';
+import '../../../core/utils/responsive.dart';
 import '../../../core/router/route_names.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../shared/widgets/neu.dart';
@@ -79,9 +80,12 @@ class FinanceOverviewScreen extends ConsumerWidget {
               : const Center(child: CircularProgressIndicator()))
           : RefreshIndicator(
               onRefresh: () async => ref.invalidate(financeOverviewProvider),
-              child: ListView(
-                padding: const EdgeInsets.all(16),
-                children: [
+              // Layar lebar: peringatan & rambu | amplop berdampingan.
+              child: AdaptiveColumns(
+                narrowPadding: const EdgeInsets.all(16),
+                widePadding: const EdgeInsets.fromLTRB(32, 16, 32, 32),
+                narrowGap: 16,
+                left: [
                   if (hasMissingAllocations(overview)) ...[
                     _MissingAllocationsCard(overview: overview),
                     const SizedBox(height: 16),
@@ -93,7 +97,8 @@ class FinanceOverviewScreen extends ConsumerWidget {
                   _GuardsCard(overview: overview),
                   const SizedBox(height: 16),
                   _EmergencyProgressCard(overview: overview),
-                  const SizedBox(height: 16),
+                ],
+                right: [
                   Text('Amplop', style: Theme.of(context).textTheme.titleMedium),
                   const SizedBox(height: 8),
                   _BucketGrid(overview: overview),

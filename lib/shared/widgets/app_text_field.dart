@@ -21,6 +21,7 @@ class AppTextField extends StatelessWidget {
     this.textInputAction,
     this.onSubmitted,
     this.enabled = true,
+    this.autofillHints,
   });
 
   final String label;
@@ -35,6 +36,9 @@ class AppTextField extends StatelessWidget {
   final TextInputAction? textInputAction;
   final ValueChanged<String>? onSubmitted;
   final bool enabled;
+
+  /// Petunjuk untuk password manager browser/OS (mis. [AutofillHints.password]).
+  final Iterable<String>? autofillHints;
 
   @override
   Widget build(BuildContext context) {
@@ -55,6 +59,7 @@ class AppTextField extends StatelessWidget {
             textInputAction: textInputAction,
             onFieldSubmitted: onSubmitted,
             enabled: enabled,
+            autofillHints: autofillHints,
             style: AppTextStyles.bodyLarge,
             decoration: InputDecoration(
               hintText: hintText,

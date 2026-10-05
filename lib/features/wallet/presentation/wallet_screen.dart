@@ -6,6 +6,7 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/utils/formatters.dart';
+import '../../../core/utils/responsive.dart';
 import '../data/wallet_repository.dart';
 
 /// Dompet pelanggan: saldo, top-up (via DOKU), & riwayat transaksi.
@@ -20,8 +21,8 @@ class WalletScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('Saldo Saya')),
       body: async.when(
-        loading: () =>
-            const Center(child: CircularProgressIndicator(color: AppColors.amber)),
+        loading: () => const Center(
+            child: CircularProgressIndicator(color: AppColors.amber)),
         error: (e, _) => Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -39,9 +40,13 @@ class WalletScreen extends ConsumerWidget {
         data: (w) => RefreshIndicator(
           color: AppColors.amber,
           onRefresh: () async => ref.invalidate(walletProvider),
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
-            children: [
+          // Layar lebar: saldo + isi saldo | riwayat berdampingan.
+          child: AdaptiveColumns(
+            narrowPadding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
+            widePadding: const EdgeInsets.fromLTRB(32, 16, 32, 32),
+            leftWidth: 420,
+            narrowGap: 24,
+            left: [
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(22),
@@ -76,7 +81,8 @@ class WalletScreen extends ConsumerWidget {
                     ),
                 ],
               ),
-              const SizedBox(height: 24),
+            ],
+            right: [
               Text('Riwayat', style: AppTextStyles.titleMedium),
               const SizedBox(height: 8),
               if (w.transactions.isEmpty)
@@ -148,7 +154,8 @@ class _TopupChip extends StatelessWidget {
               border: Border.all(color: AppColors.amber, width: 1.4),
             ),
             child: Text('+ ${Formatters.rupiah(amount)}',
-                style: AppTextStyles.label.copyWith(color: AppColors.amberDark)),
+                style:
+                    AppTextStyles.label.copyWith(color: AppColors.amberDark)),
           ),
         ),
       ),

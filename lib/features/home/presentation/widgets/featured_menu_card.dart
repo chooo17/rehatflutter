@@ -9,15 +9,19 @@ import '../../../../shared/widgets/neu.dart';
 
 /// Kartu menu unggulan (dipakai di daftar horizontal beranda).
 class FeaturedMenuCard extends StatelessWidget {
-  const FeaturedMenuCard({super.key, required this.item, this.onTap});
+  const FeaturedMenuCard(
+      {super.key, required this.item, this.onTap, this.width = 168});
 
   final MenuItemModel item;
   final VoidCallback? onTap;
 
+  /// Lebar kartu; `null` = mengisi sel (dipakai grid desktop).
+  final double? width;
+
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 168,
+      width: width,
       child: RepaintBoundary(
         child: Material(
           color: AppColors.surface,

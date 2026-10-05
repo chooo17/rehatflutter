@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/constants/app_colors.dart';
+import '../../../core/utils/responsive.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/utils/formatters.dart';
@@ -41,13 +42,18 @@ class AdminMenuCostScreen extends ConsumerWidget {
           return RefreshIndicator(
             color: AppColors.amber,
             onRefresh: () async => ref.invalidate(allMenuItemsProvider),
-            child: ListView.separated(
+            child: ResponsiveListView(
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-              itemCount: items.length + 1,
-              separatorBuilder: (_, __) => const SizedBox(height: 10),
+              itemCount: items.length,
+              minItemWidth: 360,
+              maxColumns: 3,
+              runSpacing: 10,
+              header: Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: _Hint(belumIsi: belumIsi, total: items.length),
+              ),
               itemBuilder: (context, i) {
-                if (i == 0) return _Hint(belumIsi: belumIsi, total: items.length);
-                return _CostRow(item: items[i - 1]);
+                return _CostRow(item: items[i]);
               },
             ),
           );

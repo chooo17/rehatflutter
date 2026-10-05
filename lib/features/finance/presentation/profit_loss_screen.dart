@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 
 import '../../../core/router/route_names.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/utils/responsive.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../shared/widgets/neu.dart';
 import '../data/finance_repository.dart';
@@ -69,9 +70,14 @@ class ProfitLossScreen extends ConsumerWidget {
                 ? const Center(child: CircularProgressIndicator())
                 : RefreshIndicator(
                     onRefresh: () async => ref.invalidate(pnlProvider),
-                    child: ListView(
-                      padding: const EdgeInsets.all(16),
-                      children: [
+                    // Layar lebar: laporan laba rugi | rincian biaya tetap.
+                    child: AdaptiveColumns(
+                      narrowPadding: const EdgeInsets.all(16),
+                      widePadding: const EdgeInsets.fromLTRB(32, 16, 32, 32),
+                      leftFlex: 3,
+                      rightFlex: 2,
+                      narrowGap: 24,
+                      left: [
                         if (progress != null) ...[
                           _MonthInProgressBanner(progress: progress),
                           const SizedBox(height: 16),
@@ -104,7 +110,8 @@ class ProfitLossScreen extends ConsumerWidget {
                           suffix: '${p.netMarginPct}%',
                           highlight: true,
                         ),
-                        const SizedBox(height: 24),
+                      ],
+                      right: [
                         // NeuCard sudah ber-padding 16 secara bawaan.
                         NeuCard(
                           child: Column(

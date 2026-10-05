@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/app_colors.dart';
+import '../../../core/utils/responsive.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/router/route_names.dart';
 import '../../../core/utils/formatters.dart';
@@ -55,16 +56,26 @@ class AdminOrdersScreen extends ConsumerWidget {
                 if (active.isNotEmpty) ...[
                   _SectionHeader('Perlu tindakan', count: active.length),
                   const SizedBox(height: 10),
-                  for (final o in active) ...[card(o), const SizedBox(height: 10)],
+                  // Layar lebar: kartu pesanan jadi grid.
+                  ResponsiveGrid(
+                    minItemWidth: 380,
+                    maxColumns: 3,
+                    runSpacing: 10,
+                    children: [for (final o in active) card(o)],
+                  ),
+                  const SizedBox(height: 10),
                 ],
                 if (history.isNotEmpty) ...[
                   if (active.isNotEmpty) const SizedBox(height: 14),
                   _SectionHeader('Riwayat', count: history.length),
                   const SizedBox(height: 10),
-                  for (final o in history) ...[
-                    card(o),
-                    const SizedBox(height: 10)
-                  ],
+                  ResponsiveGrid(
+                    minItemWidth: 380,
+                    maxColumns: 3,
+                    runSpacing: 10,
+                    children: [for (final o in history) card(o)],
+                  ),
+                  const SizedBox(height: 10),
                 ],
               ],
             ),

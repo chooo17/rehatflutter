@@ -14,19 +14,39 @@ import '../../../banners/data/banner_repository.dart';
 /// Carousel banner promo di beranda. Menyembunyikan diri bila tak ada banner
 /// (mis. belum ada isian / migrasi belum jalan) sehingga beranda tetap utuh.
 class BannerCarousel extends ConsumerWidget {
-  const BannerCarousel({super.key});
+  const BannerCarousel(
+      {super.key, this.height, this.inset = 20, this.topGap = 20});
+
+  /// Tinggi tetap (mis. hero desktop yang disejajarkan dgn kolom samping).
+  /// `null` = ikut lebar (lihat [_CarouselState.build]).
+  final double? height;
+
+  /// Jarak kiri-kanan kartu banner.
+  final double inset;
+
+  /// Jarak di atas carousel.
+  final double topGap;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final banners = ref.watch(activeBannersProvider).valueOrNull ?? const [];
     if (banners.isEmpty) return const SizedBox.shrink();
-    return _Carousel(banners: banners);
+    return _Carousel(
+        banners: banners, height: height, inset: inset, topGap: topGap);
   }
 }
 
 class _Carousel extends StatefulWidget {
-  const _Carousel({required this.banners});
+  const _Carousel({
+    required this.banners,
+    required this.height,
+    required this.inset,
+    required this.topGap,
+  });
   final List<BannerModel> banners;
+  final double? height;
+  final double inset;
+  final double topGap;
 
   @override
   State<_Carousel> createState() => _CarouselState();
@@ -64,15 +84,20 @@ class _CarouselState extends State<_Carousel> {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        const SizedBox(height: 20),
+        SizedBox(height: widget.topGap),
         SizedBox(
-          height: 130,
+          // Tinggi ikut lebar (±3,2:1). Dulu tetap 130 → di layar lebar banner
+          // jadi pita tipis ±10:1 dan gambar terpotong parah. Batas bawah 130
+          // menjaga tampilan HP; batas atas 240 agar tak mendominasi layar.
+          height: widget.height ??
+              ((MediaQuery.sizeOf(context).width - 2 * widget.inset) / 3.2)
+                  .clamp(130.0, 240.0),
           child: PageView.builder(
             controller: _controller,
             itemCount: widget.banners.length,
             onPageChanged: (i) => setState(() => _page = i),
             itemBuilder: (context, i) => Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
+              padding: EdgeInsets.symmetric(horizontal: widget.inset),
               child: _BannerCard(banner: widget.banners[i]),
             ),
           ),

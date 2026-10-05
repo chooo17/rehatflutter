@@ -10,6 +10,7 @@ import '../../../core/constants/app_text_styles.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/router/route_names.dart';
 import '../../../core/utils/formatters.dart';
+import '../../../core/utils/responsive.dart';
 import '../../../shared/models/loyalty_model.dart';
 import '../../../shared/models/voucher_model.dart';
 import '../../../shared/widgets/neu.dart';
@@ -38,9 +39,8 @@ class LoyaltyScreen extends ConsumerWidget {
           ref.invalidate(loyaltySummaryProvider);
           ref.invalidate(vouchersProvider);
         },
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-          children: [
+        child: LayoutBuilder(builder: (context, c) {
+          final tier = <Widget>[
             _PointsHeader(summary: summary),
             const SizedBox(height: 8),
             Align(
@@ -51,7 +51,8 @@ class LoyaltyScreen extends ConsumerWidget {
                 label: const Text('Riwayat poin'),
               ),
             ),
-            const SizedBox(height: 20),
+          ];
+          final redeem = <Widget>[
             Text('Tukar Poin jadi Voucher', style: AppTextStyles.displaySmall),
             const SizedBox(height: 4),
             Text(
@@ -61,7 +62,8 @@ class LoyaltyScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 12),
             _RedeemPointsRow(points: summary.points),
-            const SizedBox(height: 20),
+          ];
+          final stamps = <Widget>[
             Text('Stamp Card', style: AppTextStyles.displaySmall),
             const SizedBox(height: 4),
             Text(
@@ -77,7 +79,8 @@ class LoyaltyScreen extends ConsumerWidget {
               const SizedBox(height: 14),
               _RedeemStampButton(count: summary.redeemableRewards),
             ],
-            const SizedBox(height: 28),
+          ];
+          final vouchers = <Widget>[
             Text('Voucher Saya', style: AppTextStyles.displaySmall),
             const SizedBox(height: 12),
             vouchersAsync.when(
@@ -91,20 +94,65 @@ class LoyaltyScreen extends ConsumerWidget {
               ),
               data: (vouchers) {
                 if (vouchers.isEmpty) return const _NoVouchers();
-                return Column(
+                return ResponsiveGrid(
+                  minItemWidth: 300,
+                  maxColumns: 2,
                   children: [
-                    for (var i = 0; i < vouchers.length; i++) ...[
+                    for (var i = 0; i < vouchers.length; i++)
                       _VoucherCard(voucher: vouchers[i])
                           .animate()
                           .fadeIn(delay: (i * 50).ms, duration: 260.ms),
-                      if (i != vouchers.length - 1) const SizedBox(height: 12),
-                    ],
                   ],
                 );
               },
             ),
-          ],
-        ),
+          ];
+
+          // Layar lebar: dua kolom (tier + stamp | tukar poin + voucher)
+          // agar isi mengisi lebar, bukan satu kolom panjang yang melar.
+          if (c.maxWidth >= 900) {
+            Widget col(List<Widget> children) => Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: children,
+                );
+            return ListView(
+              padding: const EdgeInsets.fromLTRB(32, 8, 32, 32),
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                        child: col([
+                      ...tier,
+                      const SizedBox(height: 12),
+                      ...stamps,
+                    ])),
+                    const SizedBox(width: 32),
+                    Expanded(
+                        child: col([
+                      ...redeem,
+                      const SizedBox(height: 28),
+                      ...vouchers,
+                    ])),
+                  ],
+                ),
+              ],
+            );
+          }
+
+          return ListView(
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+            children: [
+              ...tier,
+              const SizedBox(height: 20),
+              ...redeem,
+              const SizedBox(height: 20),
+              ...stamps,
+              const SizedBox(height: 28),
+              ...vouchers,
+            ],
+          );
+        }),
       ),
     );
   }
@@ -140,7 +188,8 @@ class _PointsHeader extends StatelessWidget {
           ),
           const SizedBox(height: 18),
           Text('${summary.points}',
-              style: AppTextStyles.displayLarge.copyWith(color: AppColors.crema)),
+              style:
+                  AppTextStyles.displayLarge.copyWith(color: AppColors.crema)),
           Text('Poin terkumpul • menentukan tier-mu',
               style: AppTextStyles.bodyMedium
                   .copyWith(color: AppColors.crema.withValues(alpha: 0.75))),
@@ -326,7 +375,9 @@ class _RedeemPointsCard extends StatelessWidget {
             children: [
               Text('$pct%',
                   style: AppTextStyles.displaySmall.copyWith(
-                    color: affordable ? AppColors.amberDark : AppColors.textSecondary,
+                    color: affordable
+                        ? AppColors.amberDark
+                        : AppColors.textSecondary,
                   )),
               const SizedBox(height: 4),
               busy
@@ -360,55 +411,64 @@ class _StampCard extends StatelessWidget {
     return NeuCard(
       padding: const EdgeInsets.all(18),
       radius: 20,
-      child: Column(
-        children: [
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: summary.stampTarget,
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 5,
-              mainAxisSpacing: 12,
-              crossAxisSpacing: 12,
-              childAspectRatio: 1,
-            ),
-            itemBuilder: (context, i) {
-              final isFilled = showFull || i < filled;
-              final isReward = i == summary.stampTarget - 1;
-              return Container(
-                decoration: BoxDecoration(
-                  color: isFilled ? AppColors.amber : AppColors.crema,
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: isFilled ? AppColors.amberDark : AppColors.border,
-                  ),
+      // Lebar dibatasi: grid 5 kolom aspek 1 membuat lingkaran stamp ikut
+      // membesar sebanding lebar layar (≈230px di desktop).
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 400),
+          child: Column(
+            children: [
+              GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: summary.stampTarget,
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 5,
+                  mainAxisSpacing: 12,
+                  crossAxisSpacing: 12,
+                  childAspectRatio: 1,
                 ),
-                child: Icon(
-                  isReward
-                      ? Icons.card_giftcard_rounded
-                      : Icons.local_cafe_rounded,
-                  color: isFilled ? AppColors.espresso : AppColors.amberLight,
-                  size: 20,
+                itemBuilder: (context, i) {
+                  final isFilled = showFull || i < filled;
+                  final isReward = i == summary.stampTarget - 1;
+                  return Container(
+                    decoration: BoxDecoration(
+                      color: isFilled ? AppColors.amber : AppColors.crema,
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color:
+                            isFilled ? AppColors.amberDark : AppColors.border,
+                      ),
+                    ),
+                    child: Icon(
+                      isReward
+                          ? Icons.card_giftcard_rounded
+                          : Icons.local_cafe_rounded,
+                      color:
+                          isFilled ? AppColors.espresso : AppColors.amberLight,
+                      size: 20,
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 16),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: LinearProgressIndicator(
+                  value: showFull ? 1.0 : summary.stampProgress,
+                  minHeight: 8,
+                  backgroundColor: AppColors.crema,
+                  valueColor: const AlwaysStoppedAnimation(AppColors.amber),
                 ),
-              );
-            },
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '${showFull ? summary.stampTarget : filled} / ${summary.stampTarget} stamp',
+                style: AppTextStyles.caption,
+              ),
+            ],
           ),
-          const SizedBox(height: 16),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: LinearProgressIndicator(
-              value: showFull ? 1.0 : summary.stampProgress,
-              minHeight: 8,
-              backgroundColor: AppColors.crema,
-              valueColor: const AlwaysStoppedAnimation(AppColors.amber),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            '${showFull ? summary.stampTarget : filled} / ${summary.stampTarget} stamp',
-            style: AppTextStyles.caption,
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -468,11 +528,11 @@ class _VoucherCard extends StatelessWidget {
                   children: [
                     Text(voucher.title, style: AppTextStyles.titleMedium),
                     const SizedBox(height: 2),
-                    Text(voucher.sourceLabel,
-                        style: AppTextStyles.bodySmall),
+                    Text(voucher.sourceLabel, style: AppTextStyles.bodySmall),
                     if (voucher.expiresAt != null) ...[
                       const SizedBox(height: 2),
-                      Text('Berlaku s/d ${Formatters.tanggal(voucher.expiresAt!)}',
+                      Text(
+                          'Berlaku s/d ${Formatters.tanggal(voucher.expiresAt!)}',
                           style: AppTextStyles.caption),
                     ],
                     const SizedBox(height: 8),
@@ -563,8 +623,7 @@ class _NoVouchers extends StatelessWidget {
                   .copyWith(color: AppColors.textSecondary)),
           const SizedBox(height: 4),
           Text('Menangkan voucher lewat permainan Spin di beranda.',
-              textAlign: TextAlign.center,
-              style: AppTextStyles.bodySmall),
+              textAlign: TextAlign.center, style: AppTextStyles.bodySmall),
         ],
       ),
     );

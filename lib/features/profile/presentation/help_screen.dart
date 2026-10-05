@@ -41,42 +41,63 @@ class HelpScreen extends StatelessWidget {
         children: [
           Text('Pertanyaan Umum', style: AppTextStyles.displaySmall),
           const SizedBox(height: 12),
-          for (final faq in _faqs)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: NeuCard(
-                padding: EdgeInsets.zero,
-                radius: 16,
-                child: Theme(
-                  data: Theme.of(context)
-                      .copyWith(dividerColor: Colors.transparent),
-                  child: ExpansionTile(
-                    shape: const Border(),
-                    collapsedShape: const Border(),
-                    tilePadding: const EdgeInsets.symmetric(horizontal: 16),
-                    iconColor: AppColors.amberDark,
-                    collapsedIconColor: AppColors.textSecondary,
-                    title: Text(faq.$1, style: AppTextStyles.titleMedium),
-                    childrenPadding:
-                        const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                    expandedAlignment: Alignment.centerLeft,
-                    children: [
-                      Text(faq.$2,
-                          style: AppTextStyles.bodyMedium.copyWith(
-                              color: AppColors.textSecondary, height: 1.5)),
-                    ],
+          // Layar lebar: FAQ dibagi dua kolom INDEPENDEN (bukan grid per
+          // baris) supaya membuka satu jawaban tak ikut memanjangkan kartu
+          // di sebelahnya.
+          LayoutBuilder(builder: (context, c) {
+            Widget faqTile((String, String) faq) => Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: NeuCard(
+                    padding: EdgeInsets.zero,
+                    radius: 16,
+                    child: Theme(
+                      data: Theme.of(context)
+                          .copyWith(dividerColor: Colors.transparent),
+                      child: ExpansionTile(
+                        shape: const Border(),
+                        collapsedShape: const Border(),
+                        tilePadding: const EdgeInsets.symmetric(horizontal: 16),
+                        iconColor: AppColors.amberDark,
+                        collapsedIconColor: AppColors.textSecondary,
+                        title: Text(faq.$1, style: AppTextStyles.titleMedium),
+                        childrenPadding:
+                            const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                        expandedAlignment: Alignment.centerLeft,
+                        children: [
+                          Text(faq.$2,
+                              style: AppTextStyles.bodyMedium.copyWith(
+                                  color: AppColors.textSecondary, height: 1.5)),
+                        ],
+                      ),
+                    ),
                   ),
+                );
+            if (c.maxWidth < 900) {
+              return Column(children: [for (final f in _faqs) faqTile(f)]);
+            }
+            final half = (_faqs.length / 2).ceil();
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                      children: [for (final f in _faqs.take(half)) faqTile(f)]),
                 ),
-              ),
-            ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                      children: [for (final f in _faqs.skip(half)) faqTile(f)]),
+                ),
+              ],
+            );
+          }),
           const SizedBox(height: 16),
           NeuCard(
             padding: const EdgeInsets.all(16),
             radius: 16,
             child: Row(
               children: [
-                Icon(Icons.support_agent_rounded,
-                    color: AppColors.amberDark),
+                Icon(Icons.support_agent_rounded, color: AppColors.amberDark),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(

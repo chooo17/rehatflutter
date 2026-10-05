@@ -56,8 +56,10 @@ class _AdminQrTablesScreenState extends State<AdminQrTablesScreen> {
           GridView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
+            // Lebar kartu dibatasi (bukan 2 kolom tetap): di tablet kartu QR
+            // 2-kolom membengkak ±360×440px.
+            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+              maxCrossAxisExtent: 240,
               crossAxisSpacing: 12,
               mainAxisSpacing: 12,
               childAspectRatio: 0.82,

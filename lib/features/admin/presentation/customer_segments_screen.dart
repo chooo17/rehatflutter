@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/constants/app_colors.dart';
+import '../../../core/utils/responsive.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/utils/formatters.dart';
@@ -73,10 +74,20 @@ class CustomerSegmentsScreen extends ConsumerWidget {
                 ],
               ),
               const SizedBox(height: 8),
-              ...data.segments.map((s) => _SegmentCard(
-                    segment: s,
-                    onTap: () => _openSegment(context, ref, s),
-                  )),
+              // Layar lebar: kartu segmen jadi grid (kartu sudah membawa
+              // jarak atas 10 sendiri → runSpacing 0).
+              ResponsiveGrid(
+                minItemWidth: 340,
+                maxColumns: 3,
+                runSpacing: 0,
+                children: [
+                  for (final s in data.segments)
+                    _SegmentCard(
+                      segment: s,
+                      onTap: () => _openSegment(context, ref, s),
+                    ),
+                ],
+              ),
             ],
           ),
         ),

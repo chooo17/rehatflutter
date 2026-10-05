@@ -55,19 +55,28 @@ class CartScreen extends ConsumerWidget {
                       Expanded(
                         child: Padding(
                           padding: const EdgeInsets.only(right: 8),
-                          child: ListView.separated(
+                          // Kartu item dalam grid: di desktop baris tunggal
+                          // melebar ±1500px (nama & stepper terpisah jauh).
+                          child: ResponsiveListView(
                             padding: const EdgeInsets.only(bottom: 24),
+                            minItemWidth: 380,
+                            maxColumns: 3,
                             itemCount: items.length,
-                            separatorBuilder: (_, __) =>
-                                const Divider(height: 28),
-                            itemBuilder: (context, i) =>
-                                _CartLine(line: items[i]),
+                            itemBuilder: (context, i) => Container(
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(
+                                color: AppColors.surface,
+                                borderRadius: BorderRadius.circular(18),
+                                border: Border.all(color: AppColors.border),
+                              ),
+                              child: _CartLine(line: items[i]),
+                            ),
                           ),
                         ),
                       ),
                       const SizedBox(width: 16),
                       SizedBox(
-                        width: 320,
+                        width: context.isDesktop ? 360 : 320,
                         child: _SummaryPanel(
                             total: total, count: items.length, isAdmin: isAdmin),
                       ),
@@ -306,8 +315,12 @@ class _EmptyCart extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Padding samping: tema tombol berlebar penuh, tanpa ini "Lihat Menu"
+    // menempel ke tepi layar.
     return Center(
-      child: Column(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
@@ -332,6 +345,7 @@ class _EmptyCart extends StatelessWidget {
             child: const Text('Lihat Menu'),
           ),
         ],
+      ),
       ),
     );
   }

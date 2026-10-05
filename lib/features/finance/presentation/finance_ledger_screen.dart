@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/constants/app_colors.dart';
+import '../../../core/utils/responsive.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../shared/widgets/neu.dart';
 import '../application/finance_ledger_view.dart';
@@ -284,21 +285,24 @@ class _LedgerList extends StatelessWidget {
       );
     }
 
-    return ListView.separated(
+    // Layar lebar: baris mutasi jadi grid; tombol muat-lagi tetap
+    // penuh-lebar di bawah (footer).
+    return ResponsiveListView(
       padding: const EdgeInsets.all(16),
-      itemCount: state.items.length + 1,
-      separatorBuilder: (_, __) => const SizedBox(height: 10),
-      itemBuilder: (context, i) {
-        if (i == state.items.length) {
-          return _LoadMoreFooter(
-            canLoadMore: canLoadMore(state),
-            loading: loadingMore,
-            error: loadMoreError,
-            onPressed: onLoadMore,
-          );
-        }
-        return _LedgerRow(entry: state.items[i]);
-      },
+      itemCount: state.items.length,
+      minItemWidth: 380,
+      maxColumns: 3,
+      runSpacing: 10,
+      footer: Padding(
+        padding: const EdgeInsets.only(top: 10),
+        child: _LoadMoreFooter(
+          canLoadMore: canLoadMore(state),
+          loading: loadingMore,
+          error: loadMoreError,
+          onPressed: onLoadMore,
+        ),
+      ),
+      itemBuilder: (context, i) => _LedgerRow(entry: state.items[i]),
     );
   }
 }

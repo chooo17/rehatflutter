@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/app_colors.dart';
+import '../../../core/utils/responsive.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/router/route_names.dart';
 import '../../../core/utils/formatters.dart';
@@ -33,10 +34,12 @@ class OrderHistoryScreen extends ConsumerWidget {
           return RefreshIndicator(
             color: AppColors.amber,
             onRefresh: () async => ref.invalidate(orderHistoryProvider),
-            child: ListView.separated(
+            child: ResponsiveListView(
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
               itemCount: orders.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 12),
+              minItemWidth: 360,
+              maxColumns: 3,
+              runSpacing: 12,
               itemBuilder: (context, i) => _OrderCard(
                 order: orders[i],
                 onTap: () => context.pushNamed(

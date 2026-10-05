@@ -31,8 +31,8 @@ class MenuDetailScreen extends ConsumerWidget {
 
     return Scaffold(
       body: detailAsync.when(
-        loading: () =>
-            const Center(child: CircularProgressIndicator(color: AppColors.amber)),
+        loading: () => const Center(
+            child: CircularProgressIndicator(color: AppColors.amber)),
         error: (e, _) => _ErrorState(
           onRetry: () => ref.invalidate(menuDetailProvider(id)),
         ),
@@ -63,9 +63,9 @@ class _DetailBodyState extends ConsumerState<_DetailBody> {
     // Ukuran dihilangkan (produk hanya 1 ukuran) → tak dikirim ke pesanan.
     _size = null;
     _temperature = o.temperatures.isNotEmpty ? o.temperatures.first : null;
-    _sugarLevel = o.sugarLevels.isNotEmpty ? _defaultSugar(o.sugarLevels) : null;
+    _sugarLevel =
+        o.sugarLevels.isNotEmpty ? _defaultSugar(o.sugarLevels) : null;
   }
-
 
   int _defaultSugar(List<int> levels) =>
       levels.contains(100) ? 100 : levels.first;
@@ -91,11 +91,188 @@ class _DetailBodyState extends ConsumerState<_DetailBody> {
       ));
   }
 
+  List<Widget> _actions(MenuItemModel item, bool isGuest) => isGuest
+      ? [CartIconButton(color: AppColors.espresso)]
+      : [
+          Padding(
+            padding: const EdgeInsets.only(right: 4),
+            child: FavoriteButton(item: item, size: 24),
+          ),
+          CartIconButton(color: AppColors.espresso),
+        ];
+
+  /// Nama, harga, deskripsi, opsi, jumlah, ulasan — dipakai kedua tata letak.
+  Widget _details(MenuItemModel item) {
+    final o = item.options;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(item.name, style: AppTextStyles.displayMedium),
+            ),
+            if (item.rating != null) ...[
+              const Icon(Icons.star_rounded, color: AppColors.amber, size: 20),
+              const SizedBox(width: 4),
+              Text(item.rating!.toStringAsFixed(1), style: AppTextStyles.label),
+            ],
+          ],
+        ),
+        const SizedBox(height: 6),
+        Text(
+          Formatters.rupiah(item.price),
+          style: AppTextStyles.titleLarge.copyWith(color: AppColors.amberDark),
+        ),
+        if (item.description.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          Text(item.description,
+              style: AppTextStyles.bodyMedium
+                  .copyWith(color: AppColors.textSecondary, height: 1.6)),
+        ],
+        // Ukuran dihilangkan — produk hanya tersedia 1 ukuran.
+        // Suhu ------------------------------------------------
+        if (o.temperatures.isNotEmpty) ...[
+          const SizedBox(height: 24),
+          _label('Suhu'),
+          const SizedBox(height: 10),
+          _chips(
+            values: o.temperatures,
+            selected: _temperature,
+            labelOf: CustomizationLabels.temperature,
+            onTap: (v) => setState(() => _temperature = v),
+          ),
+        ],
+        // Gula ------------------------------------------------
+        if (o.sugarLevels.isNotEmpty) ...[
+          const SizedBox(height: 24),
+          _label('Tingkat gula'),
+          const SizedBox(height: 10),
+          _chips(
+            values: o.sugarLevels,
+            selected: _sugarLevel,
+            labelOf: (v) => v == 0 ? 'Tanpa gula' : '$v%',
+            onTap: (v) => setState(() => _sugarLevel = v),
+          ),
+        ],
+        const SizedBox(height: 24),
+        Row(
+          children: [
+            _label('Jumlah'),
+            const Spacer(),
+            _QtyStepper(
+              quantity: _qty,
+              onChanged: (v) => setState(() => _qty = v),
+            ),
+          ],
+        ),
+        const SizedBox(height: 28),
+        _ReviewsSection(itemId: item.id),
+      ],
+    );
+  }
+
+  Widget _bottomBar(MenuItemModel item) {
+    return NeuBottomBar(
+      child: Row(
+        children: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('Total',
+                  style: AppTextStyles.caption
+                      .copyWith(color: AppColors.textSecondary)),
+              Text(Formatters.rupiah(_total), style: AppTextStyles.titleLarge),
+            ],
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Builder(
+              builder: (btnContext) => NeuButton(
+                expand: true,
+                accent: item.isAvailable,
+                onPressed:
+                    item.isAvailable ? () => _addToCart(btnContext) : null,
+                child: Text(
+                  item.isAvailable ? 'Tambah ke Keranjang' : 'Habis',
+                  style: AppTextStyles.button.copyWith(
+                      color: item.isAvailable
+                          ? Colors.white
+                          : AppColors.textSecondary),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final item = widget.item;
-    final o = item.options;
     final isGuest = ref.watch(isGuestProvider);
+
+    // Layar lebar: dua panel — foto besar di kiri, opsi + tombol tambah di
+    // kanan — bukan foto pita + kolom opsi yang melar selebar layar.
+    if (MediaQuery.sizeOf(context).width >= 900) {
+      return SafeArea(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              flex: 5,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(24, 16, 12, 24),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(24),
+                      child: _HeaderImage(url: item.imageUrl),
+                    ),
+                    Positioned(
+                      left: 8,
+                      top: 8,
+                      width: 56,
+                      height: 56,
+                      child: _circleButton(
+                        icon: Icons.arrow_back_rounded,
+                        onTap: () => context.pop(),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            Expanded(
+              flex: 4,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 12, 16, 0),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: _actions(item, isGuest),
+                    ),
+                  ),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.fromLTRB(12, 8, 32, 24),
+                      child: _details(item),
+                    ),
+                  ),
+                  _bottomBar(item),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Stack(
       children: [
         CustomScrollView(
@@ -110,15 +287,7 @@ class _DetailBodyState extends ConsumerState<_DetailBody> {
                 onTap: () => context.pop(),
               ),
               // Tamu tak punya favorit → sembunyikan; keranjang tetap ada.
-              actions: isGuest
-                  ? [CartIconButton(color: AppColors.espresso)]
-                  : [
-                      Padding(
-                        padding: const EdgeInsets.only(right: 4),
-                        child: FavoriteButton(item: item, size: 24),
-                      ),
-                      CartIconButton(color: AppColors.espresso),
-                    ],
+              actions: _actions(item, isGuest),
               flexibleSpace: FlexibleSpaceBar(
                 background: _HeaderImage(url: item.imageUrl),
               ),
@@ -126,76 +295,7 @@ class _DetailBodyState extends ConsumerState<_DetailBody> {
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(20, 20, 20, 120),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(item.name,
-                              style: AppTextStyles.displayMedium),
-                        ),
-                        if (item.rating != null) ...[
-                          const Icon(Icons.star_rounded,
-                              color: AppColors.amber, size: 20),
-                          const SizedBox(width: 4),
-                          Text(item.rating!.toStringAsFixed(1),
-                              style: AppTextStyles.label),
-                        ],
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      Formatters.rupiah(item.price),
-                      style: AppTextStyles.titleLarge
-                          .copyWith(color: AppColors.amberDark),
-                    ),
-                    if (item.description.isNotEmpty) ...[
-                      const SizedBox(height: 16),
-                      Text(item.description,
-                          style: AppTextStyles.bodyMedium.copyWith(
-                              color: AppColors.textSecondary, height: 1.6)),
-                    ],
-                    // Ukuran dihilangkan — produk hanya tersedia 1 ukuran.
-                    // Suhu ------------------------------------------------
-                    if (o.temperatures.isNotEmpty) ...[
-                      const SizedBox(height: 24),
-                      _label('Suhu'),
-                      const SizedBox(height: 10),
-                      _chips(
-                        values: o.temperatures,
-                        selected: _temperature,
-                        labelOf: CustomizationLabels.temperature,
-                        onTap: (v) => setState(() => _temperature = v),
-                      ),
-                    ],
-                    // Gula ------------------------------------------------
-                    if (o.sugarLevels.isNotEmpty) ...[
-                      const SizedBox(height: 24),
-                      _label('Tingkat gula'),
-                      const SizedBox(height: 10),
-                      _chips(
-                        values: o.sugarLevels,
-                        selected: _sugarLevel,
-                        labelOf: (v) => v == 0 ? 'Tanpa gula' : '$v%',
-                        onTap: (v) => setState(() => _sugarLevel = v),
-                      ),
-                    ],
-                    const SizedBox(height: 24),
-                    Row(
-                      children: [
-                        _label('Jumlah'),
-                        const Spacer(),
-                        _QtyStepper(
-                          quantity: _qty,
-                          onChanged: (v) => setState(() => _qty = v),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 28),
-                    _ReviewsSection(itemId: item.id),
-                  ],
-                ),
+                child: _details(item),
               ),
             ),
           ],
@@ -204,49 +304,13 @@ class _DetailBodyState extends ConsumerState<_DetailBody> {
           left: 0,
           right: 0,
           bottom: 0,
-          child: NeuBottomBar(
-            child: Row(
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text('Total',
-                        style: AppTextStyles.caption
-                            .copyWith(color: AppColors.textSecondary)),
-                    Text(Formatters.rupiah(_total),
-                        style: AppTextStyles.titleLarge),
-                  ],
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Builder(
-                    builder: (btnContext) => NeuButton(
-                      expand: true,
-                      accent: item.isAvailable,
-                      onPressed: item.isAvailable
-                          ? () => _addToCart(btnContext)
-                          : null,
-                      child: Text(
-                        item.isAvailable ? 'Tambah ke Keranjang' : 'Habis',
-                        style: AppTextStyles.button.copyWith(
-                            color: item.isAvailable
-                                ? Colors.white
-                                : AppColors.textSecondary),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
+          child: _bottomBar(item),
         ),
       ],
     );
   }
 
-  Widget _label(String text) =>
-      Text(text, style: AppTextStyles.titleMedium);
+  Widget _label(String text) => Text(text, style: AppTextStyles.titleMedium);
 
   /// Baris chip generik untuk opsi (ukuran/suhu/gula).
   Widget _chips<T>({
@@ -268,12 +332,14 @@ class _DetailBodyState extends ConsumerState<_DetailBody> {
                 color: v == selected ? AppColors.espresso : AppColors.surface,
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                    color: v == selected ? AppColors.espresso : AppColors.border),
+                    color:
+                        v == selected ? AppColors.espresso : AppColors.border),
               ),
               child: Text(
                 labelOf(v),
                 style: AppTextStyles.caption.copyWith(
-                  color: v == selected ? AppColors.crema : AppColors.textPrimary,
+                  color:
+                      v == selected ? AppColors.crema : AppColors.textPrimary,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -416,8 +482,8 @@ class _ReviewsSection extends ConsumerWidget {
                     child: CircularProgressIndicator(
                         strokeWidth: 2.2, color: AppColors.amber))),
           ),
-          error: (e, _) => Text('Gagal memuat ulasan.',
-              style: AppTextStyles.bodySmall),
+          error: (e, _) =>
+              Text('Gagal memuat ulasan.', style: AppTextStyles.bodySmall),
           data: (reviews) {
             if (reviews.isEmpty) {
               return Text('Belum ada ulasan untuk menu ini.',
@@ -460,8 +526,8 @@ class _ReviewTile extends StatelessWidget {
             color: AppColors.crema,
             borderRadius: BorderRadius.circular(12),
           ),
-          child: Icon(Icons.person_rounded,
-              color: AppColors.amberDark, size: 20),
+          child:
+              Icon(Icons.person_rounded, color: AppColors.amberDark, size: 20),
         ),
         const SizedBox(width: 12),
         Expanded(

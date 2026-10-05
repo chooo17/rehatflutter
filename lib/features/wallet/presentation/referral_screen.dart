@@ -7,6 +7,7 @@ import '../../../core/analytics/analytics_service.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
+import '../../../core/utils/responsive.dart';
 import '../../../core/network/api_exception.dart';
 import '../data/wallet_repository.dart';
 
@@ -20,8 +21,8 @@ class ReferralScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('Ajak Teman')),
       body: async.when(
-        loading: () =>
-            const Center(child: CircularProgressIndicator(color: AppColors.amber)),
+        loading: () => const Center(
+            child: CircularProgressIndicator(color: AppColors.amber)),
         error: (e, _) => Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -36,9 +37,12 @@ class ReferralScreen extends ConsumerWidget {
             ],
           ),
         ),
-        data: (r) => ListView(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
-          children: [
+        // Layar lebar: kartu undangan | form kode teman berdampingan.
+        data: (r) => AdaptiveColumns(
+          narrowPadding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
+          widePadding: const EdgeInsets.fromLTRB(32, 16, 32, 32),
+          narrowGap: 24,
+          left: [
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(24),
@@ -75,8 +79,7 @@ class ReferralScreen extends ConsumerWidget {
                       children: [
                         SelectableText(r.code,
                             style: AppTextStyles.titleLarge.copyWith(
-                                color: AppColors.espresso,
-                                letterSpacing: 2)),
+                                color: AppColors.espresso, letterSpacing: 2)),
                         const SizedBox(width: 10),
                         IconButton(
                           icon: const Icon(Icons.copy_rounded, size: 18),
@@ -113,9 +116,13 @@ class ReferralScreen extends ConsumerWidget {
                 minimumSize: const Size.fromHeight(52),
               ),
             ),
-            const SizedBox(height: 24),
-            const Divider(),
-            const SizedBox(height: 16),
+          ],
+          right: [
+            // Pemisah hanya saat ditumpuk (mobile).
+            if (MediaQuery.sizeOf(context).width < 900) ...[
+              const Divider(),
+              const SizedBox(height: 16),
+            ],
             Text('Punya kode teman?', style: AppTextStyles.titleMedium),
             const SizedBox(height: 8),
             _ApplyCodeField(

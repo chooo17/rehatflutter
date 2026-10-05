@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/constants/app_colors.dart';
+import '../../../core/utils/responsive.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../shared/widgets/neu.dart';
 import '../data/finance_repository.dart';
@@ -66,7 +67,13 @@ class FixedCostsScreen extends ConsumerWidget {
                         textAlign: TextAlign.center,
                       ),
                     ),
-                  for (final c in items)
+                  // Layar lebar: kartu biaya jadi grid.
+                  ResponsiveGrid(
+                    minItemWidth: 340,
+                    maxColumns: 3,
+                    runSpacing: 8,
+                    children: [
+                      for (final c in items)
                     NeuCard(
                       // ListTile membawa padding sendiri -> matikan padding kartu.
                       padding: EdgeInsets.zero,
@@ -88,6 +95,8 @@ class FixedCostsScreen extends ConsumerWidget {
                         ),
                       ),
                     ),
+                    ],
+                  ),
                 ],
               ),
             ),

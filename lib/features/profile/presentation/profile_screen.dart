@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/router/route_names.dart';
+import '../../../core/utils/responsive.dart';
 import '../../../core/theme/theme_controller.dart';
 import '../../../shared/widgets/neu.dart';
 import '../../auth/application/auth_controller.dart';
@@ -20,53 +21,49 @@ class ProfileScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(title: const Text('Profil')),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-        children: [
-          Row(
-            children: [
-              NeuCard(
-                padding: EdgeInsets.zero,
-                radius: 20,
-                child: SizedBox(
-                  width: 64,
-                  height: 64,
-                  child: (user?.avatarUrl != null && user!.avatarUrl!.isNotEmpty)
-                      ? CachedNetworkImage(
-                          imageUrl: user.avatarUrl!,
-                          fit: BoxFit.cover,
-                          errorWidget: (_, __, ___) => Icon(
-                              Icons.person_rounded,
-                              color: AppColors.amberDark,
-                              size: 32),
-                        )
-                      : Icon(Icons.person_rounded,
-                          color: AppColors.amberDark, size: 32),
-                ),
+      body: LayoutBuilder(builder: (context, c) {
+        final identity = Row(
+          children: [
+            NeuCard(
+              padding: EdgeInsets.zero,
+              radius: 20,
+              child: SizedBox(
+                width: 64,
+                height: 64,
+                child: (user?.avatarUrl != null && user!.avatarUrl!.isNotEmpty)
+                    ? CachedNetworkImage(
+                        imageUrl: user.avatarUrl!,
+                        fit: BoxFit.cover,
+                        errorWidget: (_, __, ___) => Icon(Icons.person_rounded,
+                            color: AppColors.amberDark, size: 32),
+                      )
+                    : Icon(Icons.person_rounded,
+                        color: AppColors.amberDark, size: 32),
               ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      user?.name.isNotEmpty == true
-                          ? user!.name
-                          : 'Sahabat Rehat',
-                      style: AppTextStyles.titleLarge,
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      user?.phone ?? '-',
-                      style: AppTextStyles.bodyMedium
-                          .copyWith(color: AppColors.textSecondary),
-                    ),
-                  ],
-                ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    user?.name.isNotEmpty == true
+                        ? user!.name
+                        : 'Sahabat Rehat',
+                    style: AppTextStyles.titleLarge,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    user?.phone ?? '-',
+                    style: AppTextStyles.bodyMedium
+                        .copyWith(color: AppColors.textSecondary),
+                  ),
+                ],
               ),
-            ],
-          ),
-          const SizedBox(height: 28),
+            ),
+          ],
+        );
+        final account = <Widget>[
           _tile(Icons.person_outline_rounded, 'Edit profil',
               onTap: () => context.pushNamed(RouteNames.editProfile)),
           _tile(Icons.account_balance_wallet_outlined, 'Saldo Saya',
@@ -85,6 +82,8 @@ class ProfileScreen extends ConsumerWidget {
               onTap: () => context.pushNamed(RouteNames.notifications)),
           _tile(Icons.help_outline_rounded, 'Bantuan',
               onTap: () => context.pushNamed(RouteNames.help)),
+        ];
+        final admin = <Widget>[
           if (user?.isAdmin == true) ...[
             _tile(Icons.insights_rounded, 'Dashboard Penjualan',
                 onTap: () => context.pushNamed(RouteNames.adminDashboard)),
@@ -107,7 +106,8 @@ class ProfileScreen extends ConsumerWidget {
             _tile(Icons.print_rounded, 'Printer & Struk',
                 onTap: () => context.pushNamed(RouteNames.printerSettings)),
           ],
-          const SizedBox(height: 24),
+        ];
+        final settings = <Widget>[
           Text('Tampilan', style: AppTextStyles.titleMedium),
           const SizedBox(height: 10),
           _ThemeModeSelector(
@@ -122,44 +122,103 @@ class ProfileScreen extends ConsumerWidget {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.logout_rounded, color: AppColors.error, size: 20),
+                const Icon(Icons.logout_rounded,
+                    color: AppColors.error, size: 20),
                 const SizedBox(width: 8),
                 Text('Keluar',
-                    style: AppTextStyles.button.copyWith(color: AppColors.error)),
+                    style:
+                        AppTextStyles.button.copyWith(color: AppColors.error)),
               ],
             ),
           ),
-        ],
-      ),
+        ];
+
+        // Layar lebar: identitas + pengaturan di kolom kiri, menu sebagai grid
+        // berkelompok di kanan — mengisi lebar tanpa baris yang melar.
+        if (c.maxWidth >= 900) {
+          return ListView(
+            padding: const EdgeInsets.fromLTRB(32, 8, 32, 32),
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(
+                    width: 320,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        identity,
+                        const SizedBox(height: 24),
+                        ...settings,
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 40),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Akun', style: AppTextStyles.titleMedium),
+                        const SizedBox(height: 12),
+                        ResponsiveGrid(
+                            minItemWidth: 260,
+                            maxColumns: 3,
+                            children: account),
+                        if (admin.isNotEmpty) ...[
+                          const SizedBox(height: 28),
+                          Text('Admin', style: AppTextStyles.titleMedium),
+                          const SizedBox(height: 12),
+                          ResponsiveGrid(
+                              minItemWidth: 260,
+                              maxColumns: 3,
+                              children: admin),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          );
+        }
+
+        return ListView(
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+          children: [
+            identity,
+            const SizedBox(height: 28),
+            for (final t in [...account, ...admin])
+              Padding(padding: const EdgeInsets.only(bottom: 10), child: t),
+            const SizedBox(height: 24),
+            ...settings,
+          ],
+        );
+      }),
     );
   }
 
   /// Baris menu: tiap item adalah kartu neumorphic timbul dengan depth &
   /// efek tekan sendiri.
   Widget _tile(IconData icon, String label, {VoidCallback? onTap}) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: NeuCard(
-        onTap: onTap ?? () {},
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-        radius: 16,
-        child: Row(
-          children: [
-            NeuInset(
-              padding: EdgeInsets.zero,
-              radius: 11,
-              child: SizedBox(
-                width: 38,
-                height: 38,
-                child: Icon(icon, color: AppColors.amberDark, size: 20),
-              ),
+    return NeuCard(
+      onTap: onTap ?? () {},
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      radius: 16,
+      child: Row(
+        children: [
+          NeuInset(
+            padding: EdgeInsets.zero,
+            radius: 11,
+            child: SizedBox(
+              width: 38,
+              height: 38,
+              child: Icon(icon, color: AppColors.amberDark, size: 20),
             ),
-            const SizedBox(width: 14),
-            Expanded(child: Text(label, style: AppTextStyles.bodyLarge)),
-            Icon(Icons.chevron_right_rounded,
-                color: AppColors.textSecondary),
-          ],
-        ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(child: Text(label, style: AppTextStyles.bodyLarge)),
+          Icon(Icons.chevron_right_rounded, color: AppColors.textSecondary),
+        ],
       ),
     );
   }

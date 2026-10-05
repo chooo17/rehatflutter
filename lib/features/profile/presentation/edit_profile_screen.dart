@@ -36,7 +36,8 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     super.initState();
     final user = ref.read(authControllerProvider).user;
     _nameCtrl = TextEditingController(text: user?.name ?? '');
-    _birthdate = user?.birthdate != null ? DateTime.tryParse(user!.birthdate!) : null;
+    _birthdate =
+        user?.birthdate != null ? DateTime.tryParse(user!.birthdate!) : null;
     _birthdateLocked = (user?.birthdate ?? '').isNotEmpty;
   }
 
@@ -122,159 +123,231 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     final state = ref.watch(authControllerProvider);
     final user = state.user;
 
+    final avatar = GestureDetector(
+      onTap: _uploadingAvatar ? null : _pickAvatar,
+      child: Stack(
+        children: [
+          NeuCard(
+            padding: EdgeInsets.zero,
+            radius: 28,
+            child: SizedBox(
+              width: 96,
+              height: 96,
+              child: _uploadingAvatar
+                  ? const Center(
+                      child: SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2.4, color: AppColors.amber),
+                      ),
+                    )
+                  : (user?.avatarUrl != null && user!.avatarUrl!.isNotEmpty
+                      ? CachedNetworkImage(
+                          imageUrl: user.avatarUrl!,
+                          fit: BoxFit.cover,
+                          errorWidget: (_, __, ___) => Icon(
+                              Icons.person_rounded,
+                              color: AppColors.amberDark,
+                              size: 48),
+                        )
+                      : Icon(Icons.person_rounded,
+                          color: AppColors.amberDark, size: 48)),
+            ),
+          ),
+          Positioned(
+            right: 0,
+            bottom: 0,
+            child: Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: AppColors.espresso,
+                shape: BoxShape.circle,
+                border: Border.all(color: AppColors.backgroundLight, width: 2),
+              ),
+              child: Icon(Icons.camera_alt_rounded,
+                  color: AppColors.crema, size: 16),
+            ),
+          ),
+        ],
+      ),
+    );
+    final nameField = AppTextField(
+      label: 'Nama lengkap',
+      controller: _nameCtrl,
+      hintText: 'Nama kamu',
+      prefixIcon: Icons.badge_outlined,
+      textInputAction: TextInputAction.done,
+      onSubmitted: (_) => _save(),
+      validator: (v) {
+        final value = v?.trim() ?? '';
+        if (value.isEmpty) return 'Nama wajib diisi';
+        if (value.length < 2) return 'Nama terlalu pendek';
+        return null;
+      },
+    );
+    final phoneField = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Nomor telepon', style: AppTextStyles.label),
+        const SizedBox(height: 8),
+        NeuInset(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          radius: 14,
+          child: Row(
+            children: [
+              Icon(Icons.phone_outlined,
+                  color: AppColors.textSecondary, size: 20),
+              const SizedBox(width: 12),
+              Text(user?.phone ?? '-',
+                  style: AppTextStyles.bodyLarge
+                      .copyWith(color: AppColors.textSecondary)),
+              const Spacer(),
+              Icon(Icons.lock_outline_rounded,
+                  color: AppColors.textSecondary, size: 16),
+            ],
+          ),
+        ),
+      ],
+    );
+    final birthField = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Tanggal lahir', style: AppTextStyles.label),
+        const SizedBox(height: 8),
+        GestureDetector(
+          onTap: _pickBirthdate,
+          child: NeuInset(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            radius: 14,
+            child: Row(
+              children: [
+                Icon(Icons.cake_outlined,
+                    color: AppColors.textSecondary, size: 20),
+                const SizedBox(width: 12),
+                Text(
+                  _birthdate == null
+                      ? 'Pilih tanggal lahir'
+                      : Formatters.tanggal(_birthdate!),
+                  style: AppTextStyles.bodyLarge.copyWith(
+                    color: _birthdate == null
+                        ? AppColors.textSecondary
+                        : AppColors.textPrimary,
+                  ),
+                ),
+                if (_birthdateLocked) ...[
+                  const Spacer(),
+                  Icon(Icons.lock_outline_rounded,
+                      color: AppColors.textSecondary, size: 16),
+                ],
+              ],
+            ),
+          ),
+        ),
+        if (_birthdateLocked) ...[
+          const SizedBox(height: 6),
+          Text(
+            'Tanggal lahir terkunci. Hubungi admin untuk koreksi.',
+            style:
+                AppTextStyles.caption.copyWith(color: AppColors.textSecondary),
+          ),
+        ],
+      ],
+    );
+    final saveButton = PrimaryButton(
+      label: 'Simpan',
+      isLoading: state.isSubmitting,
+      onPressed: _save,
+    );
+
+    // Layar lebar: kartu foto di kiri, field dalam grid 2 kolom di kanan —
+    // bukan form sempit di tengah dengan ruang kosong di kiri-kanan.
+    if (MediaQuery.sizeOf(context).width >= 900) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Edit Profil')),
+        body: Form(
+          key: _formKey,
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(32, 16, 32, 32),
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(
+                    width: 300,
+                    child: NeuCard(
+                      padding: const EdgeInsets.all(24),
+                      radius: 22,
+                      child: Column(
+                        children: [
+                          avatar,
+                          const SizedBox(height: 16),
+                          Text(
+                              user?.name.isNotEmpty == true
+                                  ? user!.name
+                                  : 'Sahabat Rehat',
+                              textAlign: TextAlign.center,
+                              style: AppTextStyles.titleLarge),
+                          const SizedBox(height: 4),
+                          Text('Ketuk foto untuk mengganti',
+                              style: AppTextStyles.caption
+                                  .copyWith(color: AppColors.textSecondary)),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 32),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        ResponsiveGrid(
+                          minItemWidth: 300,
+                          maxColumns: 2,
+                          spacing: 20,
+                          runSpacing: 18,
+                          children: [nameField, phoneField, birthField],
+                        ),
+                        const SizedBox(height: 28),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: SizedBox(width: 240, child: saveButton),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(title: const Text('Edit Profil')),
       body: SafeArea(
         child: ResponsiveCenter(
           maxWidth: 480,
           child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: GestureDetector(
-                    onTap: _uploadingAvatar ? null : _pickAvatar,
-                    child: Stack(
-                      children: [
-                        NeuCard(
-                          padding: EdgeInsets.zero,
-                          radius: 28,
-                          child: SizedBox(
-                          width: 96,
-                          height: 96,
-                          child: _uploadingAvatar
-                              ? const Center(
-                                  child: SizedBox(
-                                    width: 24,
-                                    height: 24,
-                                    child: CircularProgressIndicator(
-                                        strokeWidth: 2.4,
-                                        color: AppColors.amber),
-                                  ),
-                                )
-                              : (user?.avatarUrl != null &&
-                                      user!.avatarUrl!.isNotEmpty
-                                  ? CachedNetworkImage(
-                                      imageUrl: user.avatarUrl!,
-                                      fit: BoxFit.cover,
-                                      errorWidget: (_, __, ___) => Icon(
-                                          Icons.person_rounded,
-                                          color: AppColors.amberDark,
-                                          size: 48),
-                                    )
-                                  : Icon(Icons.person_rounded,
-                                      color: AppColors.amberDark, size: 48)),
-                          ),
-                        ),
-                        Positioned(
-                          right: 0,
-                          bottom: 0,
-                          child: Container(
-                            padding: const EdgeInsets.all(6),
-                            decoration: BoxDecoration(
-                              color: AppColors.espresso,
-                              shape: BoxShape.circle,
-                              border:
-                                  Border.all(color: AppColors.backgroundLight, width: 2),
-                            ),
-                            child: Icon(Icons.camera_alt_rounded,
-                                color: AppColors.crema, size: 16),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 28),
-                AppTextField(
-                  label: 'Nama lengkap',
-                  controller: _nameCtrl,
-                  hintText: 'Nama kamu',
-                  prefixIcon: Icons.badge_outlined,
-                  textInputAction: TextInputAction.done,
-                  onSubmitted: (_) => _save(),
-                  validator: (v) {
-                    final value = v?.trim() ?? '';
-                    if (value.isEmpty) return 'Nama wajib diisi';
-                    if (value.length < 2) return 'Nama terlalu pendek';
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 18),
-                // Nomor HP (read-only — identifier akun).
-                Text('Nomor telepon', style: AppTextStyles.label),
-                const SizedBox(height: 8),
-                NeuInset(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                  radius: 14,
-                  child: Row(
-                    children: [
-                      Icon(Icons.phone_outlined,
-                          color: AppColors.textSecondary, size: 20),
-                      const SizedBox(width: 12),
-                      Text(user?.phone ?? '-',
-                          style: AppTextStyles.bodyLarge
-                              .copyWith(color: AppColors.textSecondary)),
-                      const Spacer(),
-                      Icon(Icons.lock_outline_rounded,
-                          color: AppColors.textSecondary, size: 16),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 18),
-                Text('Tanggal lahir', style: AppTextStyles.label),
-                const SizedBox(height: 8),
-                GestureDetector(
-                  onTap: _pickBirthdate,
-                  child: NeuInset(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                    radius: 14,
-                    child: Row(
-                      children: [
-                        Icon(Icons.cake_outlined,
-                            color: AppColors.textSecondary, size: 20),
-                        const SizedBox(width: 12),
-                        Text(
-                          _birthdate == null
-                              ? 'Pilih tanggal lahir'
-                              : Formatters.tanggal(_birthdate!),
-                          style: AppTextStyles.bodyLarge.copyWith(
-                            color: _birthdate == null
-                                ? AppColors.textSecondary
-                                : AppColors.textPrimary,
-                          ),
-                        ),
-                        if (_birthdateLocked) ...[
-                          const Spacer(),
-                          Icon(Icons.lock_outline_rounded,
-                              color: AppColors.textSecondary, size: 16),
-                        ],
-                      ],
-                    ),
-                  ),
-                ),
-                if (_birthdateLocked) ...[
-                  const SizedBox(height: 6),
-                  Text(
-                    'Tanggal lahir terkunci. Hubungi admin untuk koreksi.',
-                    style: AppTextStyles.caption
-                        .copyWith(color: AppColors.textSecondary),
-                  ),
+            padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(child: avatar),
+                  const SizedBox(height: 28),
+                  nameField,
+                  const SizedBox(height: 18),
+                  phoneField,
+                  const SizedBox(height: 18),
+                  birthField,
+                  const SizedBox(height: 32),
+                  saveButton,
                 ],
-                const SizedBox(height: 32),
-                PrimaryButton(
-                  label: 'Simpan',
-                  isLoading: state.isSubmitting,
-                  onPressed: _save,
-                ),
-              ],
+              ),
             ),
-          ),
           ),
         ),
       ),

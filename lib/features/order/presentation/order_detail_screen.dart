@@ -9,6 +9,7 @@ import '../../../core/constants/app_text_styles.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/router/route_names.dart';
 import '../../../core/utils/formatters.dart';
+import '../../../core/utils/responsive.dart';
 import '../../../shared/models/order_model.dart';
 import '../../../shared/widgets/neu.dart';
 import '../../printer/application/printer_controller.dart';
@@ -51,8 +52,8 @@ class OrderDetailScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('Detail Pesanan')),
       body: detailAsync.when(
-        loading: () =>
-            const Center(child: CircularProgressIndicator(color: AppColors.amber)),
+        loading: () => const Center(
+            child: CircularProgressIndicator(color: AppColors.amber)),
         error: (e, _) => _ErrorState(
           onRetry: () => ref.invalidate(
               isAdmin ? adminOrderDetailProvider(id) : orderDetailProvider(id)),
@@ -89,9 +90,12 @@ class _Body extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-      children: [
+    // Layar lebar: status & lacak | item & ringkasan berdampingan.
+    return AdaptiveColumns(
+      narrowPadding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+      widePadding: const EdgeInsets.fromLTRB(32, 16, 32, 32),
+      narrowGap: 24,
+      left: [
         // Header: nomor antrian + status.
         Container(
           padding: const EdgeInsets.all(18),
@@ -105,8 +109,8 @@ class _Body extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(order.hasQueue ? 'Nomor antrian' : 'Status',
-                      style: AppTextStyles.caption
-                          .copyWith(color: AppColors.crema.withValues(alpha: 0.7))),
+                      style: AppTextStyles.caption.copyWith(
+                          color: AppColors.crema.withValues(alpha: 0.7))),
                   const SizedBox(height: 2),
                   Text(order.queueLabel,
                       style: (order.hasQueue
@@ -178,7 +182,8 @@ class _Body extends StatelessWidget {
           const SizedBox(height: 20),
           QrisPaymentCard(orderId: order.id, amount: order.total),
         ],
-        const SizedBox(height: 24),
+      ],
+      right: [
         Text('Item', style: AppTextStyles.titleMedium),
         const SizedBox(height: 8),
         NeuCard(
@@ -217,7 +222,8 @@ class _Body extends StatelessWidget {
               ],
               if (order.discountAmount > 0) ...[
                 const SizedBox(height: 8),
-                _summaryRow('Diskon', '- ${Formatters.rupiah(order.discountAmount)}',
+                _summaryRow(
+                    'Diskon', '- ${Formatters.rupiah(order.discountAmount)}',
                     valueColor: AppColors.success),
               ],
               if (order.pointsEarned > 0) ...[
@@ -349,8 +355,9 @@ class _AdminStatusControlsState extends ConsumerState<_AdminStatusControls> {
     setState(() => _busy = true);
     final messenger = ScaffoldMessenger.of(context);
     try {
-      await ref.read(orderRepositoryProvider).updateStatus(widget.order.id, status,
-          paymentMethod: paymentMethod);
+      await ref
+          .read(orderRepositoryProvider)
+          .updateStatus(widget.order.id, status, paymentMethod: paymentMethod);
       ref.invalidate(orderDetailProvider(widget.order.id));
       ref.invalidate(adminOrderDetailProvider(widget.order.id));
       ref.invalidate(orderHistoryProvider);
@@ -377,7 +384,8 @@ class _AdminStatusControlsState extends ConsumerState<_AdminStatusControls> {
       if (mounted) {
         messenger
           ..hideCurrentSnackBar()
-          ..showSnackBar(const SnackBar(content: Text('Gagal memperbarui status.')));
+          ..showSnackBar(
+              const SnackBar(content: Text('Gagal memperbarui status.')));
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -460,7 +468,9 @@ class _AdminStatusControlsState extends ConsumerState<_AdminStatusControls> {
     setState(() => _busy = true);
     final messenger = ScaffoldMessenger.of(context);
     try {
-      await ref.read(orderRepositoryProvider).refundOrder(widget.order.id, reason);
+      await ref
+          .read(orderRepositoryProvider)
+          .refundOrder(widget.order.id, reason);
       ref.invalidate(orderDetailProvider(widget.order.id));
       ref.invalidate(adminOrderDetailProvider(widget.order.id));
       ref.invalidate(adminOrdersProvider);
@@ -479,7 +489,8 @@ class _AdminStatusControlsState extends ConsumerState<_AdminStatusControls> {
       if (mounted) {
         messenger
           ..hideCurrentSnackBar()
-          ..showSnackBar(const SnackBar(content: Text('Gagal refund pesanan.')));
+          ..showSnackBar(
+              const SnackBar(content: Text('Gagal refund pesanan.')));
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -633,8 +644,8 @@ class _AdminStatusControlsState extends ConsumerState<_AdminStatusControls> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
-                  onPressed: () =>
-                      _setStatus(OrderStatus.paid, paymentMethod: PaymentMethod.cash),
+                  onPressed: () => _setStatus(OrderStatus.paid,
+                      paymentMethod: PaymentMethod.cash),
                   icon: const Icon(Icons.payments_outlined, size: 18),
                   label: const Text('Lunas (Tunai)'),
                   style: ElevatedButton.styleFrom(
@@ -683,7 +694,8 @@ class _AdminStatusControlsState extends ConsumerState<_AdminStatusControls> {
                   label: const Text('Refund (Tunai)'),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppColors.error,
-                    side: BorderSide(color: AppColors.error.withValues(alpha: 0.5)),
+                    side: BorderSide(
+                        color: AppColors.error.withValues(alpha: 0.5)),
                     minimumSize: const Size(0, 48),
                   ),
                 ),

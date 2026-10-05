@@ -54,51 +54,169 @@ class HomeScreen extends ConsumerWidget {
             ref.invalidate(featuredMenuProvider);
             ref.invalidate(loyaltySummaryProvider);
           },
-          child: ListView(
-            padding: const EdgeInsets.only(bottom: 24),
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-                child: _Header(
-                    greeting: _greeting(),
-                    name: user?.name,
-                    isAdmin: user?.isAdmin ?? false),
+          child: LayoutBuilder(builder: (context, c) {
+            final header = _Header(
+                greeting: _greeting(),
+                name: user?.name,
+                isAdmin: user?.isAdmin ?? false);
+            final featured = featuredAsync.when(
+              loading: () => const _FeaturedLoading(),
+              error: (e, _) => _FeaturedError(
+                onRetry: () => ref.invalidate(featuredMenuProvider),
               ),
-              const SizedBox(height: 20),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: _PointsCard(points: summary.points, stampLabel: stampLabel),
-              ),
-              const BannerCarousel(),
-              const SizedBox(height: 24),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: SpinBanner(
+              data: (items) => _FeaturedList(items: items),
+            );
+            if (c.maxWidth >= 900) {
+              return _WideHome(
+                header: header,
+                points:
+                    _PointsCard(points: summary.points, stampLabel: stampLabel),
+                spin: SpinBanner(
                   onTap: () => context.pushNamed(RouteNames.spin),
                 ),
-              ),
-              const SizedBox(height: 28),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: SectionHeader(
-                  title: 'Menu Unggulan',
-                  actionLabel: 'Lihat semua',
-                  onAction: () => context.goNamed(RouteNames.menu),
-                ),
-              ),
-              const SizedBox(height: 14),
-              SizedBox(
-                height: 250,
-                child: featuredAsync.when(
-                  loading: () => const _FeaturedLoading(),
+                featuredGrid: featuredAsync.when(
+                  loading: () =>
+                      const SizedBox(height: 250, child: _FeaturedLoading()),
                   error: (e, _) => _FeaturedError(
                     onRetry: () => ref.invalidate(featuredMenuProvider),
                   ),
-                  data: (items) => _FeaturedList(items: items),
+                  data: (items) => _FeaturedGrid(items: items),
+                ),
+                onSeeAll: () => context.goNamed(RouteNames.menu),
+              );
+            }
+            return ListView(
+              padding: const EdgeInsets.only(bottom: 24),
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+                  child: header,
+                ),
+                const SizedBox(height: 20),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: _PointsCard(
+                      points: summary.points, stampLabel: stampLabel),
+                ),
+                const BannerCarousel(),
+                const SizedBox(height: 24),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: SpinBanner(
+                    onTap: () => context.pushNamed(RouteNames.spin),
+                  ),
+                ),
+                const SizedBox(height: 28),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: SectionHeader(
+                    title: 'Menu Unggulan',
+                    actionLabel: 'Lihat semua',
+                    onAction: () => context.goNamed(RouteNames.menu),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                SizedBox(height: 250, child: featured),
+              ],
+            );
+          }),
+        ),
+      ),
+    );
+  }
+}
+
+/// Beranda layar lebar: hero (banner | poin + spin) mengisi lebar, lalu menu
+/// unggulan sebagai grid — tanpa ruang kosong di kiri-kanan.
+class _WideHome extends StatelessWidget {
+  const _WideHome({
+    required this.header,
+    required this.points,
+    required this.spin,
+    required this.featuredGrid,
+    required this.onSeeAll,
+  });
+
+  final Widget header;
+  final Widget points;
+  final Widget spin;
+  final Widget featuredGrid;
+  final VoidCallback onSeeAll;
+
+  static const double _heroHeight = 300;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(32, 20, 32, 32),
+      children: [
+        header,
+        const SizedBox(height: 24),
+        SizedBox(
+          height: _heroHeight,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Expanded(
+                flex: 3,
+                child: BannerCarousel(
+                    height: _heroHeight - 16, inset: 0, topGap: 0),
+              ),
+              const SizedBox(width: 20),
+              Expanded(
+                flex: 2,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    points,
+                    const SizedBox(height: 16),
+                    Expanded(child: spin),
+                  ],
                 ),
               ),
             ],
           ),
+        ),
+        const SizedBox(height: 32),
+        SectionHeader(
+          title: 'Menu Unggulan',
+          actionLabel: 'Lihat semua',
+          onAction: onSeeAll,
+        ),
+        const SizedBox(height: 14),
+        featuredGrid,
+      ],
+    );
+  }
+}
+
+class _FeaturedGrid extends StatelessWidget {
+  const _FeaturedGrid({required this.items});
+  final List<MenuItemModel> items;
+
+  @override
+  Widget build(BuildContext context) {
+    if (items.isEmpty) {
+      return Text('Belum ada menu unggulan.',
+          style: AppTextStyles.bodyMedium
+              .copyWith(color: AppColors.textSecondary));
+    }
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+        maxCrossAxisExtent: 240,
+        mainAxisSpacing: 16,
+        crossAxisSpacing: 16,
+        mainAxisExtent: 270,
+      ),
+      itemCount: items.length,
+      itemBuilder: (context, i) => FeaturedMenuCard(
+        item: items[i],
+        width: null,
+        onTap: () => context.pushNamed(
+          RouteNames.menuDetail,
+          pathParameters: {'id': items[i].id},
         ),
       ),
     );
@@ -206,8 +324,8 @@ class _FeaturedList extends StatelessWidget {
       return Center(
         child: Text(
           'Belum ada menu unggulan.',
-          style: AppTextStyles.bodyMedium
-              .copyWith(color: AppColors.textSecondary),
+          style:
+              AppTextStyles.bodyMedium.copyWith(color: AppColors.textSecondary),
         ),
       );
     }

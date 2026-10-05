@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../core/constants/app_colors.dart';
+import '../../../core/utils/responsive.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../shared/models/banner_model.dart';
@@ -71,10 +72,12 @@ class AdminBannersScreen extends ConsumerWidget {
               ),
             );
           }
-          return ListView.separated(
+          return ResponsiveListView(
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 96),
             itemCount: banners.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 12),
+            minItemWidth: 420,
+            maxColumns: 3,
+            runSpacing: 12,
             itemBuilder: (context, i) => _BannerRow(
               banner: banners[i],
               onEdit: () => _openForm(context, ref, banner: banners[i]),

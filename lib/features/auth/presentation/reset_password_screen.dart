@@ -13,6 +13,7 @@ import '../../../shared/widgets/app_text_field.dart';
 import '../../../shared/widgets/otp_boxes.dart';
 import '../../../shared/widgets/primary_button.dart';
 import '../application/auth_controller.dart';
+import 'widgets/auth_split_layout.dart';
 
 /// Layar reset password: masukkan kode OTP + kata sandi baru.
 class ResetPasswordScreen extends ConsumerStatefulWidget {
@@ -151,8 +152,9 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
         ),
       ),
       body: SafeArea(
-        child: ResponsiveCenter(
+        child: AuthSplitLayout(child: ResponsiveCenter(
           maxWidth: 480,
+          centerVertically: true,
           child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(24, 8, 24, 32),
           child: Form(
@@ -278,7 +280,7 @@ class _ResetPasswordScreenState extends ConsumerState<ResetPasswordScreen> {
             ).animate().fadeIn(duration: 350.ms),
           ),
           ),
-        ),
+        )),
       ),
     );
   }

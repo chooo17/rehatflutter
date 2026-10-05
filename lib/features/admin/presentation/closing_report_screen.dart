@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../../core/constants/app_colors.dart';
+import '../../../core/utils/responsive.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/utils/formatters.dart';
 import '../data/admin_report_repository.dart';
@@ -58,9 +59,12 @@ class ClosingReportScreen extends ConsumerWidget {
         data: (r) => RefreshIndicator(
           color: AppColors.amber,
           onRefresh: () async => ref.invalidate(closingReportProvider),
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
-            children: [
+          // Layar lebar: ringkasan | rekonsiliasi berdampingan.
+          child: AdaptiveColumns(
+            narrowPadding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
+            widePadding: const EdgeInsets.fromLTRB(32, 12, 32, 32),
+            narrowGap: 16,
+            left: [
               _DateHeader(date: date),
               const SizedBox(height: 16),
               _Section(title: 'Ringkasan Hari Ini', children: [
@@ -80,7 +84,8 @@ class ClosingReportScreen extends ConsumerWidget {
                 _plain('Pesanan', '${r.summary.orders}'),
                 _plain('Item terjual', '${r.summary.itemsSold}'),
               ]),
-              const SizedBox(height: 16),
+            ],
+            right: [
               _Section(title: 'Rekonsiliasi Pembayaran', children: [
                 _recon('QRIS masuk (settle)', r.qrisSettled,
                     color: AppColors.success),

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/app_colors.dart';
+import '../../../core/utils/responsive.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/router/route_names.dart';
 import '../../../core/utils/formatters.dart';
@@ -103,8 +104,13 @@ class RecipeListScreen extends ConsumerWidget {
                           ),
                         ],
                       )
-                    : ListView.builder(
+                    // Layar lebar: daftar menu jadi grid (tiap kartu membawa
+                    // jarak bawah 12 sendiri → runSpacing 0).
+                    : ResponsiveListView(
                         padding: const EdgeInsets.all(16),
+                        minItemWidth: 340,
+                        maxColumns: 3,
+                        runSpacing: 0,
                         itemCount: rows.length,
                         itemBuilder: (context, i) {
                           final row = rows[i];
@@ -296,18 +302,14 @@ class _RecipeScreenState extends ConsumerState<RecipeScreen> {
                   ),
                 )
               : const Center(child: CircularProgressIndicator()))
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _HppSummaryCard(
+          : LayoutBuilder(builder: (context, c) {
+              final summary = _HppSummaryCard(
                     hppHot: hppHot,
                     hppIced: hppIced,
                     storedCostPrice: menuItem?.costPrice,
                     delta: delta,
-                  ),
-                  const SizedBox(height: 16),
+                  );
+              final editor = <Widget>[
                   Text('Baris Resep', style: Theme.of(context).textTheme.titleMedium),
                   const SizedBox(height: 8),
                   if (_lines.isEmpty)
@@ -356,9 +358,44 @@ class _RecipeScreenState extends ConsumerState<RecipeScreen> {
                     ),
                   ),
                   const SizedBox(height: 32),
-                ],
-              ),
-            ),
+              ];
+              // Layar lebar: editor baris resep di kiri, kartu HPP terhitung
+              // menetap di panel kanan (selalu terlihat saat takaran diubah).
+              if (c.maxWidth >= 900) {
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.fromLTRB(32, 16, 16, 16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: editor,
+                        ),
+                      ),
+                    ),
+                    SizedBox(
+                      width: 400,
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.fromLTRB(16, 16, 32, 16),
+                        child: summary,
+                      ),
+                    ),
+                  ],
+                );
+              }
+              return SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    summary,
+                    const SizedBox(height: 16),
+                    ...editor,
+                  ],
+                ),
+              );
+            }),
     );
   }
 }

@@ -9,6 +9,7 @@ import '../../../core/utils/responsive.dart';
 import '../../../shared/widgets/app_text_field.dart';
 import '../../../shared/widgets/primary_button.dart';
 import '../application/auth_controller.dart';
+import 'widgets/auth_split_layout.dart';
 
 /// Onboarding: melengkapi profil (nama wajib, tanggal lahir opsional)
 /// setelah verifikasi OTP berhasil.
@@ -74,8 +75,9 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
 
     return Scaffold(
       body: SafeArea(
-        child: ResponsiveCenter(
+        child: AuthSplitLayout(child: ResponsiveCenter(
           maxWidth: 480,
+          centerVertically: true,
           child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(24, 32, 24, 32),
           child: Form(
@@ -165,7 +167,7 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
             ).animate().fadeIn(duration: 350.ms),
           ),
           ),
-        ),
+        )),
       ),
     );
   }

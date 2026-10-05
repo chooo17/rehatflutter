@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/app_colors.dart';
+import '../../../core/utils/responsive.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/router/route_names.dart';
 import '../data/order_repository.dart';
@@ -89,31 +90,61 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen>
                 if (active.isNotEmpty) ...[
                   _SectionLabel('Sedang berjalan (${active.length})'),
                   const SizedBox(height: 10),
-                  for (final o in active) ...[
-                    OrderTrackCard(
+                  ResponsiveGrid(
+
+                    minItemWidth: 380,
+
+                    maxColumns: 3,
+
+                    runSpacing: 10,
+
+                    children: [
+
+                      for (final o in active)
+
+                        OrderTrackCard(
                       order: o,
                       onTap: () => context.pushNamed(
                         RouteNames.orderDetail,
                         pathParameters: {'id': o.id},
                       ),
                     ),
-                    const SizedBox(height: 10),
-                  ],
+
+                    ],
+
+                  ),
+
+                  const SizedBox(height: 10),
                   const SizedBox(height: 12),
                 ],
                 if (past.isNotEmpty) ...[
                   const _SectionLabel('Riwayat'),
                   const SizedBox(height: 10),
-                  for (final o in past) ...[
-                    OrderTrackCard(
+                  ResponsiveGrid(
+
+                    minItemWidth: 380,
+
+                    maxColumns: 3,
+
+                    runSpacing: 10,
+
+                    children: [
+
+                      for (final o in past)
+
+                        OrderTrackCard(
                       order: o,
                       onTap: () => context.pushNamed(
                         RouteNames.orderDetail,
                         pathParameters: {'id': o.id},
                       ),
                     ),
-                    const SizedBox(height: 10),
-                  ],
+
+                    ],
+
+                  ),
+
+                  const SizedBox(height: 10),
                 ],
               ],
             ),

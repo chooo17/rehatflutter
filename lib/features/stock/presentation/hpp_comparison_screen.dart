@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/app_colors.dart';
+import '../../../core/utils/responsive.dart';
 import '../../../core/router/route_names.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../shared/widgets/neu.dart';
@@ -100,11 +101,14 @@ class HppComparisonScreen extends ConsumerWidget {
                         child: Text('Belum ada menu.', textAlign: TextAlign.center),
                       )
                     else
-                      for (final row in sorted)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
-                          child: _HppRowTile(row: row),
-                        ),
+                      // Layar lebar: baris perbandingan jadi grid.
+                      ResponsiveGrid(
+                        minItemWidth: 380,
+                        maxColumns: 3,
+                        children: [
+                          for (final row in sorted) _HppRowTile(row: row),
+                        ],
+                      ),
                   ],
                 ),
               );

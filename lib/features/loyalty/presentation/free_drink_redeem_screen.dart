@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/constants/app_colors.dart';
+import '../../../core/utils/responsive.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../shared/widgets/neu.dart';
@@ -173,17 +174,7 @@ class _FreeDrinkRedeemBodyState extends ConsumerState<_FreeDrinkRedeemBody> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(freeDrinkControllerProvider);
-    final content = ListView(
-      shrinkWrap: widget.inSheet,
-      physics: widget.inSheet ? const ClampingScrollPhysics() : null,
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-      children: [
-        if (widget.inSheet)
-          Center(
-            child: Text('Tukar Voucher Gratis',
-                style: AppTextStyles.titleLarge),
-          ),
-        if (widget.inSheet) const SizedBox(height: 12),
+    final form = <Widget>[
         Text(
           'Ketik no. HP pelanggan — nama & voucher aktif muncul otomatis. '
           'Tandai terpakai saat minuman diserahkan.',
@@ -235,12 +226,35 @@ class _FreeDrinkRedeemBodyState extends ConsumerState<_FreeDrinkRedeemBody> {
             ),
           ),
         ),
+    ];
+    final content = ListView(
+      shrinkWrap: widget.inSheet,
+      physics: widget.inSheet ? const ClampingScrollPhysics() : null,
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+      children: [
+        if (widget.inSheet)
+          Center(
+            child: Text('Tukar Voucher Gratis',
+                style: AppTextStyles.titleLarge),
+          ),
+        if (widget.inSheet) const SizedBox(height: 12),
+        ...form,
         const SizedBox(height: 18),
         _results(state),
       ],
     );
 
-    if (!widget.inSheet) return content;
+    // Halaman penuh di layar lebar: form pencarian | hasil berdampingan.
+    if (!widget.inSheet) {
+      return AdaptiveColumns(
+        narrowPadding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+        widePadding: const EdgeInsets.fromLTRB(32, 16, 32, 32),
+        leftWidth: 400,
+        narrowGap: 18,
+        left: form,
+        right: [_results(state)],
+      );
+    }
     // Dalam bottom sheet: hormati keyboard & batasi tinggi agar bisa di-scroll.
     return SafeArea(
       child: Padding(

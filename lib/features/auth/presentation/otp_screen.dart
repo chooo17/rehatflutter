@@ -12,6 +12,7 @@ import '../../../core/utils/responsive.dart';
 import '../../../shared/widgets/otp_boxes.dart';
 import '../../../shared/widgets/primary_button.dart';
 import '../application/auth_controller.dart';
+import 'widgets/auth_split_layout.dart';
 
 /// Layar verifikasi OTP 6 digit setelah register.
 class OtpScreen extends ConsumerStatefulWidget {
@@ -137,8 +138,9 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
         ),
       ),
       body: SafeArea(
-        child: ResponsiveCenter(
+        child: AuthSplitLayout(child: ResponsiveCenter(
           maxWidth: 480,
+          centerVertically: true,
           child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(24, 8, 24, 32),
           child: Column(
@@ -218,7 +220,7 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
             ],
           ).animate().fadeIn(duration: 350.ms),
         ),
-        ),
+        )),
       ),
     );
   }

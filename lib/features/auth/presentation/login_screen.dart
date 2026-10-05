@@ -12,6 +12,7 @@ import '../../../shared/widgets/app_text_field.dart';
 import '../../../shared/widgets/neu.dart';
 import '../../../shared/widgets/primary_button.dart';
 import '../application/auth_controller.dart';
+import 'widgets/auth_split_layout.dart';
 
 /// Layar masuk (login) menggunakan nomor telepon & kata sandi.
 class LoginScreen extends ConsumerStatefulWidget {
@@ -43,6 +44,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           password: _passwordCtrl.text,
         );
 
+    // Beri tahu password manager browser/OS: simpan kredensial hanya bila
+    // login sukses, supaya kata sandi yang salah tak ikut ditawarkan disimpan.
+    TextInput.finishAutofillContext(shouldSave: ok);
+
     if (!ok && mounted) {
       final msg = ref.read(authControllerProvider).errorMessage ??
           'Gagal masuk. Coba lagi.';
@@ -59,12 +64,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
     return Scaffold(
       body: SafeArea(
-        child: ResponsiveCenter(
+        child: AuthSplitLayout(child: ResponsiveCenter(
           maxWidth: 480,
+          centerVertically: true,
           child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(24, 32, 24, 32),
           child: Form(
             key: _formKey,
+            // AutofillGroup → browser menawarkan "Simpan kata sandi?" & mengisi
+            // otomatis di login berikutnya. Commit dilakukan manual di _submit.
+            child: AutofillGroup(
+            onDisposeAction: AutofillContextAction.cancel,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -94,6 +104,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   prefixIcon: Icons.phone_outlined,
                   keyboardType: TextInputType.phone,
                   textInputAction: TextInputAction.next,
+                  autofillHints: const [
+                    AutofillHints.username,
+                    AutofillHints.telephoneNumber,
+                  ],
                   inputFormatters: [
                     FilteringTextInputFormatter.allow(RegExp(r'[0-9+]')),
                   ],
@@ -112,6 +126,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   prefixIcon: Icons.lock_outline_rounded,
                   obscureText: _obscure,
                   textInputAction: TextInputAction.done,
+                  autofillHints: const [AutofillHints.password],
                   onSubmitted: (_) => _submit(),
                   suffixIcon: IconButton(
                     icon: Icon(
@@ -189,9 +204,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   duration: 350.ms,
                   curve: Curves.easeOut,
                 ),
+            ),
           ),
         ),
-        ),
+        )),
       ),
     );
   }

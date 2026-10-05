@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/constants/app_colors.dart';
+import '../../../core/utils/responsive.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../shared/widgets/neu.dart';
 import '../application/stock_view.dart';
@@ -65,11 +66,20 @@ class IngredientsScreen extends ConsumerWidget {
                   : ListView(
                       padding: const EdgeInsets.all(16),
                       children: [
-                        for (final ing in items)
-                          _IngredientTile(
-                            ingredient: ing,
-                            onEdit: () => _showFormSheet(context, ref, editing: ing),
-                          ),
+                        // Layar lebar: bahan jadi grid (tile membawa jarak
+                        // bawah 12 sendiri → runSpacing 0).
+                        ResponsiveGrid(
+                          minItemWidth: 340,
+                          maxColumns: 3,
+                          runSpacing: 0,
+                          children: [
+                            for (final ing in items)
+                              _IngredientTile(
+                                ingredient: ing,
+                                onEdit: () => _showFormSheet(context, ref, editing: ing),
+                              ),
+                          ],
+                        ),
                       ],
                     ),
             ),

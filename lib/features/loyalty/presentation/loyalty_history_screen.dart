@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/constants/app_colors.dart';
+import '../../../core/utils/responsive.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../shared/models/loyalty_history_model.dart';
@@ -28,10 +29,21 @@ class LoyaltyHistoryScreen extends ConsumerWidget {
           return RefreshIndicator(
             color: AppColors.amber,
             onRefresh: () async => ref.invalidate(loyaltyHistoryProvider),
-            child: ListView.separated(
+            child: ResponsiveListView(
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
               itemCount: entries.length,
-              separatorBuilder: (_, __) => const Divider(height: 20),
+              minItemWidth: 340,
+              maxColumns: 3,
+              separator: const Divider(height: 20),
+              gridCell: (cell) => Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppColors.border),
+                ),
+                child: cell,
+              ),
               itemBuilder: (context, i) => _HistoryRow(entry: entries[i]),
             ),
           );

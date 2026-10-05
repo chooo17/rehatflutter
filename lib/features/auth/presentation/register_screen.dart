@@ -11,6 +11,7 @@ import '../../../core/utils/responsive.dart';
 import '../../../shared/widgets/app_text_field.dart';
 import '../../../shared/widgets/primary_button.dart';
 import '../application/auth_controller.dart';
+import 'widgets/auth_split_layout.dart';
 
 /// Layar pendaftaran akun baru (nomor HP + kata sandi → OTP).
 class RegisterScreen extends ConsumerStatefulWidget {
@@ -83,8 +84,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         ),
       ),
       body: SafeArea(
-        child: ResponsiveCenter(
+        child: AuthSplitLayout(child: ResponsiveCenter(
           maxWidth: 480,
+          centerVertically: true,
           child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(24, 8, 24, 32),
           child: Form(
@@ -197,7 +199,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             ).animate().fadeIn(duration: 350.ms),
           ),
         ),
-        ),
+        )),
       ),
     );
   }

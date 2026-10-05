@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/constants/app_colors.dart';
+import '../../../core/utils/responsive.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../shared/models/notification_model.dart';
@@ -61,10 +62,12 @@ class NotificationsScreen extends ConsumerWidget {
           return RefreshIndicator(
             color: AppColors.amber,
             onRefresh: () async => ref.invalidate(notificationsProvider),
-            child: ListView.separated(
+            child: ResponsiveListView(
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
               itemCount: list.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 10),
+              minItemWidth: 360,
+              maxColumns: 3,
+              runSpacing: 10,
               itemBuilder: (context, i) => _NotificationTile(
                 notif: list[i],
                 icon: _iconFor(list[i].type),

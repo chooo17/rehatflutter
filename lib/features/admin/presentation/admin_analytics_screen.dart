@@ -42,42 +42,93 @@ class AdminAnalyticsScreen extends ConsumerWidget {
               _RangePills(active: range, onPick: (r) =>
                   ref.read(analyticsRangeProvider.notifier).state = r),
               const SizedBox(height: 16),
-              Row(children: [
-                Expanded(child: _Kpi(
+              // Layar lebar: 3 KPI sebaris, lalu kedua grafik berdampingan.
+              LayoutBuilder(builder: (context, c) {
+                final repeat = _Kpi(
                     label: 'Pelanggan berulang',
                     value: '${a.repeatRatePct}%',
-                    sub: 'dari ${a.uniqueBuyers} pembeli')),
-                const SizedBox(width: 12),
-                Expanded(child: _Kpi(
+                    sub: 'dari ${a.uniqueBuyers} pembeli');
+                final aov = _Kpi(
                     label: 'Rata-rata pesanan',
                     value: Formatters.rupiah(a.avgOrderValue),
-                    sub: '${a.orders} pesanan')),
-              ]),
-              const SizedBox(height: 12),
-              _Kpi(
-                label: 'Jam paling sibuk',
-                value: a.peakHour == null ? '—' : '${a.peakHour.toString().padLeft(2, '0')}.00',
-                sub: 'gunakan untuk jadwal staf & happy hour',
-                wide: true,
-              ),
-              const SizedBox(height: 24),
-              Text('Pesanan per jam', style: AppTextStyles.titleMedium),
-              const SizedBox(height: 12),
-              _BarChart(
-                values: a.hourly,
-                labelEvery: 3,
-                labelBuilder: (i) => i.toString().padLeft(2, '0'),
-                highlight: a.peakHour,
-              ),
-              const SizedBox(height: 24),
-              Text('Pesanan per hari', style: AppTextStyles.titleMedium),
-              const SizedBox(height: 12),
-              _BarChart(
-                values: a.dow,
-                labelEvery: 1,
-                labelBuilder: (i) =>
-                    const ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'][i],
-              ),
+                    sub: '${a.orders} pesanan');
+                final peak = _Kpi(
+                  label: 'Jam paling sibuk',
+                  value: a.peakHour == null ? '—' : '${a.peakHour.toString().padLeft(2, '0')}.00',
+                  sub: 'gunakan untuk jadwal staf & happy hour',
+                  wide: true,
+                );
+                final hourly = Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Pesanan per jam', style: AppTextStyles.titleMedium),
+                    const SizedBox(height: 12),
+                    _BarChart(
+                      values: a.hourly,
+                      labelEvery: 3,
+                      labelBuilder: (i) => i.toString().padLeft(2, '0'),
+                      highlight: a.peakHour,
+                    ),
+                  ],
+                );
+                final daily = Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Pesanan per hari', style: AppTextStyles.titleMedium),
+                    const SizedBox(height: 12),
+                    _BarChart(
+                      values: a.dow,
+                      labelEvery: 1,
+                      labelBuilder: (i) =>
+                          const ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'][i],
+                    ),
+                  ],
+                );
+                if (c.maxWidth < 900) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(children: [
+                        Expanded(child: repeat),
+                        const SizedBox(width: 12),
+                        Expanded(child: aov),
+                      ]),
+                      const SizedBox(height: 12),
+                      peak,
+                      const SizedBox(height: 24),
+                      hourly,
+                      const SizedBox(height: 24),
+                      daily,
+                    ],
+                  );
+                }
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    IntrinsicHeight(
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Expanded(child: repeat),
+                          const SizedBox(width: 12),
+                          Expanded(child: aov),
+                          const SizedBox(width: 12),
+                          Expanded(child: peak),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(flex: 3, child: hourly),
+                        const SizedBox(width: 24),
+                        Expanded(flex: 2, child: daily),
+                      ],
+                    ),
+                  ],
+                );
+              }),
             ],
           ),
         ),

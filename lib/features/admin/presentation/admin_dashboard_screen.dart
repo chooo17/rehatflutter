@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/app_colors.dart';
+import '../../../core/utils/responsive.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/router/route_names.dart';
 import '../../../core/utils/formatters.dart';
@@ -251,9 +252,26 @@ class AdminDashboardScreen extends ConsumerWidget {
               data: (r) => _Report(report: r),
             ),
             const SizedBox(height: 24),
-            const _SalesCalendar(),
-            const SizedBox(height: 24),
-            const _ExpensesSection(),
+            // Layar lebar: kalender & pengeluaran berdampingan.
+            LayoutBuilder(builder: (context, c) {
+              if (c.maxWidth < 900) {
+                return const Column(
+                  children: [
+                    _SalesCalendar(),
+                    SizedBox(height: 24),
+                    _ExpensesSection(),
+                  ],
+                );
+              }
+              return const Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: _SalesCalendar()),
+                  SizedBox(width: 24),
+                  Expanded(child: _ExpensesSection()),
+                ],
+              );
+            }),
           ],
         ),
       ),
@@ -275,119 +293,79 @@ class _Report extends StatelessWidget {
         // belum memotong biaya tetap. Label SENGAJA bukan "Laba bersih" agar
         // tidak bentrok dengan angka laba rugi modul Keuangan yang lebih
         // akurat; lihat CLAUDE.md §4).
-        Row(
+        // KPI adaptif: 2 kolom (HP) → 4 (tablet) → 6 (desktop). Dulu baris
+        // 2-kolom tetap → di desktop tiap kartu selebar ±600px dgn isi kecil.
+        ResponsiveGrid(
+          minItemWidth: 160,
+          maxColumns: 6,
           children: [
-            Expanded(
-              child: _KpiCard(
-                icon: Icons.payments_rounded,
-                label: 'Total omzet',
-                value: Formatters.rupiah(report.revenue),
-                accent: true,
-              ),
+            _KpiCard(
+              icon: Icons.payments_rounded,
+              label: 'Total omzet',
+              value: Formatters.rupiah(report.revenue),
+              accent: true,
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _KpiCard(
-                icon: Icons.savings_rounded,
-                label: 'Laba kotor − pengeluaran',
-                value: Formatters.rupiah(report.netProfit),
-              ),
+            _KpiCard(
+              icon: Icons.savings_rounded,
+              label: 'Laba kotor − pengeluaran',
+              value: Formatters.rupiah(report.netProfit),
             ),
+            // HPP (modal) & laba kotor + margin riil berbasis cost_price.
+            _KpiCard(
+              icon: Icons.inventory_2_rounded,
+              label: 'HPP (modal)',
+              value: Formatters.rupiah(report.cogs),
+            ),
+            _KpiCard(
+              icon: Icons.trending_up_rounded,
+              label: 'Laba kotor · ${report.grossMarginPct}%',
+              value: Formatters.rupiah(report.grossProfit),
+            ),
+            // Penerimaan dipisah metode bayar.
+            _KpiCard(
+              icon: Icons.qr_code_2_rounded,
+              label: 'Diterima via QRIS',
+              value: Formatters.rupiah(report.qrisRevenue),
+            ),
+            _KpiCard(
+              icon: Icons.payments_outlined,
+              label: 'Diterima Tunai',
+              value: Formatters.rupiah(report.cashRevenue),
+            ),
+            // Kas tunai di kasir = omzet - QRIS - pengeluaran.
+            _KpiCard(
+              icon: Icons.account_balance_wallet_rounded,
+              label: 'Kas Tunai Kasir',
+              value: Formatters.rupiah(report.cashInDrawer),
+            ),
+            _KpiCard(
+              icon: Icons.money_off_rounded,
+              label: 'Pengeluaran',
+              value: Formatters.rupiah(report.expenses),
+            ),
+            _KpiCard(
+              icon: Icons.receipt_long_rounded,
+              label: 'Pesanan',
+              value: '${report.orders}',
+            ),
+            _KpiCard(
+              icon: Icons.local_cafe_rounded,
+              label: 'Item terjual',
+              value: '${report.itemsSold}',
+            ),
+            if (report.stampRedemptions != null)
+              _KpiCard(
+                icon: Icons.card_giftcard_rounded,
+                label: 'Kopi gratis ditukar (stamp)'
+                    '${report.stampRedemptionsUsed != null ? ' • ${report.stampRedemptionsUsed} terpakai' : ''}',
+                value: '${report.stampRedemptions}',
+              ),
           ],
         ),
-        const SizedBox(height: 12),
-        // HPP (modal) & laba kotor + margin riil berbasis cost_price.
-        Row(
-          children: [
-            Expanded(
-              child: _KpiCard(
-                icon: Icons.inventory_2_rounded,
-                label: 'HPP (modal)',
-                value: Formatters.rupiah(report.cogs),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _KpiCard(
-                icon: Icons.trending_up_rounded,
-                label: 'Laba kotor · ${report.grossMarginPct}%',
-                value: Formatters.rupiah(report.grossProfit),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        // Penerimaan dipisah metode bayar.
-        Row(
-          children: [
-            Expanded(
-              child: _KpiCard(
-                icon: Icons.qr_code_2_rounded,
-                label: 'Diterima via QRIS',
-                value: Formatters.rupiah(report.qrisRevenue),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _KpiCard(
-                icon: Icons.payments_outlined,
-                label: 'Diterima Tunai',
-                value: Formatters.rupiah(report.cashRevenue),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        // Kas tunai di kasir = omzet - QRIS - pengeluaran.
-        Row(
-          children: [
-            Expanded(
-              child: _KpiCard(
-                icon: Icons.account_balance_wallet_rounded,
-                label: 'Kas Tunai Kasir',
-                value: Formatters.rupiah(report.cashInDrawer),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _KpiCard(
-                icon: Icons.money_off_rounded,
-                label: 'Pengeluaran',
-                value: Formatters.rupiah(report.expenses),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: _KpiCard(
-                icon: Icons.receipt_long_rounded,
-                label: 'Pesanan',
-                value: '${report.orders}',
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _KpiCard(
-                icon: Icons.local_cafe_rounded,
-                label: 'Item terjual',
-                value: '${report.itemsSold}',
-              ),
-            ),
-          ],
-        ),
-        if (report.stampRedemptions != null) ...[
-          const SizedBox(height: 12),
-          _KpiCard(
-            icon: Icons.card_giftcard_rounded,
-            label: 'Kopi gratis ditukar (stamp)'
-                '${report.stampRedemptionsUsed != null ? ' • ${report.stampRedemptionsUsed} terpakai' : ''}',
-            value: '${report.stampRedemptions}',
-          ),
-        ],
         const SizedBox(height: 24),
+        // Layar lebar: grafik & item terlaris berdampingan.
+        LayoutBuilder(builder: (context, c) {
+          final chart = <Widget>[
         Text('Pendapatan harian', style: AppTextStyles.titleMedium),
         const SizedBox(height: 12),
         NeuCard(
@@ -395,7 +373,8 @@ class _Report extends StatelessWidget {
           radius: 20,
           child: _RevenueChart(series: report.series),
         ),
-        const SizedBox(height: 24),
+          ];
+          final top = <Widget>[
         Text('Item terlaris', style: AppTextStyles.titleMedium),
         const SizedBox(height: 12),
         if (report.topItems.isEmpty)
@@ -415,6 +394,32 @@ class _Report extends StatelessWidget {
             _TopItemRow(rank: i + 1, item: report.topItems[i]),
             if (i != report.topItems.length - 1) const SizedBox(height: 10),
           ],
+          ];
+          if (c.maxWidth < 900) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [...chart, const SizedBox(height: 24), ...top],
+            );
+          }
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                flex: 3,
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: chart),
+              ),
+              const SizedBox(width: 24),
+              Expanded(
+                flex: 2,
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: top),
+              ),
+            ],
+          );
+        }),
       ],
     );
   }
@@ -722,11 +727,15 @@ class _SalesCalendar extends ConsumerWidget {
                 ],
               ),
               const SizedBox(height: 6),
-              GridView.count(
-                crossAxisCount: 7,
+              // Tinggi sel TETAP (bukan childAspectRatio): dgn rasio, sel ikut
+              // memanjang sebanding lebar layar — ±400px per sel di desktop.
+              GridView(
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 7,
+                  mainAxisExtent: 56,
+                ),
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
-                childAspectRatio: 0.82,
                 children: cells,
               ),
             ],
@@ -1060,17 +1069,29 @@ class _ExpenseRowState extends ConsumerState<_ExpenseRow> {
                     style: AppTextStyles.bodyMedium,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis),
+                // Flexible + ellipsis: kolom pengeluaran kini bisa sempit
+                // (berdampingan dgn kalender di layar lebar) — tanpa ini
+                // baris meta meluap.
                 Row(
                   children: [
-                    Text(Formatters.tanggalJam(item.spentAt),
-                        style: AppTextStyles.caption
-                            .copyWith(color: AppColors.textSecondary)),
+                    Flexible(
+                      child: Text(Formatters.tanggalJam(item.spentAt),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppTextStyles.caption
+                              .copyWith(color: AppColors.textSecondary)),
+                    ),
                     Text('  ·  ',
                         style: AppTextStyles.caption
                             .copyWith(color: AppColors.textSecondary)),
-                    Text(expenseBucketLabel(item.bucket),
-                        style: AppTextStyles.caption
-                            .copyWith(color: AppColors.amberDark, fontWeight: FontWeight.w600)),
+                    Flexible(
+                      child: Text(expenseBucketLabel(item.bucket),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppTextStyles.caption.copyWith(
+                              color: AppColors.amberDark,
+                              fontWeight: FontWeight.w600)),
+                    ),
                   ],
                 ),
               ],

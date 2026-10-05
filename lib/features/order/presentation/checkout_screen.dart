@@ -72,179 +72,235 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     final discount = state.discountAmount;
     final total = subtotal - discount;
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Pembayaran')),
-      body: items.isEmpty
-          ? ResponsiveCenter(
-              maxWidth: 640,
-              child: Center(
-                child: Text('Keranjang kosong.',
-                    style: AppTextStyles.bodyMedium
-                        .copyWith(color: AppColors.textSecondary)),
-              ),
-            )
-          : ResponsiveCenter(
-              maxWidth: 640,
-              child: ListView(
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-              children: [
-                if (isGuest) ...[
-                  const _SectionLabel('Data pemesan'),
-                  const SizedBox(height: 10),
-                  _GuestField(
-                      controller: _guestNameCtrl,
-                      hint: 'Nama kamu *',
-                      icon: Icons.person_outline_rounded,
-                      textCapitalization: TextCapitalization.words),
-                  const SizedBox(height: 10),
-                  _GuestField(
-                      controller: _guestPhoneCtrl,
-                      hint: 'No. HP / WhatsApp *',
-                      icon: Icons.phone_outlined,
-                      keyboardType: TextInputType.phone),
-                  const SizedBox(height: 24),
-                ],
-                if (tableNumber != null) ...[
-                  _TableBanner(table: tableNumber),
-                  const SizedBox(height: 24),
-                ] else ...[
-                  const _SectionLabel('Tipe pesanan'),
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      for (final type in OrderType.values) ...[
-                        Expanded(
-                          child: _OrderTypeCard(
-                            type: type,
-                            selected: state.orderType == type,
-                            onTap: () => notifier.setOrderType(type),
-                          ),
-                        ),
-                        if (type != OrderType.values.last)
-                          const SizedBox(width: 10),
-                      ],
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-                ],
-                const _SectionLabel('Metode pembayaran'),
-                const SizedBox(height: 10),
-                // 'cash' hanya untuk kasir. Saldo Rehat hanya untuk user login
-                // (tamu tak punya dompet).
-                for (final method in [
-                  ..._customerMethods,
-                  if (!isGuest) PaymentMethod.balance,
-                ]) ...[
-                  _PaymentRow(
-                    method: method,
-                    selected: state.paymentMethod == method,
-                    onTap: () => notifier.setPaymentMethod(method),
-                  ),
-                  const SizedBox(height: 8),
-                ],
-                const SizedBox(height: 24),
-                // Voucher tak berlaku untuk tamu (butuh akun).
-                if (!isGuest) ...[
-                  const _SectionLabel('Voucher'),
-                  const SizedBox(height: 10),
-                  const _VoucherPicker(),
-                  const SizedBox(height: 24),
-                ],
-                const _SectionLabel('Catatan untuk barista'),
-                const SizedBox(height: 10),
-                TextField(
-                  controller: _notesCtrl,
-                  onChanged: notifier.setNotes,
-                  maxLines: 3,
-                  maxLength: 300,
-                  textCapitalization: TextCapitalization.sentences,
-                  decoration: const InputDecoration(
-                    hintText: 'Mis. es sedikit, gula 50%, nama di gelas: Rizki',
-                    alignLabelWithHint: true,
-                  ),
+    final formA = <Widget>[
+      if (isGuest) ...[
+        const _SectionLabel('Data pemesan'),
+        const SizedBox(height: 10),
+        _GuestField(
+            controller: _guestNameCtrl,
+            hint: 'Nama kamu *',
+            icon: Icons.person_outline_rounded,
+            textCapitalization: TextCapitalization.words),
+        const SizedBox(height: 10),
+        _GuestField(
+            controller: _guestPhoneCtrl,
+            hint: 'No. HP / WhatsApp *',
+            icon: Icons.phone_outlined,
+            keyboardType: TextInputType.phone),
+        const SizedBox(height: 24),
+      ],
+      if (tableNumber != null) ...[
+        _TableBanner(table: tableNumber),
+        const SizedBox(height: 24),
+      ] else ...[
+        const _SectionLabel('Tipe pesanan'),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            for (final type in OrderType.values) ...[
+              Expanded(
+                child: _OrderTypeCard(
+                  type: type,
+                  selected: state.orderType == type,
+                  onTap: () => notifier.setOrderType(type),
                 ),
-                const SizedBox(height: 8),
-                const _SectionLabel('Ringkasan pesanan'),
-                const SizedBox(height: 10),
-                NeuCard(
-                  padding: const EdgeInsets.all(16),
-                  radius: 18,
-                  child: Column(
-                    children: [
-                      for (final line in items)
-                        Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 6),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('${line.quantity}x',
-                                  style: AppTextStyles.label
-                                      .copyWith(color: AppColors.amberDark)),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(line.item.name,
-                                        style: AppTextStyles.bodyMedium),
-                                    if (line.customizationSummary.isNotEmpty)
-                                      Text(line.customizationSummary,
-                                          style: AppTextStyles.bodySmall),
-                                  ],
-                                ),
-                              ),
-                              Text(Formatters.rupiah(line.subtotal),
-                                  style: AppTextStyles.bodyMedium),
-                            ],
-                          ),
-                        ),
-                      const Divider(height: 24),
-                      _summaryRow('Subtotal', Formatters.rupiah(subtotal)),
-                      if (discount > 0) ...[
-                        const SizedBox(height: 6),
-                        _summaryRow(
-                          'Diskon voucher (${state.voucher!.discountPct}%)',
-                          '- ${Formatters.rupiah(discount)}',
-                          valueColor: AppColors.success,
-                        ),
-                      ],
-                      const SizedBox(height: 10),
-                      Row(
+              ),
+              if (type != OrderType.values.last) const SizedBox(width: 10),
+            ],
+          ],
+        ),
+        const SizedBox(height: 24),
+      ],
+      const _SectionLabel('Metode pembayaran'),
+      const SizedBox(height: 10),
+      // 'cash' hanya untuk kasir. Saldo Rehat hanya untuk user login
+      // (tamu tak punya dompet).
+      for (final method in [
+        ..._customerMethods,
+        if (!isGuest) PaymentMethod.balance,
+      ]) ...[
+        _PaymentRow(
+          method: method,
+          selected: state.paymentMethod == method,
+          onTap: () => notifier.setPaymentMethod(method),
+        ),
+        const SizedBox(height: 8),
+      ],
+      const SizedBox(height: 24),
+    ];
+    final formB = <Widget>[
+      // Voucher tak berlaku untuk tamu (butuh akun).
+      if (!isGuest) ...[
+        const _SectionLabel('Voucher'),
+        const SizedBox(height: 10),
+        const _VoucherPicker(),
+        const SizedBox(height: 24),
+      ],
+      const _SectionLabel('Catatan untuk barista'),
+      const SizedBox(height: 10),
+      TextField(
+        controller: _notesCtrl,
+        onChanged: notifier.setNotes,
+        maxLines: 3,
+        maxLength: 300,
+        textCapitalization: TextCapitalization.sentences,
+        decoration: const InputDecoration(
+          hintText: 'Mis. es sedikit, gula 50%, nama di gelas: Rizki',
+          alignLabelWithHint: true,
+        ),
+      ),
+      const SizedBox(height: 8),
+    ];
+    final summary = <Widget>[
+      const _SectionLabel('Ringkasan pesanan'),
+      const SizedBox(height: 10),
+      NeuCard(
+        padding: const EdgeInsets.all(16),
+        radius: 18,
+        child: Column(
+          children: [
+            for (final line in items)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('${line.quantity}x',
+                        style: AppTextStyles.label
+                            .copyWith(color: AppColors.amberDark)),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Total', style: AppTextStyles.titleMedium),
-                          const Spacer(),
-                          Text(Formatters.rupiah(total),
-                              style: AppTextStyles.titleLarge
-                                  .copyWith(color: AppColors.amberDark)),
+                          Text(line.item.name, style: AppTextStyles.bodyMedium),
+                          if (line.customizationSummary.isNotEmpty)
+                            Text(line.customizationSummary,
+                                style: AppTextStyles.bodySmall),
                         ],
                       ),
-                    ],
+                    ),
+                    Text(Formatters.rupiah(line.subtotal),
+                        style: AppTextStyles.bodyMedium),
+                  ],
+                ),
+              ),
+            const Divider(height: 24),
+            _summaryRow('Subtotal', Formatters.rupiah(subtotal)),
+            if (discount > 0) ...[
+              const SizedBox(height: 6),
+              _summaryRow(
+                'Diskon voucher (${state.voucher!.discountPct}%)',
+                '- ${Formatters.rupiah(discount)}',
+                valueColor: AppColors.success,
+              ),
+            ],
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Text('Total', style: AppTextStyles.titleMedium),
+                const Spacer(),
+                Text(Formatters.rupiah(total),
+                    style: AppTextStyles.titleLarge
+                        .copyWith(color: AppColors.amberDark)),
+              ],
+            ),
+          ],
+        ),
+      ),
+    ];
+    final submit = NeuButton(
+      expand: true,
+      accent: true,
+      onPressed: state.isSubmitting ? null : _placeOrder,
+      child: state.isSubmitting
+          ? const SizedBox(
+              height: 22,
+              width: 22,
+              child: CircularProgressIndicator(
+                strokeWidth: 2.4,
+                valueColor: AlwaysStoppedAnimation(Colors.white),
+              ),
+            )
+          : Text('Buat Pesanan • ${Formatters.rupiah(total)}',
+              style: AppTextStyles.button.copyWith(color: Colors.white)),
+    );
+
+    if (items.isEmpty) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Pembayaran')),
+        body: Center(
+          child: Text('Keranjang kosong.',
+              style: AppTextStyles.bodyMedium
+                  .copyWith(color: AppColors.textSecondary)),
+        ),
+      );
+    }
+
+    // Layar lebar: form di kiri, ringkasan + tombol bayar di panel kanan —
+    // mengisi lebar, total & tombol selalu terlihat tanpa menggulir.
+    if (MediaQuery.sizeOf(context).width >= 900) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Pembayaran')),
+        body: TwoPane(
+          secondaryWidth: 420,
+          primary: ListView(
+            padding: const EdgeInsets.fromLTRB(32, 8, 32, 32),
+            children: [
+              // Form dua kolom: di desktop panel kiri ±1400px — satu kolom
+              // membuat baris pilihan & kolom catatan melar.
+              ResponsiveGrid(
+                minItemWidth: 380,
+                maxColumns: 2,
+                spacing: 32,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: formA,
                   ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: formB,
+                  ),
+                ],
+              ),
+            ],
+          ),
+          secondary: DecoratedBox(
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              border: Border(left: BorderSide(color: AppColors.border)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  child: ListView(
+                    padding: const EdgeInsets.fromLTRB(24, 16, 24, 16),
+                    children: summary,
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+                  child: submit,
                 ),
               ],
             ),
-            ),
-      bottomNavigationBar: items.isEmpty
-          ? null
-          : NeuBottomBar(
-              child: NeuButton(
-                expand: true,
-                accent: true,
-                onPressed: state.isSubmitting ? null : _placeOrder,
-                child: state.isSubmitting
-                    ? const SizedBox(
-                        height: 22,
-                        width: 22,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2.4,
-                          valueColor: AlwaysStoppedAnimation(Colors.white),
-                        ),
-                      )
-                    : Text('Buat Pesanan • ${Formatters.rupiah(total)}',
-                        style:
-                            AppTextStyles.button.copyWith(color: Colors.white)),
-              ),
-            ),
+          ),
+        ),
+      );
+    }
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('Pembayaran')),
+      body: ResponsiveCenter(
+        maxWidth: 640,
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+          children: [...formA, ...formB, ...summary],
+        ),
+      ),
+      bottomNavigationBar: NeuBottomBar(child: submit),
     );
   }
 
@@ -398,38 +454,38 @@ class _OrderTypeCard extends StatelessWidget {
           depth: selected ? -4 : 5,
           padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
           radius: AppRadius.md,
-        child: Column(
-          children: [
-            Stack(
-              clipBehavior: Clip.none,
-              children: [
-                Icon(type.icon,
-                    color: selected ? AppColors.amber : AppColors.amberDark,
-                    size: 26),
-                if (selected)
-                  const Positioned(
-                    right: -10,
-                    top: -6,
-                    child: Icon(Icons.check_circle_rounded,
-                        color: AppColors.amber, size: 14),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(type.label,
-                style: AppTextStyles.label.copyWith(
-                  color: accent,
-                  fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
-                )),
-            const SizedBox(height: 2),
-            Text(
-              type.description,
-              textAlign: TextAlign.center,
-              style: AppTextStyles.caption
-                  .copyWith(color: AppColors.textSecondary),
-            ),
-          ],
-        ),
+          child: Column(
+            children: [
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Icon(type.icon,
+                      color: selected ? AppColors.amber : AppColors.amberDark,
+                      size: 26),
+                  if (selected)
+                    const Positioned(
+                      right: -10,
+                      top: -6,
+                      child: Icon(Icons.check_circle_rounded,
+                          color: AppColors.amber, size: 14),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(type.label,
+                  style: AppTextStyles.label.copyWith(
+                    color: accent,
+                    fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+                  )),
+              const SizedBox(height: 2),
+              Text(
+                type.description,
+                textAlign: TextAlign.center,
+                style: AppTextStyles.caption
+                    .copyWith(color: AppColors.textSecondary),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -471,8 +527,8 @@ class _VoucherPicker extends ConsumerWidget {
             ),
             for (final v in vouchers)
               ListTile(
-                leading: Icon(Icons.local_offer_rounded,
-                    color: AppColors.amberDark),
+                leading:
+                    Icon(Icons.local_offer_rounded, color: AppColors.amberDark),
                 title: Text('Diskon ${v.discountPct}%',
                     style: AppTextStyles.bodyLarge),
                 subtitle: Text(
@@ -488,7 +544,9 @@ class _VoucherPicker extends ConsumerWidget {
       ),
     );
     if (chosen == null) return;
-    await ref.read(checkoutControllerProvider.notifier).applyVoucher(chosen.code);
+    await ref
+        .read(checkoutControllerProvider.notifier)
+        .applyVoucher(chosen.code);
     if (!context.mounted) return;
     final st = ref.read(checkoutControllerProvider);
     if (st.errorMessage != null) {
@@ -511,8 +569,8 @@ class _VoucherPicker extends ConsumerWidget {
           const SizedBox(
               width: 16,
               height: 16,
-              child:
-                  CircularProgressIndicator(strokeWidth: 2, color: AppColors.amber)),
+              child: CircularProgressIndicator(
+                  strokeWidth: 2, color: AppColors.amber)),
           const SizedBox(width: 10),
           Text('Memuat voucher…',
               style: AppTextStyles.bodyMedium
