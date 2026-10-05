@@ -49,7 +49,10 @@ class MainShell extends ConsumerWidget {
       // lembut agar terasa "melayang" di atas konten.
       bottomNavigationBar: SafeArea(
         top: false,
+        // heightFactor: 1 — Center polos memuai setinggi layar di
+        // bottomNavigationBar, menelan seluruh body (konten jadi kosong).
         child: Center(
+          heightFactor: 1,
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 480),
             child: Container(

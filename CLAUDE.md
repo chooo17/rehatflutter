@@ -79,6 +79,8 @@ Sudah diatasi permanen lewat header di [`web/vercel.json`](web/vercel.json):
 - `/canvaskit/*` → cache 1 tahun `immutable` (sudah ber-versi di path, aman)
 
 `deploy_web.sh` menyalin `web/vercel.json` ke `build/web/` — jadi jangan hapus file itu.
+
+**`vercel.json` di ROOT repo (`git.deploymentEnabled: false`) — JANGAN dihapus.** Project Vercel `rehatflutter` tersambung ke repo GitHub, sehingga tiap push ke `main` Vercel ikut membuat deploy produksi sendiri **tanpa build Flutter** (isi kosong) → seluruh web **404** sampai deploy CI menimpanya. Pernah terjadi 5 Okt 2026 (±2,5 menit down, iframe `/preorder` di situs `rehat-coffeehouse.my.id` ikut 404). File ini hanya mematikan deploy integrasi Git; deploy via CLI (CI & `deploy_web.sh`, keduanya dari `build/web`) tidak terpengaruh.
 Verifikasi setelah deploy: `curl -sI https://rehatflutter.vercel.app/main.dart.js | grep -i cache-control`
 
 ### Backend (Railway)
