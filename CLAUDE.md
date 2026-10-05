@@ -14,7 +14,7 @@
 | **Pembayaran** | DOKU (QRIS/SNAP + Checkout) — **PRODUKSI (uang nyata)** | `src/services/dokuService.js`, `dokuSnapService.js` |
 | **Notifikasi** | Firebase Cloud Messaging (push) + in-app polling | `firebase_messaging`, `notificationService.js` |
 | **Crash** | Firebase Crashlytics (mobile) | `main.dart` |
-| **OTP** | WhatsApp via Fonnte (device `087777601617`) | `authService.js`, `config/whatsapp.js` |
+| **OTP** | WhatsApp via Fonnte (device `087748537208`) | `authService.js`, `config/whatsapp.js` |
 
 - **Web live:** https://rehatflutter.vercel.app (Vercel, project `rehatflutter`)
 - **Backend live:** https://rehat-backend-production.up.railway.app/v1 (Railway, service `rehat-backend`)
@@ -31,12 +31,12 @@ Path berikut spesifik mesin dev saat ini — ganti sesuai PC-mu:
 
 | Alat | Path (mesin saat ini) |
 |---|---|
-| Flutter SDK | `C:\Users\thezu\flutter\bin\flutter.bat` (Flutter 3.44.4 stable) — **tidak di PATH**, panggil path penuh |
+| Flutter SDK | `D:\flutter\bin\flutter.bat` (Flutter 3.47.6 stable, per Okt 2026; dulu `C:\Users\thezu\flutter`) — **tidak di PATH**, panggil path penuh. Script `scripts/*.sh` masih default ke path lama → jalankan dgn `FLUTTER_BIN=D:/flutter/bin/flutter.bat bash scripts/<x>.sh` |
 | Android SDK / adb | `D:\Sdk\platform-tools\adb.exe` |
 | Emulator | `D:\Sdk\emulator\emulator.exe -avd Pixel_8_Pro` |
 | Backend repo | `D:\REHAT\rehat-backend\rehat-backend` |
 
-> Di PC lain: install Flutter 3.44.x, set `flutter.sdk` di `android/local.properties`, `flutter pub get`.
+> Di PC lain: install Flutter 3.47.x, set `flutter.sdk` di `android/local.properties`, `flutter pub get`.
 
 ---
 
@@ -182,10 +182,11 @@ Dashboard penjualan (**omzet, HPP, laba kotor & bersih RIIL, margin%**) · Grafi
 
 ## 5b. Notifikasi WhatsApp (Fonnte) — ATURAN PENTING
 
-Gateway: **Fonnte**, device pengirim **`087777601617`** (paket Free, kuota 1000/bulan). `sendWhatsapp` sudah mendukung target grup (ID `…@g.us` diteruskan apa adanya, tidak dinormalkan).
+Gateway: **Fonnte**, device pengirim **`087748537208`** (nama device "Rehat", paket Free, kuota 1000/bulan, aktif s/d 24 Okt 2026). `sendWhatsapp` sudah mendukung target grup (ID `…@g.us` diteruskan apa adanya, tidak dinormalkan).
 
 > ⚠️ **Riwayat & jebakan (Juli 2026):** device `087777601617` **di-soft-ban WhatsApp** untuk *cold-outbound* — OTP 1-lawan-1 ke nomor baru **tak terkirim** (status Fonnte "connect" & "queued" tapi tak sampai), **sementara pesan ke grup tetap jalan** (device anggota grup = tepercaya; OTP ke banyak orang asing = sidik jari spam). Sempat dicoba `087864504924` (nomor admin — berisiko membakar WA pribadi), lalu dipindah ke **nomor `087864504924`**. Token pengirim = `FONNTE_TOKEN` (Railway + `.env` lokal); ganti device = ganti token itu. **Ini solusi sementara** — nomor unofficial baru pun berisiko kena flag yang sama seiring volume OTP. Solusi andal jangka panjang: **WhatsApp Business API resmi** atau OTP via **email/SMS provider transaksional**. Kode `sendOtp` kini **tak pernah 500** saat gagal (kembalikan `otpSent`), layar OTP menampilkan peringatan + tombol kirim ulang.
-> **Update terbaru (permintaan user):** device pengirim **dikembalikan ke `087777601617`** (token `FONNTE_TOKEN` diganti di Railway + `.env`). ⚠️ Ini nomor yang **dulu kena soft-ban** (lihat riwayat di atas) & merupakan **nomor admin `irur`** — pantau ketat apakah OTP ke nomor baru benar-benar sampai; bila "queued" tapi tak terkirim, itu gejala flag berulang.
+> Sempat dikembalikan ke `087777601617` (nomor admin `irur`), tapi per 5 Okt 2026 device itu **disconnect** & paket Lite-nya habis 7 Okt 2026.
+> **Update terbaru (5 Okt 2026, permintaan user):** device pengirim **dipindah ke `087748537208`** (nomor khusus, bukan nomor admin) — `FONNTE_TOKEN` diganti di Railway + `.env`. Terverifikasi: status `connect` & sudah anggota grup `WA_ANNOUNCE_GROUP`. Tetap pantau OTP ke nomor baru; bila "queued" tapi tak terkirim, itu gejala flag (lihat riwayat di atas).
 > **Saat ganti device Fonnte:** pastikan nomor baru juga **anggota (admin) grup** `WA_ANNOUNCE_GROUP`, kalau tidak pengumuman grup berhenti.
 
 **Siapa dapat WA otomatis:**
@@ -338,7 +339,7 @@ Detail model & validasi ada di kode (`src/routes/index.js`, `src/services/*`). E
 - ✅ Notifikasi WA grup aktif; WA admin per-nomor dihentikan; kasir tanpa WA otomatis.
 - ✅ Waktu seluruh sistem konsisten **WIB** (penyimpanan UTC → perhitungan WIB → tampilan WIB).
 - ✅ Alur status disederhanakan (tanpa "Siap diambil"), auto-proses setelah bayar, tracking FIFO.
-- 👤 **Akun admin saat ini (2):** `irur` (087777601617) & `irurr` (087864504924). **Device Fonnte pengirim OTP kini nomor `087777601617`** (= nomor admin `irur`; perhatikan riwayat soft-ban di §5b).
+- 👤 **Akun admin saat ini (2):** `irur` (087777601617) & `irurr` (087864504924). **Device Fonnte pengirim OTP kini nomor `087748537208`** (nomor khusus Rehat, bukan nomor admin; lihat §5b).
   Menjadikan admin: `node src/db/set-admin.js <nomor>` di folder backend.
 - ⏳ **Ditunda (permintaan user):** penukaran stamp digital & belanja poin.
 - ✅ **Refund tunai** live (backend `POST /admin/orders/:id/refund` + tombol di detail pesanan admin); migrasi 012 terpasang. Masih **tunai-only** (QRIS/Saldo belum).
