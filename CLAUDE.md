@@ -50,6 +50,9 @@ Path berikut spesifik mesin dev saat ini — ganti sesuai PC-mu:
 - `--dart-define=ADMIN_BUILD=true|false` harus cocok dgn flavor (gating `UserModel.isAdmin`).
 - Web build **wajib** `--pwa-strategy=none` (service worker cache bikin stuck-loading saat redeploy).
 
+### 🔴 JANGAN deploy web dari SDK lokal 3.47.6
+CI mem-build web dgn **Flutter 3.44.4** (`deploy-web.yml`). Deploy manual `deploy_web.sh` dgn SDK lokal **3.47.6** (6 Okt 2026) membuat **semua gambar menu tampil kotak HITAM** di web (kartu `CachedNetworkImage`+`memCacheWidth` lewat CanvasKit) — padahal kode & file gambar tak berubah (Supabase Storage 200, CORS `*`). Dipulihkan dgn push ke `main` → CI rebuild dgn 3.44.4. **Deploy web lewat CI (push ke `main`)**, atau pasang SDK 3.44.4 untuk deploy manual. APK tidak terdampak isu ini (bukan CanvasKit), tapi tetap uji gambar sebelum rilis bila SDK beda versi.
+
 ### 🔴 URUTAN DEPLOY (jebakan yang pernah menggigit)
 `scripts/deploy_web.sh` menjalankan **`flutter clean`** → menghapus SELURUH `build/`, **termasuk APK yang sudah jadi**, tanpa peringatan.
 
