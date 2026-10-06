@@ -144,6 +144,26 @@ class MenuRepository {
     });
   }
 
+  /// (Admin) Hapus menu (`DELETE /menu/items/:id`). Mengembalikan `true` bila
+  /// menu DIARSIPKAN (sudah pernah terjual → riwayat dipertahankan), `false`
+  /// bila dihapus permanen.
+  Future<bool> deleteItem(String itemId) async {
+    final res =
+        await _client.delete<dynamic>(ApiConstants.menuItemUpdate(itemId));
+    final data = res.data;
+    final inner = data is Map ? (data['data'] ?? data) : null;
+    return inner is Map && inner['mode'] == 'archived';
+  }
+
+  /// (Admin) Tambah kategori (`POST /menu/categories`).
+  Future<MenuCategory> createCategory(String name) async {
+    final res = await _client
+        .post<dynamic>(ApiConstants.menuCategories, data: {'name': name});
+    final data = res.data;
+    final inner = data is Map ? (data['data'] ?? data) : data;
+    return MenuCategory.fromJson(Map<String, dynamic>.from(inner as Map));
+  }
+
   List<MenuItemModel> _parseList(dynamic data) {
     final list =
         data is Map ? (data['data'] ?? data['items'] ?? data['menu']) : data;

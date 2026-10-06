@@ -12,14 +12,24 @@ import '../../../shared/models/menu_item_model.dart';
 import '../../../shared/widgets/neu.dart';
 import '../../menu/data/menu_repository.dart';
 
-/// (Admin) Kelola menu: tambah menu baru, ubah detail, aktif/nonaktifkan.
-/// Gambar diatur di layar "Kelola Gambar Menu" yang terpisah.
-class AdminMenuManageScreen extends ConsumerWidget {
+/// (Admin) Kelola menu: tambah/ubah/hapus menu, aktif/nonaktifkan, filter per
+/// kategori & tambah kategori. Gambar diatur di layar "Kelola Gambar Menu".
+class AdminMenuManageScreen extends ConsumerStatefulWidget {
   const AdminMenuManageScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<AdminMenuManageScreen> createState() =>
+      _AdminMenuManageScreenState();
+}
+
+class _AdminMenuManageScreenState extends ConsumerState<AdminMenuManageScreen> {
+  /// Id kategori yang sedang difilter ('' = Semua).
+  String _categoryId = '';
+
+  @override
+  Widget build(BuildContext context) {
     final async = ref.watch(allMenuItemsProvider);
+    final cats = ref.watch(menuCategoriesProvider).valueOrNull ?? const [];
     return Scaffold(
       appBar: AppBar(title: const Text('Kelola Menu')),
       floatingActionButton: FloatingActionButton.extended(
@@ -27,7 +37,7 @@ class AdminMenuManageScreen extends ConsumerWidget {
         icon: const Icon(Icons.add_rounded, color: Colors.white),
         label: Text('Tambah Menu',
             style: AppTextStyles.button.copyWith(color: Colors.white)),
-        onPressed: () => _openEditor(context, ref, null),
+        onPressed: () => _openEditor(null),
       ),
       body: async.when(
         loading: () =>
@@ -38,26 +48,54 @@ class AdminMenuManageScreen extends ConsumerWidget {
             child: const Text('Gagal memuat. Coba lagi'),
           ),
         ),
-        data: (items) => RefreshIndicator(
-          color: AppColors.amber,
-          onRefresh: () async => ref.invalidate(allMenuItemsProvider),
-          child: ResponsiveListView(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 96),
-            itemCount: items.length,
-            minItemWidth: 360,
-            maxColumns: 3,
-            runSpacing: 10,
-            itemBuilder: (_, i) => _MenuRow(
-              item: items[i],
-              onTap: () => _openEditor(context, ref, items[i]),
-            ),
-          ),
-        ),
+        data: (all) {
+          // Kategori terpilih bisa lenyap (mis. dinonaktifkan di DB) → Semua.
+          final active = cats.any((c) => c.id == _categoryId && !c.isAll)
+              ? _categoryId
+              : '';
+          final items = active.isEmpty
+              ? all
+              : all.where((m) => m.categoryId == active).toList();
+          return Column(
+            children: [
+              _CategoryFilterBar(
+                categories: cats.where((c) => !c.isAll).toList(),
+                items: all,
+                active: active,
+                onPick: (id) => setState(() => _categoryId = id),
+                onAdd: _addCategory,
+              ),
+              Expanded(
+                child: RefreshIndicator(
+                  color: AppColors.amber,
+                  onRefresh: () async {
+                    ref.invalidate(menuCategoriesProvider);
+                    ref.invalidate(allMenuItemsProvider);
+                  },
+                  child: items.isEmpty
+                      ? _EmptyCategory(onAdd: () => _openEditor(null))
+                      : ResponsiveListView(
+                          padding: const EdgeInsets.fromLTRB(20, 4, 20, 96),
+                          itemCount: items.length,
+                          minItemWidth: 360,
+                          maxColumns: 3,
+                          runSpacing: 10,
+                          itemBuilder: (_, i) => _MenuRow(
+                            item: items[i],
+                            onTap: () => _openEditor(items[i]),
+                            onDelete: () => _confirmDelete(items[i]),
+                          ),
+                        ),
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
 
-  void _openEditor(BuildContext context, WidgetRef ref, MenuItemModel? item) {
+  void _openEditor(MenuItemModel? item) {
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -68,16 +106,252 @@ class AdminMenuManageScreen extends ConsumerWidget {
       builder: (_) => Padding(
         padding: EdgeInsets.only(
             bottom: MediaQuery.of(context).viewInsets.bottom),
-        child: _MenuEditor(item: item),
+        // Menu baru langsung terisi kategori yang sedang difilter.
+        child: _MenuEditor(
+            item: item,
+            initialCategoryId: _categoryId.isEmpty ? null : _categoryId),
+      ),
+    );
+  }
+
+  Future<void> _confirmDelete(MenuItemModel item) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Hapus ${item.name}?'),
+        content: const Text(
+          'Menu akan hilang dari katalog pelanggan dan dari daftar ini.\n\n'
+          'Bila menu ini pernah terjual, datanya diarsipkan supaya riwayat '
+          'pesanan & laporan penjualan tetap utuh.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Batal'),
+          ),
+          TextButton(
+            style: TextButton.styleFrom(foregroundColor: AppColors.error),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Hapus'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final archived =
+          await ref.read(menuRepositoryProvider).deleteItem(item.id);
+      ref.invalidate(allMenuItemsProvider);
+      ref.invalidate(menuCatalogProvider);
+      HapticFeedback.mediumImpact();
+      messenger.showSnackBar(SnackBar(
+        content: Text(archived
+            ? '${item.name} diarsipkan — riwayat penjualan tetap tersimpan'
+            : '${item.name} dihapus'),
+      ));
+    } on ApiException catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text(e.message)));
+    } catch (_) {
+      messenger.showSnackBar(
+          const SnackBar(content: Text('Gagal menghapus menu.')));
+    }
+  }
+
+  Future<void> _addCategory() async {
+    final cat = await showDialog<MenuCategory>(
+      context: context,
+      builder: (_) => const _AddCategoryDialog(),
+    );
+    if (cat == null || !mounted) return;
+    ref.invalidate(menuCategoriesProvider);
+    ref.invalidate(menuCatalogProvider);
+    setState(() => _categoryId = cat.id);
+    ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Kategori "${cat.name}" siap dipakai')));
+  }
+}
+
+/// Baris chip filter kategori (+ jumlah menu) dan chip "Kategori" untuk
+/// menambah kategori baru. Gulir horizontal di HP, membungkus di layar lebar.
+class _CategoryFilterBar extends StatelessWidget {
+  const _CategoryFilterBar({
+    required this.categories,
+    required this.items,
+    required this.active,
+    required this.onPick,
+    required this.onAdd,
+  });
+
+  final List<MenuCategory> categories;
+  final List<MenuItemModel> items;
+  final String active;
+  final ValueChanged<String> onPick;
+  final VoidCallback onAdd;
+
+  @override
+  Widget build(BuildContext context) {
+    final counts = <String, int>{};
+    for (final m in items) {
+      counts[m.categoryId] = (counts[m.categoryId] ?? 0) + 1;
+    }
+    Widget chip(String id, String label, int n) => Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          child: ChoiceChip(
+            label: Text('$label ($n)'),
+            selected: active == id,
+            selectedColor: AppColors.amber.withValues(alpha: 0.2),
+            onSelected: (_) => onPick(id),
+          ),
+        );
+    return SizedBox(
+      height: 56,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        children: [
+          chip('', 'Semua', items.length),
+          for (final c in categories) chip(c.id, c.name, counts[c.id] ?? 0),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: ActionChip(
+              avatar: const Icon(Icons.add_rounded, size: 18),
+              label: const Text('Kategori'),
+              tooltip: 'Tambah kategori',
+              onPressed: onAdd,
+            ),
+          ),
+        ],
       ),
     );
   }
 }
 
+class _EmptyCategory extends StatelessWidget {
+  const _EmptyCategory({required this.onAdd});
+  final VoidCallback onAdd;
+
+  @override
+  Widget build(BuildContext context) {
+    // ListView supaya tarik-untuk-segarkan tetap berfungsi saat kosong.
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(32, 64, 32, 96),
+      children: [
+        Icon(Icons.restaurant_menu_rounded,
+            size: 48, color: AppColors.textSecondary),
+        const SizedBox(height: 12),
+        Text('Belum ada menu di kategori ini',
+            textAlign: TextAlign.center, style: AppTextStyles.titleMedium),
+        const SizedBox(height: 4),
+        Text('Tambahkan menu pertama — kategorinya langsung terisi.',
+            textAlign: TextAlign.center,
+            style: AppTextStyles.bodySmall
+                .copyWith(color: AppColors.textSecondary)),
+        const SizedBox(height: 16),
+        Center(
+          child: TextButton.icon(
+            onPressed: onAdd,
+            icon: const Icon(Icons.add_rounded),
+            label: const Text('Tambah Menu'),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Dialog tambah kategori. Mengembalikan [MenuCategory] yang dibuat via `pop`.
+class _AddCategoryDialog extends ConsumerStatefulWidget {
+  const _AddCategoryDialog();
+
+  @override
+  ConsumerState<_AddCategoryDialog> createState() => _AddCategoryDialogState();
+}
+
+class _AddCategoryDialogState extends ConsumerState<_AddCategoryDialog> {
+  final _name = TextEditingController();
+  bool _saving = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _name.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    final name = _name.text.trim();
+    if (name.isEmpty) {
+      setState(() => _error = 'Nama kategori wajib diisi.');
+      return;
+    }
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+    try {
+      final cat = await ref.read(menuRepositoryProvider).createCategory(name);
+      if (mounted) Navigator.of(context).pop(cat);
+    } on ApiException catch (e) {
+      _fail(e.message);
+    } catch (_) {
+      _fail('Gagal menyimpan kategori.');
+    }
+  }
+
+  void _fail(String message) {
+    if (!mounted) return;
+    setState(() {
+      _saving = false;
+      _error = message;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Tambah Kategori'),
+      content: TextField(
+        controller: _name,
+        autofocus: true,
+        enabled: !_saving,
+        maxLength: 60,
+        textCapitalization: TextCapitalization.words,
+        textInputAction: TextInputAction.done,
+        onSubmitted: (_) => _save(),
+        decoration: InputDecoration(
+          labelText: 'Nama kategori *',
+          hintText: 'mis. Teh, Dessert',
+          errorText: _error,
+          border: const OutlineInputBorder(),
+          isDense: true,
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _saving ? null : () => Navigator.of(context).pop(),
+          child: const Text('Batal'),
+        ),
+        TextButton(
+          onPressed: _saving ? null : _save,
+          child: _saving
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2))
+              : const Text('Simpan'),
+        ),
+      ],
+    );
+  }
+}
+
 class _MenuRow extends StatelessWidget {
-  const _MenuRow({required this.item, required this.onTap});
+  const _MenuRow(
+      {required this.item, required this.onTap, required this.onDelete});
   final MenuItemModel item;
   final VoidCallback onTap;
+  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -132,8 +406,12 @@ class _MenuRow extends StatelessWidget {
                           item.isAvailable ? AppColors.success : AppColors.error,
                       fontWeight: FontWeight.w700)),
             ),
-            const SizedBox(width: 4),
-            Icon(Icons.chevron_right_rounded, color: AppColors.textSecondary),
+            IconButton(
+              tooltip: 'Hapus menu',
+              onPressed: onDelete,
+              icon: const Icon(Icons.delete_outline_rounded,
+                  color: AppColors.error),
+            ),
           ],
         ),
       ),
@@ -143,8 +421,11 @@ class _MenuRow extends StatelessWidget {
 
 /// Form tambah/ubah menu (modal bottom sheet).
 class _MenuEditor extends ConsumerStatefulWidget {
-  const _MenuEditor({this.item});
+  const _MenuEditor({this.item, this.initialCategoryId});
   final MenuItemModel? item;
+
+  /// Kategori awal untuk menu BARU (kategori yang sedang difilter).
+  final String? initialCategoryId;
 
   @override
   ConsumerState<_MenuEditor> createState() => _MenuEditorState();
@@ -173,7 +454,9 @@ class _MenuEditorState extends ConsumerState<_MenuEditor> {
     _cost = TextEditingController(
         text: it != null && it.costPrice > 0 ? '${it.costPrice}' : '');
     _sort = TextEditingController(text: '0');
-    _categoryId = (it?.categoryId.isNotEmpty ?? false) ? it!.categoryId : null;
+    _categoryId = it == null
+        ? widget.initialCategoryId
+        : (it.categoryId.isNotEmpty ? it.categoryId : null);
     _available = it?.isAvailable ?? true;
     _featured = it?.isFeatured ?? false;
   }
