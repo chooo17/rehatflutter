@@ -425,22 +425,27 @@ final ordersTrackingProvider =
     authControllerProvider
         .select((s) => s.status == AuthStatus.authenticated),
   );
+  // Daftar terakhir yang BERHASIL diambil. Saat jaringan putus sebentar, daftar
+  // ini dipertahankan: dulu kegagalan mengirim daftar kosong → banner di Menu
+  // hilang-muncul dan polling melambat ke 20 dtk justru saat ada pesanan aktif.
+  List<OrderModel>? last;
   while (true) {
-    List<OrderModel> list = const [];
     // Saat aplikasi di background JANGAN menembak backend — hemat kuota &
     // baterai. Kasir bisa membiarkan app terbuka berjam-jam; tanpa jeda ini
     // `fetchAllOrders` jalan tiap 3 dtk selamanya.
     if (isAuthed && ref.read(appForegroundProvider)) {
       try {
-        list = isAdmin
+        last = isAdmin
             ? await repo.fetchAllOrders(limit: 50)
             : await repo.fetchHistory(limit: 20);
+        yield last;
       } catch (_) {
-        // Jaringan gagal → daftar kosong.
+        // Belum pernah berhasil → keluar dari keadaan loading dgn daftar kosong.
+        if (last == null) yield const [];
       }
-      yield list;
     }
-    final hasActive = list.any((o) => kActiveOrderStatuses.contains(o.status));
+    final hasActive =
+        (last ?? const []).any((o) => kActiveOrderStatuses.contains(o.status));
     await Future.delayed(Duration(seconds: hasActive ? 3 : 20));
   }
 });

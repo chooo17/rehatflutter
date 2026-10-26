@@ -31,6 +31,28 @@ class _FakeOrderRepository extends OrderRepository {
   int get totalCalls => historyCalls + allOrdersCalls;
 }
 
+/// Sukses sekali (satu pesanan aktif), lalu jaringan gagal terus.
+class _FlakyOrderRepository extends OrderRepository {
+  _FlakyOrderRepository() : super(client: DioClient(storage: SecureStorage()));
+
+  int calls = 0;
+
+  @override
+  Future<List<OrderModel>> fetchHistory({int page = 1, int limit = 20}) async {
+    calls++;
+    if (calls > 1) throw Exception('jaringan putus');
+    return [
+      OrderModel(
+        id: 'o1',
+        queueNumber: 'A-1',
+        total: 25000,
+        status: OrderStatus.paid,
+        createdAt: DateTime(2026, 10, 26, 9),
+      ),
+    ];
+  }
+}
+
 /// AuthController palsu: `build()` tidak memanggil super sehingga tak ada
 /// dependensi jaringan/storage yang perlu disiapkan.
 class _FakeAuthController extends AuthController {
@@ -96,6 +118,29 @@ void main() {
     // GET /orders butuh akun; tamu tak punya token → 401 memicu interceptor
     // menghapus sesi & menendang ke login. Karena itu tamu TAK BOLEH menembaknya.
     expect(repo.totalCalls, 0);
+  });
+
+  test('jaringan gagal sesudah data ada → daftar lama DIPERTAHANKAN', () async {
+    final flaky = _FlakyOrderRepository();
+    container = ProviderContainer(overrides: [
+      orderRepositoryProvider.overrideWithValue(flaky),
+      authControllerProvider.overrideWith(_FakeAuthController.new),
+      appForegroundProvider.overrideWith((ref) => true),
+    ]);
+    final seen = <List<OrderModel>>[];
+    container.listen(ordersTrackingProvider, (_, next) {
+      final v = next.valueOrNull;
+      if (v != null) seen.add(v);
+    });
+
+    // Panggilan 1 sukses (pesanan aktif → jeda 3 dtk), panggilan 2 gagal.
+    await Future<void>.delayed(const Duration(milliseconds: 3300));
+
+    expect(flaky.calls, greaterThanOrEqualTo(2));
+    expect(seen, isNotEmpty);
+    expect(seen.every((l) => l.length == 1), isTrue,
+        reason: 'kegagalan tak boleh mengirim daftar kosong');
+    expect(container.read(activeOrderProvider)?.id, 'o1');
   });
 
   test('perubahan errorMessage TIDAK me-restart polling', () async {
