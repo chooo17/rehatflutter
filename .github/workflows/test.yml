@@ -7,6 +7,8 @@ on:
     branches: ['**']
   pull_request:
   workflow_dispatch:
+  # Dipanggil juga oleh deploy-web.yml sebagai gerbang sebelum deploy.
+  workflow_call:
 
 jobs:
   test:

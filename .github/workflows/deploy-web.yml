@@ -7,8 +7,10 @@ on:
     paths:
       - 'lib/**'
       - 'web/**'
+      - 'assets/**'   # font/gambar bundel ikut ter-deploy
       - 'pubspec.yaml'
       - '.github/workflows/deploy-web.yml'
+      - '.github/workflows/test.yml'
   workflow_dispatch:
 
 # Secrets yang HARUS diisi di GitHub → Settings → Secrets and variables → Actions:
@@ -25,7 +27,14 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Gerbang: analyze + seluruh test HARUS lulus dulu. Dulu deploy berjalan
+  # paralel dgn workflow Test, sehingga kode yang gagal test tetap live.
+  # Memanggil test.yml (workflow_call) supaya isi gerbangnya satu sumber.
+  test:
+    uses: ./.github/workflows/test.yml
+
   deploy:
+    needs: test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
