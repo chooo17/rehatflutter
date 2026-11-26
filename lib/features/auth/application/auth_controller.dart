@@ -52,6 +52,23 @@ class AuthState {
   }
 }
 
+/// State berikutnya saat refresh token gagal (401 yang tak bisa dipulihkan),
+/// atau `null` bila tak perlu berubah.
+///
+/// Tamu TIDAK pernah punya sesi, jadi 401 dari endpoint berakun yang terlanjur
+/// terpanggil bukan "sesi berakhir" — menimpa status tamu dgn
+/// `unauthenticated` membuat router melempar tamu dari /guest-menu ke /login.
+AuthState? sessionExpiredState(AuthState current) {
+  switch (current.status) {
+    case AuthStatus.unauthenticated:
+    case AuthStatus.guest:
+      return null;
+    case AuthStatus.unknown:
+    case AuthStatus.authenticated:
+      return const AuthState(status: AuthStatus.unauthenticated);
+  }
+}
+
 /// Controller autentikasi. Mengelola sesi & aksi register/OTP/login/profil.
 class AuthController extends Notifier<AuthState> {
   late final AuthRepository _repo;
@@ -68,8 +85,8 @@ class AuthController extends Notifier<AuthState> {
   }
 
   Future<void> _onSessionExpired() async {
-    if (state.status == AuthStatus.unauthenticated) return;
-    state = const AuthState(status: AuthStatus.unauthenticated);
+    final next = sessionExpiredState(state);
+    if (next != null) state = next;
   }
 
   Future<void> _restoreSession() async {

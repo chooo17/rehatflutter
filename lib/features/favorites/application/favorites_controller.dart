@@ -1,12 +1,19 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../shared/models/menu_item_model.dart';
+import '../../auth/application/auth_controller.dart';
 import '../data/favorites_repository.dart';
 
 /// Menyimpan daftar menu favorit & menangani toggle dengan pembaruan optimistis.
 class FavoritesController extends AsyncNotifier<List<MenuItemModel>> {
   @override
-  Future<List<MenuItemModel>> build() {
+  Future<List<MenuItemModel>> build() async {
+    // Favorit butuh akun. Tamu/belum login -> kosong tanpa request, supaya
+    // GET /favorites tak dibalas 401 (yang dulu melempar tamu ke /login).
+    // Di-watch agar favorit dimuat ulang begitu pengguna login.
+    final signedIn =
+        ref.watch(authControllerProvider.select((s) => s.isAuthenticated));
+    if (!signedIn) return const [];
     return ref.watch(favoritesRepositoryProvider).fetchFavorites();
   }
 
