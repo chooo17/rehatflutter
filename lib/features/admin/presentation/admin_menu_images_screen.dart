@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../core/constants/app_colors.dart';
+import '../../../core/utils/image_url.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/network/api_exception.dart';
@@ -150,7 +151,7 @@ class _ItemRow extends StatelessWidget {
                       )
                     : (item.imageUrl != null && item.imageUrl!.isNotEmpty
                         ? CachedNetworkImage(
-                            imageUrl: item.imageUrl!,
+                            imageUrl: resizedImageUrl(item.imageUrl!, 400),
                             fit: BoxFit.cover,
                             placeholder: (_, __) =>
                                 Container(color: AppColors.crema),

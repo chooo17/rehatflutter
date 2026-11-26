@@ -20,7 +20,13 @@ class _SplashScreenState extends State<SplashScreen>
     with SingleTickerProviderStateMixin {
   static const _bg = Color(0xFFFBC400);
   static const _ink = Color(0xFF0E0E0E);
-  static const _total = 2200.0; // ms
+  static const _total = 2200.0; // ms — skala keyframe desain asli
+
+  // Durasi putar sebenarnya. Splash ditahan minimal 1 dtk (auth_controller);
+  // dulu 1,8 dtk dari animasi 2,2 dtk. Dipercepat dgn rasio sama
+  // (2200 × 1000/1800 ≈ 1222) supaya animasi berhenti di titik yang sama,
+  // bukan terpotong di tengah. Keyframe (`ms`) tetap dalam skala 2200.
+  static const _playMs = 1222;
 
   late final AnimationController _c;
 
@@ -29,7 +35,7 @@ class _SplashScreenState extends State<SplashScreen>
     super.initState();
     _c = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 2200),
+      duration: const Duration(milliseconds: _playMs),
     )..forward();
   }
 

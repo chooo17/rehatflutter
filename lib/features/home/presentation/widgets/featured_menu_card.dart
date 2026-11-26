@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_text_styles.dart';
 import '../../../../core/utils/formatters.dart';
+import '../../../../core/utils/image_url.dart';
 import '../../../../shared/models/menu_item_model.dart';
 import '../../../../shared/widgets/neu.dart';
 
@@ -110,7 +111,7 @@ class _Image extends StatelessWidget {
       );
     }
     return CachedNetworkImage(
-      imageUrl: url!,
+      imageUrl: resizedImageUrl(url!, 500),
       fit: BoxFit.cover,
       memCacheWidth: 500,
       placeholder: (_, __) => Container(color: AppColors.crema),

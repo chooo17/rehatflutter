@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_text_styles.dart';
 import '../../../../core/router/route_names.dart';
+import '../../../../core/utils/image_url.dart';
 import '../../../../shared/models/banner_model.dart';
 import '../../../../shared/widgets/web_safe_image.dart';
 import '../../../banners/data/banner_repository.dart';
@@ -142,7 +143,7 @@ class _BannerCard extends StatelessWidget {
             // Latar: gambar bila ada, atau gradien brand.
             if (banner.hasImage)
               WebSafeImage(
-                url: banner.imageUrl!,
+                url: resizedImageUrl(banner.imageUrl!, 1000),
                 fit: BoxFit.cover,
                 placeholder: Container(color: AppColors.crema),
                 error: const _GradientBg(),

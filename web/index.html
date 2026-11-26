@@ -31,6 +31,19 @@
   <title>Rehat Coffeehouse</title>
   <link rel="manifest" href="manifest.json">
 
+  <!--
+    Percepat muat awal: buka koneksi (DNS+TLS) ke host yang PASTI dipakai
+    selagi flutter_bootstrap.js masih diunduh, dan mulai unduh main.dart.js
+    lebih awal. Harus di sini (bukan di situs induk rehat-coffeehouse.my.id):
+    app ini dimuat dalam iframe lintas-situs, dan browser memisahkan koneksi
+    & cache per situs, sehingga preconnect dari halaman induk tak terpakai.
+    Semua host ini diakses lewat fetch/XHR CORS -> wajib `crossorigin`.
+  -->
+  <link rel="preload" href="main.dart.js" as="script">
+  <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+  <link rel="preconnect" href="https://rehat-backend-production.up.railway.app" crossorigin>
+  <link rel="preconnect" href="https://fxxxxyklmosesgsrxefw.supabase.co" crossorigin>
+
   <style>
     body { margin: 0; background-color: #FAF7F2; }
     /* Layar muat awal (sebelum Flutter selesai boot) agar tak ada kilatan putih. */

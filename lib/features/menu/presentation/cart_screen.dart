@@ -7,6 +7,7 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/router/route_names.dart';
 import '../../../core/utils/formatters.dart';
+import '../../../core/utils/image_url.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../shared/models/cart_item_model.dart';
 import '../../../shared/widgets/neu.dart';
@@ -365,8 +366,9 @@ class _Thumb extends StatelessWidget {
       );
     }
     return CachedNetworkImage(
-      imageUrl: url!,
+      imageUrl: resizedImageUrl(url!, 240),
       fit: BoxFit.cover,
+      memCacheWidth: 240,
       placeholder: (_, __) => Container(color: AppColors.crema),
       errorWidget: (_, __, ___) => Container(
         color: AppColors.crema,

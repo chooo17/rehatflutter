@@ -104,8 +104,10 @@ class AuthController extends Notifier<AuthState> {
         next = state.copyWith(status: AuthStatus.unauthenticated);
       }
     }
-    // Tahan splash minimal ~1,8 dtk agar animasi logo reveal sempat terlihat.
-    final remaining = 1800 - sw.elapsedMilliseconds;
+    // Tahan splash minimal ~1 dtk agar animasi logo reveal sempat terlihat.
+    // (Dulu 1,8 dtk — terasa lambat. Animasinya ikut dipercepat; lihat
+    // `_playMs` di splash_screen.dart. Ubah keduanya bersamaan.)
+    final remaining = 1000 - sw.elapsedMilliseconds;
     if (remaining > 0) {
       await Future.delayed(Duration(milliseconds: remaining));
     }

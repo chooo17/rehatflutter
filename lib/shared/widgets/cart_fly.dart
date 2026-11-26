@@ -5,6 +5,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/constants/app_colors.dart';
+import '../../core/utils/image_url.dart';
 
 /// Animasi "lempar ke keranjang": gelembung gambar item terbang membentuk
 /// busur dari tombol tambah menuju ikon keranjang aktif.
@@ -152,7 +153,9 @@ class _FlyingItemState extends State<_FlyingItem>
       child: (img == null || img.isEmpty)
           ? fallback
           : CachedNetworkImage(
-              imageUrl: img,
+              // Kartu menu sudah memuat versi 400px -> pakai URL yang sama
+              // supaya diambil dari cache, bukan unduhan baru.
+              imageUrl: resizedImageUrl(img, 400),
               fit: BoxFit.cover,
               errorWidget: (_, __, ___) => fallback,
             ),

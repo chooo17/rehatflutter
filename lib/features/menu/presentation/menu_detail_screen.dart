@@ -7,6 +7,7 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/utils/customization_labels.dart';
 import '../../../core/utils/formatters.dart';
+import '../../../core/utils/image_url.dart';
 import '../../../shared/models/menu_item_model.dart';
 import '../../../shared/models/review_model.dart';
 import '../../../shared/widgets/cart_fly.dart';
@@ -420,7 +421,7 @@ class _HeaderImage extends StatelessWidget {
       );
     }
     return CachedNetworkImage(
-      imageUrl: url!,
+      imageUrl: resizedImageUrl(url!, 800),
       fit: BoxFit.cover,
       // Header lebar penuh — batasi decode ~800px (cukup untuk layar terpadat).
       memCacheWidth: 800,
