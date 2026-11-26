@@ -651,6 +651,10 @@ class _VoucherPicker extends ConsumerWidget {
                 child: OutlinedButton(
                   onPressed: notifier.clearVoucher,
                   style: OutlinedButton.styleFrom(
+                    // Tema global memakai Size.fromHeight (lebar tak hingga);
+                    // di dalam Row itu memicu layout error → field voucher
+                    // kosong di build release. Paksa lebar minimum 0.
+                    minimumSize: const Size(0, 54),
                     foregroundColor: AppColors.error,
                     side: BorderSide(color: AppColors.border),
                   ),
