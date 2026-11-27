@@ -40,6 +40,7 @@ import '../../features/loyalty/presentation/loyalty_history_screen.dart';
 import '../../features/delivery/presentation/address_form_screen.dart';
 import '../../features/delivery/presentation/address_list_screen.dart';
 import '../../features/delivery/presentation/courier_screen.dart';
+import '../../features/delivery/presentation/store_settings_screen.dart';
 import '../../features/loyalty/presentation/loyalty_screen.dart';
 import '../../features/menu/presentation/cart_screen.dart';
 import '../../features/menu/presentation/menu_detail_screen.dart';
@@ -251,6 +252,12 @@ final routerProvider = Provider<GoRouter>((ref) {
         name: RouteNames.courier,
         parentNavigatorKey: rootKey,
         builder: (context, state) => const CourierScreen(),
+      ),
+      GoRoute(
+        path: RouteNames.adminStoreSettingsPath,
+        name: RouteNames.adminStoreSettings,
+        parentNavigatorKey: rootKey,
+        builder: (context, state) => const StoreSettingsScreen(),
       ),
       // Shell dengan bottom navigation.
       StatefulShellRoute.indexedStack(
