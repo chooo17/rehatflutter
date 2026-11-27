@@ -38,3 +38,6 @@ graphify-out/
 
 # Worktree sementara (superpowers:using-git-worktrees)
 .worktrees/
+
+# Mockup visual companion brainstorming (superpowers)
+.superpowers/
