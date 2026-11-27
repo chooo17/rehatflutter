@@ -76,6 +76,11 @@ class ProfileScreen extends ConsumerWidget {
               onTap: () => context.pushNamed(user?.isAdmin == true
                   ? RouteNames.adminOrders
                   : RouteNames.orderHistory)),
+          _tile(Icons.location_on_outlined, 'Alamat saya',
+              onTap: () => context.pushNamed(RouteNames.addresses)),
+          if (user?.isCourier == true)
+            _tile(Icons.delivery_dining_rounded, 'Antaran',
+                onTap: () => context.pushNamed(RouteNames.courier)),
           _tile(Icons.local_offer_outlined, 'Voucher saya',
               onTap: () => context.goNamed(RouteNames.loyalty)),
           _tile(Icons.notifications_none_rounded, 'Notifikasi',
@@ -91,6 +96,8 @@ class ProfileScreen extends ConsumerWidget {
                 onTap: () => context.pushNamed(RouteNames.adminAnalytics)),
             _tile(Icons.point_of_sale_rounded, 'Tutup Kasir',
                 onTap: () => context.pushNamed(RouteNames.closingReport)),
+            _tile(Icons.delivery_dining_outlined, 'Delivery & Kurir',
+                onTap: () => context.pushNamed(RouteNames.adminStoreSettings)),
             _tile(Icons.groups_rounded, 'Segmen Pelanggan',
                 onTap: () => context.pushNamed(RouteNames.customerSegments)),
             _tile(Icons.restaurant_menu_rounded, 'Kelola Menu',
