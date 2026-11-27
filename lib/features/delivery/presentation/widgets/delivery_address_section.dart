@@ -16,7 +16,13 @@ class DeliveryAddressSection extends ConsumerWidget {
 
   Future<void> _addNew(BuildContext context, WidgetRef ref) async {
     final saved = await context.pushNamed<AddressModel>(RouteNames.addressForm);
-    if (saved != null) await ref.read(checkoutControllerProvider.notifier).selectAddress(saved.id);
+    if (saved == null) return;
+    // Muat ulang daftar dulu supaya alamat baru sudah ada saat dipilih.
+    try {
+      // ignore: unused_result
+      await ref.refresh(addressesProvider.future);
+    } catch (_) {}
+    await ref.read(checkoutControllerProvider.notifier).selectAddress(saved.id);
   }
 
   Future<void> _pick(BuildContext context, WidgetRef ref, List<AddressModel> list) async {
@@ -56,9 +62,15 @@ class DeliveryAddressSection extends ConsumerWidget {
     final q = state.deliveryQuote;
 
     // Alamat terpilih yang sudah tak ada di daftar → kosongkan pilihan.
-    if (addrAsync.hasValue && state.addressId != null && selected == null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) =>
-          ref.read(checkoutControllerProvider.notifier).syncAddresses(list));
+    // Hanya saat daftar sudah FINAL (bukan sedang dimuat ulang): sesudah alamat
+    // baru disimpan, daftar lama (tanpa alamat itu) masih terpasang selama
+    // refresh — jangan sampai pilihan baru ikut terhapus.
+    if (addrAsync.hasValue && !addrAsync.isLoading && state.addressId != null && selected == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final latest = ref.read(addressesProvider);
+        if (latest.isLoading || !latest.hasValue) return;
+        ref.read(checkoutControllerProvider.notifier).syncAddresses(latest.value!);
+      });
     }
 
     if (addrAsync.isLoading && !addrAsync.hasValue) {
