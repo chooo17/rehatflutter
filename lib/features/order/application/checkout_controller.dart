@@ -28,6 +28,7 @@ class CheckoutState {
     this.addressId,
     this.deliveryQuote,
     this.isQuoting = false,
+    this.quoteError,
   });
 
   final PaymentMethod paymentMethod;
@@ -61,7 +62,12 @@ class CheckoutState {
   final DeliveryQuote? deliveryQuote;
   final bool isQuoting;
 
-  /// Ongkir yang akan ditagih (0 bila bukan delivery).
+  /// Galat khusus cek alamat/ongkir (terpisah dari [errorMessage]) supaya UI
+  /// alamat bisa menampilkannya + tombol "Coba lagi".
+  final String? quoteError;
+
+  /// Ongkir mentah dari quote (0 bila [orderType] bukan delivery). Untuk
+  /// QR meja / tamu pakai [CheckoutController.effectiveDeliveryFee].
   int get deliveryFee =>
       orderType == OrderType.delivery ? (deliveryQuote?.deliveryFee ?? 0) : 0;
 
@@ -84,6 +90,9 @@ class CheckoutState {
     DeliveryQuote? deliveryQuote,
     bool clearQuote = false,
     bool? isQuoting,
+    String? quoteError,
+    bool clearQuoteError = false,
+    bool clearAddress = false,
   }) {
     return CheckoutState(
       paymentMethod: paymentMethod ?? this.paymentMethod,
@@ -96,16 +105,56 @@ class CheckoutState {
       errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
       pendingOrder: pendingOrder ?? this.pendingOrder,
       pendingSignature: pendingSignature ?? this.pendingSignature,
-      addressId: addressId ?? this.addressId,
+      addressId: clearAddress ? null : (addressId ?? this.addressId),
       deliveryQuote: clearQuote ? null : (deliveryQuote ?? this.deliveryQuote),
       isQuoting: isQuoting ?? this.isQuoting,
+      quoteError: clearQuoteError ? null : (quoteError ?? this.quoteError),
     );
   }
 }
 
+/// Tipe pesanan yang BENAR-BENAR berlaku: QR meja selalu dine-in; tamu tak
+/// bisa delivery (butuh akun) sehingga state delivery yang tersisa dianggap
+/// dine-in.
+OrderType effectiveOrderType(OrderType selected,
+    {required bool hasTable, required bool isGuest}) {
+  if (hasTable) return OrderType.dineIn;
+  if (isGuest && selected == OrderType.delivery) return OrderType.dineIn;
+  return selected;
+}
+
 class CheckoutController extends Notifier<CheckoutState> {
+  /// Penghitung permintaan quote: hanya respons terbaru yang boleh diterapkan.
+  int _quoteSeq = 0;
+
   @override
-  CheckoutState build() => const CheckoutState();
+  CheckoutState build() {
+    // Ongkir bergantung pada total menu → hitung ulang saat keranjang berubah.
+    ref.listen<int>(cartTotalProvider, (prev, next) {
+      if (prev != next && next > 0) refreshQuote();
+    });
+    return const CheckoutState();
+  }
+
+  /// Tipe pesanan efektif (lihat [effectiveOrderType]).
+  OrderType get effectiveType => effectiveOrderType(
+        state.orderType,
+        hasTable: ref.read(tableNumberProvider) != null,
+        isGuest: ref.read(authControllerProvider).isGuest,
+      );
+
+  /// Ongkir yang ditagih sesuai [effectiveType].
+  int get effectiveDeliveryFee =>
+      effectiveType == OrderType.delivery ? (state.deliveryQuote?.deliveryFee ?? 0) : 0;
+
+  /// Bila alamat terpilih sudah tidak ada di daftar (mis. dihapus), kosongkan.
+  void syncAddresses(List<AddressModel> list) {
+    final id = state.addressId;
+    if (id == null || list.any((a) => a.id == id)) return;
+    _quoteSeq++;
+    state = state.copyWith(
+        clearAddress: true, clearQuote: true, clearQuoteError: true, isQuoting: false);
+  }
 
   void setPaymentMethod(PaymentMethod method) =>
       state = state.copyWith(paymentMethod: method, clearError: true);
@@ -125,26 +174,36 @@ class CheckoutController extends Notifier<CheckoutState> {
       final def = list.firstWhere((a) => a.isDefault, orElse: () => list.first);
       await selectAddress(def.id);
     } on ApiException catch (e) {
-      state = state.copyWith(errorMessage: e.message);
+      state = state.copyWith(quoteError: e.message);
     } catch (_) {
-      state = state.copyWith(errorMessage: 'Gagal memuat alamat.');
+      state = state.copyWith(quoteError: 'Gagal memuat alamat.');
     }
   }
 
   /// Pilih alamat pengiriman lalu minta ongkir ke server.
   Future<void> selectAddress(String addressId) async {
-    state = state.copyWith(addressId: addressId, isQuoting: true, clearQuote: true, clearError: true);
+    final seq = ++_quoteSeq;
+    state = state.copyWith(
+        addressId: addressId,
+        isQuoting: true,
+        clearQuote: true,
+        clearError: true,
+        clearQuoteError: true);
     final itemsNet = ref.read(cartTotalProvider) - state.discountAmount;
+    // Hanya permintaan terbaru (dan alamat yang masih terpilih) yang berlaku.
+    bool stale() => seq != _quoteSeq || state.addressId != addressId;
     try {
       final q = await ref
           .read(deliveryRepositoryProvider)
           .quote(addressId: addressId, itemsNet: itemsNet);
-      if (state.addressId != addressId) return; // pilihan sudah berganti
+      if (stale()) return;
       state = state.copyWith(deliveryQuote: q, isQuoting: false);
     } on ApiException catch (e) {
-      state = state.copyWith(isQuoting: false, errorMessage: e.message);
+      if (stale()) return;
+      state = state.copyWith(isQuoting: false, quoteError: e.message);
     } catch (_) {
-      state = state.copyWith(isQuoting: false, errorMessage: 'Gagal menghitung ongkir.');
+      if (stale()) return;
+      state = state.copyWith(isQuoting: false, quoteError: 'Gagal menghitung ongkir.');
     }
   }
 
@@ -231,14 +290,14 @@ class CheckoutController extends Notifier<CheckoutState> {
     }
 
     final table = ref.read(tableNumberProvider);
-    final effectiveType = table != null ? OrderType.dineIn : state.orderType;
+    final effectiveType = this.effectiveType;
     if (effectiveType == OrderType.delivery) {
-      if (isGuest) {
-        state = state.copyWith(errorMessage: 'Masuk dulu untuk memesan delivery.');
-        return null;
-      }
       if (state.addressId == null) {
         state = state.copyWith(errorMessage: 'Pilih alamat pengiriman.');
+        return null;
+      }
+      if (state.isQuoting) {
+        state = state.copyWith(errorMessage: 'Sedang menghitung ongkir, coba sesaat lagi.');
         return null;
       }
       if (state.deliveryQuote?.available != true) {
@@ -320,6 +379,7 @@ class CheckoutController extends Notifier<CheckoutState> {
         // Poin/stamp bertambah di sisi server setelah bayar — segarkan profil.
         ref.read(authControllerProvider.notifier).refreshUser();
       }
+      _quoteSeq++; // batalkan quote yang masih terbang
       state = const CheckoutState(); // reset pilihan untuk order berikutnya
       return result;
     } on ApiException catch (e) {

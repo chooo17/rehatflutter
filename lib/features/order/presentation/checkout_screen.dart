@@ -36,6 +36,15 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   final _guestPhoneCtrl = TextEditingController();
 
   @override
+  void initState() {
+    super.initState();
+    // State checkout bertahan antar-navigasi: segarkan ongkir saat layar dibuka.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) ref.read(checkoutControllerProvider.notifier).refreshQuote();
+    });
+  }
+
+  @override
   void dispose() {
     _notesCtrl.dispose();
     _guestNameCtrl.dispose();
@@ -72,9 +81,13 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     final isGuest = ref.watch(isGuestProvider);
     final tableNumber = ref.watch(tableNumberProvider);
     final discount = state.discountAmount;
-    final deliveryFee = state.deliveryFee;
+    final effType =
+        effectiveOrderType(state.orderType, hasTable: tableNumber != null, isGuest: isGuest);
+    final isDelivery = effType == OrderType.delivery;
+    final deliveryFee = isDelivery ? (state.deliveryQuote?.deliveryFee ?? 0) : 0;
     final total = subtotal - discount + deliveryFee;
-    final deliveryConfig = ref.watch(deliveryConfigProvider).valueOrNull;
+    final deliveryConfigAsync = ref.watch(deliveryConfigProvider);
+    final deliveryConfig = deliveryConfigAsync.valueOrNull;
 
     final formA = <Widget>[
       if (isGuest) ...[
@@ -109,14 +122,17 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                     opacity: type == OrderType.delivery && deliveryConfig?.available != true ? 0.5 : 1,
                     child: _OrderTypeCard(
                       type: type,
-                      selected: state.orderType == type,
+                      selected: effType == type,
                       onTap: () {
                         if (type != OrderType.delivery) return notifier.setOrderType(type);
                         if (deliveryConfig?.available != true) {
+                          final checking = deliveryConfigAsync.isLoading;
                           ScaffoldMessenger.of(context)
                             ..hideCurrentSnackBar()
                             ..showSnackBar(SnackBar(
-                                content: Text(deliveryConfig?.message ?? 'Delivery sedang tidak tersedia.')));
+                                content: Text(checking
+                                    ? 'Memeriksa ketersediaan delivery…'
+                                    : (deliveryConfig?.message ?? 'Delivery sedang tidak tersedia.'))));
                           return;
                         }
                         notifier.useDelivery();
@@ -129,7 +145,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
             ],
           );
         }),
-        if (state.orderType == OrderType.delivery) ...[
+        if (isDelivery) ...[
           const SizedBox(height: 24),
           const _SectionLabel('Alamat pengiriman'),
           const SizedBox(height: 10),
@@ -221,11 +237,18 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                 valueColor: AppColors.success,
               ),
             ],
-            if (state.orderType == OrderType.delivery) ...[
+            if (isDelivery) ...[
               const SizedBox(height: 6),
-              _summaryRow('Ongkir',
-                  state.deliveryQuote != null && deliveryFee == 0 ? 'Gratis' : Formatters.rupiah(deliveryFee)),
-              if ((state.deliveryQuote?.remainingForFree ?? 0) > 0 && deliveryFee > 0)
+              _summaryRow(
+                  'Ongkir',
+                  state.isQuoting
+                      ? '—'
+                      : (state.deliveryQuote != null && deliveryFee == 0
+                          ? 'Gratis'
+                          : Formatters.rupiah(deliveryFee))),
+              if (!state.isQuoting &&
+                  (state.deliveryQuote?.remainingForFree ?? 0) > 0 &&
+                  deliveryFee > 0)
                 Padding(
                   padding: const EdgeInsets.only(top: 4),
                   child: Align(
@@ -255,7 +278,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       expand: true,
       accent: true,
       onPressed: state.isSubmitting ||
-              (state.orderType == OrderType.delivery &&
+              (isDelivery &&
                   (state.isQuoting || state.deliveryQuote?.available != true))
           ? null
           : _placeOrder,

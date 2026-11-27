@@ -50,16 +50,50 @@ class DeliveryAddressSection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(checkoutControllerProvider);
-    final list = ref.watch(addressesProvider).valueOrNull ?? const <AddressModel>[];
+    final addrAsync = ref.watch(addressesProvider);
+    final list = addrAsync.valueOrNull ?? const <AddressModel>[];
     final selected = list.where((a) => a.id == state.addressId).firstOrNull;
     final q = state.deliveryQuote;
 
+    // Alamat terpilih yang sudah tak ada di daftar → kosongkan pilihan.
+    if (addrAsync.hasValue && state.addressId != null && selected == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) =>
+          ref.read(checkoutControllerProvider.notifier).syncAddresses(list));
+    }
+
+    if (addrAsync.isLoading && !addrAsync.hasValue) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 12),
+        child: Center(child: SizedBox(height: 22, width: 22, child: CircularProgressIndicator(strokeWidth: 2.4))),
+      );
+    }
+    if (addrAsync.hasError && !addrAsync.hasValue) {
+      return Row(children: [
+        Expanded(
+            child: Text('Gagal memuat alamat.',
+                style: AppTextStyles.bodySmall.copyWith(color: AppColors.error))),
+        TextButton(onPressed: () => ref.invalidate(addressesProvider), child: const Text('Coba lagi')),
+      ]);
+    }
+
     if (selected == null) {
-      return OutlinedButton.icon(
+      final add = OutlinedButton.icon(
         onPressed: () => _addNew(context, ref),
         icon: const Icon(Icons.add_location_alt_outlined),
         label: const Text('Tambah alamat pengiriman'),
       );
+      if (state.quoteError == null) return add;
+      return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Row(children: [
+          Expanded(
+              child: Text(state.quoteError!,
+                  style: AppTextStyles.bodySmall.copyWith(color: AppColors.error))),
+          TextButton(
+              onPressed: () => ref.read(checkoutControllerProvider.notifier).useDelivery(),
+              child: const Text('Coba lagi')),
+        ]),
+        add,
+      ]);
     }
     return Card(
       child: Padding(
@@ -79,6 +113,15 @@ class DeliveryAddressSection extends ConsumerWidget {
             const SizedBox(height: 8),
             if (state.isQuoting)
               const LinearProgressIndicator()
+            else if (q == null && state.quoteError != null)
+              Row(children: [
+                Expanded(
+                    child: Text(state.quoteError!,
+                        style: AppTextStyles.bodySmall.copyWith(color: AppColors.error))),
+                TextButton(
+                    onPressed: () => ref.read(checkoutControllerProvider.notifier).refreshQuote(),
+                    child: const Text('Coba lagi')),
+              ])
             else if (q != null && !q.available)
               Text(q.message ?? 'Alamat ini belum bisa dikirimi.',
                   style: AppTextStyles.bodySmall.copyWith(color: AppColors.error))
