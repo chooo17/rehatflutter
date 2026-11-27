@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../core/utils/customization_labels.dart';
+import 'delivery_models.dart';
 
 /// Status pesanan beserta label & warna tampilannya.
 ///
@@ -75,10 +76,11 @@ enum OrderStatus {
   }
 }
 
-/// Tipe pesanan: makan di tempat atau bawa pulang.
+/// Tipe pesanan: makan di tempat, bawa pulang, atau delivery.
 enum OrderType {
   dineIn('dine_in', 'Dine-in', 'Makan di tempat', Icons.storefront_rounded),
-  takeaway('takeaway', 'Bawa Pulang', 'Dibungkus', Icons.shopping_bag_rounded);
+  takeaway('takeaway', 'Bawa Pulang', 'Dibungkus', Icons.shopping_bag_rounded),
+  delivery('delivery', 'Delivery', 'Diantar ke alamatmu', Icons.delivery_dining_rounded);
 
   const OrderType(this.apiValue, this.label, this.description, this.icon);
 
@@ -88,11 +90,16 @@ enum OrderType {
   final String description;
   final IconData icon;
 
+  /// Tipe yang bisa dipilih kasir di toko (delivery hanya dari app pelanggan).
+  static const List<OrderType> counterTypes = [OrderType.dineIn, OrderType.takeaway];
+
   static OrderType fromString(String? value) {
     switch ((value ?? '').toLowerCase()) {
       case 'takeaway':
       case 'take_away':
         return OrderType.takeaway;
+      case 'delivery':
+        return OrderType.delivery;
       case 'dine_in':
       case 'dinein':
       default:
@@ -160,7 +167,7 @@ class OrderItemModel {
     final c = cust is Map ? Map<String, dynamic>.from(cust) : const {};
     return OrderItemModel(
       menuItemId: (json['menu_item_id'] ?? json['menuItemId'] ?? '').toString(),
-      name: (json['name'] ?? '').toString(),
+      name: (json['name'] ?? (json['menu_items'] is Map ? json['menu_items']['name'] : null) ?? '').toString(),
       quantity: _asInt(json['quantity'] ?? json['qty']),
       price: _asInt(json['unit_price'] ?? json['price']),
       imageUrl: (json['image_url'] ?? json['imageUrl']) as String?,
@@ -198,6 +205,12 @@ class OrderModel {
     this.customerName = '',
     this.customerPhone = '',
     this.tableNumber,
+    this.deliveryFee = 0,
+    this.deliveryStatus,
+    this.deliveryAddress,
+    this.deliveryDistanceM,
+    this.courierName,
+    this.courierPhone,
   });
 
   final String id;
@@ -238,8 +251,24 @@ class OrderModel {
   /// Nomor meja (dari QR meja, dine-in). null bila bukan dari QR meja.
   final String? tableNumber;
 
+  /// Ongkir yang dibayar pelanggan (0 untuk non-delivery / gratis ongkir).
+  final int deliveryFee;
+
+  /// Status antaran (null untuk non-delivery / belum dibayar).
+  final DeliveryStatus? deliveryStatus;
+
+  /// Snapshot alamat saat pesan (delivery).
+  final AddressModel? deliveryAddress;
+  final int? deliveryDistanceM;
+  final String? courierName;
+  final String? courierPhone;
+
+  bool get isDelivery => orderType == OrderType.delivery;
+
   factory OrderModel.fromJson(Map<String, dynamic> json) {
-    final rawItems = json['items'];
+    final rawItems = json['items'] ?? json['order_items'];
+    final courier = json['courier'] is Map ? Map<String, dynamic>.from(json['courier']) : const <String, dynamic>{};
+    final addr = json['delivery_address'];
     return OrderModel(
       id: (json['id'] ?? '').toString(),
       queueNumber: (json['queue_number'] ?? json['queueNumber'] ?? '').toString(),
@@ -267,6 +296,12 @@ class OrderModel {
       tableNumber: (json['table_number']?.toString().isNotEmpty ?? false)
           ? json['table_number'].toString()
           : null,
+      deliveryFee: _asInt(json['delivery_fee']),
+      deliveryStatus: DeliveryStatus.fromString(json['delivery_status']?.toString()),
+      deliveryAddress: addr is Map ? AddressModel.fromJson(Map<String, dynamic>.from(addr)) : null,
+      deliveryDistanceM: json['delivery_distance_m'] == null ? null : _asInt(json['delivery_distance_m']),
+      courierName: (json['courier_name'] ?? courier['name'])?.toString(),
+      courierPhone: (json['courier_phone'] ?? courier['phone'])?.toString(),
     );
   }
 
@@ -291,6 +326,7 @@ class CheckoutResult {
     this.paymentStatus = 'pending',
     this.paymentToken,
     this.qrisUrl,
+    this.deliveryFee = 0,
   });
 
   final String orderId;
@@ -303,6 +339,7 @@ class CheckoutResult {
   final String paymentStatus;
   final String? paymentToken;
   final String? qrisUrl;
+  final int deliveryFee;
 
   factory CheckoutResult.fromJson(
       Map<String, dynamic> json, PaymentMethod method) {
@@ -321,6 +358,7 @@ class CheckoutResult {
       paymentStatus: (payment['status'] ?? 'pending').toString(),
       paymentToken: payment['token']?.toString(),
       qrisUrl: payment['qrisUrl']?.toString(),
+      deliveryFee: OrderModel._asInt(json['deliveryFee'] ?? json['delivery_fee']),
     );
   }
 }

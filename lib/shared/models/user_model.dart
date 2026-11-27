@@ -30,6 +30,10 @@ class UserModel {
   /// false, sehingga akun admin pun tampil & berperilaku sebagai pelanggan.
   bool get isAdmin => AppConfig.isAdminBuild && role == 'admin';
 
+  /// Kurir Rehat (layar Antaran). Tidak bergantung pada build admin: kurir
+  /// memakai app web pelanggan.
+  bool get isCourier => role == 'courier';
+
   /// Tanggal lahir (format 'yyyy-MM-dd'), diisi saat profile setup.
   final String? birthdate;
 
