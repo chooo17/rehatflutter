@@ -16,6 +16,8 @@ import '../../printer/application/printer_controller.dart';
 import '../../../shared/widgets/qris_payment_card.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../review/presentation/review_sheet.dart';
+import '../../delivery/presentation/widgets/admin_delivery_actions.dart';
+import '../../delivery/presentation/widgets/delivery_info_card.dart';
 import '../data/order_repository.dart';
 import 'widgets/edit_order_sheet.dart';
 import 'widgets/order_tracking_timeline.dart';
@@ -177,6 +179,11 @@ class _Body extends StatelessWidget {
         // status pembayaran (mis. QRIS lunas via webhook) tampil otomatis.
         _OrderAutoRefresh(
             orderId: order.id, status: order.status, isAdmin: isAdmin),
+        if (order.isDelivery) ...[
+          DeliveryInfoCard(order: order),
+          if (isAdmin) AdminDeliveryActions(order: order),
+          const SizedBox(height: 16),
+        ],
         _AdminStatusControls(order: order),
         if (order.status == OrderStatus.pending && !isAdmin) ...[
           const SizedBox(height: 20),
@@ -225,6 +232,10 @@ class _Body extends StatelessWidget {
                 _summaryRow(
                     'Diskon', '- ${Formatters.rupiah(order.discountAmount)}',
                     valueColor: AppColors.success),
+              ],
+              if (order.isDelivery) ...[
+                const SizedBox(height: 8),
+                _summaryRow('Ongkir', order.deliveryFee == 0 ? 'Gratis' : Formatters.rupiah(order.deliveryFee)),
               ],
               if (order.pointsEarned > 0) ...[
                 const SizedBox(height: 8),
