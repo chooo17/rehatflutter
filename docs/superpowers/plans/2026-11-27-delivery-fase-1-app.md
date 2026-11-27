@@ -1060,7 +1060,7 @@ FLUTTER pub add flutter_map latlong2 geolocator
 ```
 Expected: `pubspec.yaml` mendapat tiga dependensi; `pub get` sukses.
 
-- [ ] **Step 2: Izin lokasi**
+- [ ] **Step 2: Izin lokasi — DITUNDA (2026-11-27).** Rilis tahap ini **web saja** (keputusan pemilik); di web izin lokasi ditangani browser. Jangan ubah file Android/iOS sekarang. Saat versi APK/iOS diputuskan, tambahkan izin berikut:
 
 `android/app/src/main/AndroidManifest.xml`, di dalam `<manifest>` sebelum `<application`:
 
@@ -1207,7 +1207,7 @@ Expected: tanpa error baru.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add pubspec.yaml pubspec.lock android/app/src/main/AndroidManifest.xml ios/Runner/Info.plist lib/features/delivery/presentation/widgets/location_picker.dart
+git add pubspec.yaml pubspec.lock lib/features/delivery/presentation/widgets/location_picker.dart
 git commit -m "feat(delivery): paket peta & lokasi + LocationPicker (pin tengah, lokasi saya)"
 ```
 
