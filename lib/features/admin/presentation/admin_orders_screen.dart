@@ -175,6 +175,24 @@ class _AdminOrderCard extends StatelessWidget {
                         .copyWith(color: AppColors.amberDark)),
               ],
             ),
+            if (order.isDelivery && order.deliveryStatus != null) ...[
+              const SizedBox(height: 8),
+              Row(children: [
+                Icon(order.deliveryStatus!.icon, size: 16, color: AppColors.amberDark),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    [
+                      order.deliveryStatus!.label,
+                      if (order.courierName != null) order.courierName!,
+                      if (order.deliveryDistanceM != null)
+                        '${(order.deliveryDistanceM! / 1000).toStringAsFixed(1)} km',
+                    ].join(' • '),
+                    style: AppTextStyles.bodySmall,
+                  ),
+                ),
+              ]),
+            ],
             // Pesanan aktif → langsung "Tandai Selesai" (status Diproses sudah
             // otomatis saat pembayaran diterima, jadi tak ada tombol antara).
             if (kActiveOrderStatuses.contains(order.status)) ...[
@@ -216,8 +234,8 @@ class _OrderTypeChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final takeaway = type == OrderType.takeaway;
-    final color = takeaway ? AppColors.amberDark : AppColors.textSecondary;
+    final highlight = type != OrderType.dineIn;
+    final color = highlight ? AppColors.amberDark : AppColors.textSecondary;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
