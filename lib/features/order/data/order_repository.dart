@@ -106,6 +106,7 @@ class OrderRepository {
     String? voucherCode,
     String? notes,
     String? tableNumber,
+    String? addressId,
   }) async {
     final payload = {
       'items': [
@@ -123,6 +124,7 @@ class OrderRepository {
       if (notes != null && notes.trim().isNotEmpty) 'notes': notes.trim(),
       if (tableNumber != null && tableNumber.trim().isNotEmpty)
         'table_number': tableNumber.trim(),
+      if (addressId != null && addressId.isNotEmpty) 'address_id': addressId,
     };
 
     final res = await _client.post<dynamic>(ApiConstants.orders, data: payload);

@@ -163,7 +163,7 @@ class _CashierActionsState extends ConsumerState<CashierActions> {
         // Tipe pesanan
         Row(
           children: [
-            for (final t in OrderType.values) ...[
+            for (final t in OrderType.counterTypes) ...[
               Expanded(
                 child: GestureDetector(
                   onTap: () => setState(() => _orderType = t),
@@ -190,7 +190,7 @@ class _CashierActionsState extends ConsumerState<CashierActions> {
                   ),
                 ),
               ),
-              if (t != OrderType.values.last) const SizedBox(width: 8),
+              if (t != OrderType.counterTypes.last) const SizedBox(width: 8),
             ],
           ],
         ),

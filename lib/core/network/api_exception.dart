@@ -50,7 +50,20 @@ class ApiException implements Exception {
       // Envelope backend: { success:false, error:{ code, message } }.
       final err = data['error'];
       if (err is Map && err['message'] is String && (err['message'] as String).isNotEmpty) {
-        return err['message'] as String;
+        final base = err['message'] as String;
+        // VALIDATION_ERROR: sertakan field + pesan pertama dari `details`.
+        if (err['code'] == 'VALIDATION_ERROR') {
+          final details = err['details'];
+          if (details is List && details.isNotEmpty && details.first is Map) {
+            final d = details.first as Map;
+            final field = d['field'];
+            final dm = d['message'];
+            if (field is String && field.isNotEmpty && dm is String && dm.isNotEmpty) {
+              return '$base ($field: $dm)';
+            }
+          }
+        }
+        return base;
       }
       // Bentuk lain: { message: "..." } atau { error: "..." }.
       final msg = data['message'] ?? (err is String ? err : null);

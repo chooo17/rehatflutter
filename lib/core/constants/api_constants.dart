@@ -145,6 +145,21 @@ class ApiConstants {
   static String notificationRead(String id) => '/notifications/$id/read';
   static const String registerDevice = '/notifications/register-device';
 
+  // Delivery ------------------------------------------------------------
+  static const String deliveryConfig = '/delivery/config';
+  static const String deliveryQuote = '/delivery/quote';
+  static const String myAddresses = '/me/addresses';
+  static String myAddress(String id) => '/me/addresses/$id';
+  static const String courierDeliveries = '/courier/deliveries';
+  static const String courierDuty = '/courier/duty';
+  static String courierAction(String id, String action) => '/courier/deliveries/$id/$action';
+  static const String adminStoreSettings = '/admin/store-settings';
+  static const String adminStoreHours = '/admin/store-hours';
+  static const String adminCouriers = '/admin/couriers';
+  static String adminCourier(String id) => '/admin/couriers/$id';
+  static String adminAssignCourier(String orderId) => '/admin/orders/$orderId/assign-courier';
+  static String adminDeliveryRefund(String orderId) => '/admin/orders/$orderId/delivery-refund';
+
   /// Timeout default (ms).
   static const int connectTimeoutMs = 15000;
   static const int receiveTimeoutMs = 15000;

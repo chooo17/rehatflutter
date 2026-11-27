@@ -45,6 +45,7 @@ class _FakeOrderRepository extends OrderRepository {
     String? voucherCode,
     String? notes,
     String? tableNumber,
+    String? addressId,
   }) async {
     createOrderCalls++;
     lastVoucherCode = voucherCode;

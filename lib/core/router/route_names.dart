@@ -174,4 +174,16 @@ class RouteNames {
   /// AppBar-nya sendiri. Rute didaftarkan di `app_router.dart`.
   static const String stockHppComparison = 'stock-hpp-comparison';
   static const String stockHppComparisonPath = '/profile/stock/hpp-comparison';
+
+  static const String addresses = 'addresses';
+  static const String addressesPath = '/addresses';
+
+  static const String addressForm = 'address-form';
+  static const String addressFormPath = '/addresses/form';
+
+  static const String courier = 'courier';
+  static const String courierPath = '/courier';
+
+  static const String adminStoreSettings = 'admin-store-settings';
+  static const String adminStoreSettingsPath = '/admin/store-settings';
 }

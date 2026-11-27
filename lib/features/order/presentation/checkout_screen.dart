@@ -12,6 +12,8 @@ import '../../../shared/models/order_model.dart';
 import '../../../shared/models/voucher_model.dart';
 import '../../../shared/widgets/neu.dart';
 import '../../auth/application/auth_controller.dart';
+import '../../delivery/data/delivery_repository.dart';
+import '../../delivery/presentation/widgets/delivery_address_section.dart';
 import '../../loyalty/data/loyalty_repository.dart';
 import '../../menu/application/cart_controller.dart';
 import '../application/checkout_controller.dart';
@@ -32,6 +34,15 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   final _notesCtrl = TextEditingController();
   final _guestNameCtrl = TextEditingController();
   final _guestPhoneCtrl = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    // State checkout bertahan antar-navigasi: segarkan ongkir saat layar dibuka.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) ref.read(checkoutControllerProvider.notifier).refreshQuote();
+    });
+  }
 
   @override
   void dispose() {
@@ -70,7 +81,13 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     final isGuest = ref.watch(isGuestProvider);
     final tableNumber = ref.watch(tableNumberProvider);
     final discount = state.discountAmount;
-    final total = subtotal - discount;
+    final effType =
+        effectiveOrderType(state.orderType, hasTable: tableNumber != null, isGuest: isGuest);
+    final isDelivery = effType == OrderType.delivery;
+    final deliveryFee = isDelivery ? (state.deliveryQuote?.deliveryFee ?? 0) : 0;
+    final total = subtotal - discount + deliveryFee;
+    final deliveryConfigAsync = ref.watch(deliveryConfigProvider);
+    final deliveryConfig = deliveryConfigAsync.valueOrNull;
 
     final formA = <Widget>[
       if (isGuest) ...[
@@ -95,20 +112,45 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       ] else ...[
         const _SectionLabel('Tipe pesanan'),
         const SizedBox(height: 10),
-        Row(
-          children: [
-            for (final type in OrderType.values) ...[
-              Expanded(
-                child: _OrderTypeCard(
-                  type: type,
-                  selected: state.orderType == type,
-                  onTap: () => notifier.setOrderType(type),
+        Builder(builder: (context) {
+          final types = [OrderType.dineIn, OrderType.takeaway, if (!isGuest) OrderType.delivery];
+          return Row(
+            children: [
+              for (final type in types) ...[
+                Expanded(
+                  child: Opacity(
+                    opacity: type == OrderType.delivery && deliveryConfig?.available != true ? 0.5 : 1,
+                    child: _OrderTypeCard(
+                      type: type,
+                      selected: effType == type,
+                      onTap: () {
+                        if (type != OrderType.delivery) return notifier.setOrderType(type);
+                        if (deliveryConfig?.available != true) {
+                          final checking = deliveryConfigAsync.isLoading;
+                          ScaffoldMessenger.of(context)
+                            ..hideCurrentSnackBar()
+                            ..showSnackBar(SnackBar(
+                                content: Text(checking
+                                    ? 'Memeriksa ketersediaan delivery…'
+                                    : (deliveryConfig?.message ?? 'Delivery sedang tidak tersedia.'))));
+                          return;
+                        }
+                        notifier.useDelivery();
+                      },
+                    ),
+                  ),
                 ),
-              ),
-              if (type != OrderType.values.last) const SizedBox(width: 10),
+                if (type != types.last) const SizedBox(width: 10),
+              ],
             ],
-          ],
-        ),
+          );
+        }),
+        if (isDelivery) ...[
+          const SizedBox(height: 24),
+          const _SectionLabel('Alamat pengiriman'),
+          const SizedBox(height: 10),
+          const DeliveryAddressSection(),
+        ],
         const SizedBox(height: 24),
       ],
       const _SectionLabel('Metode pembayaran'),
@@ -195,6 +237,29 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                 valueColor: AppColors.success,
               ),
             ],
+            if (isDelivery) ...[
+              const SizedBox(height: 6),
+              _summaryRow(
+                  'Ongkir',
+                  state.isQuoting
+                      ? '—'
+                      : (state.deliveryQuote != null && deliveryFee == 0
+                          ? 'Gratis'
+                          : Formatters.rupiah(deliveryFee))),
+              if (!state.isQuoting &&
+                  (state.deliveryQuote?.remainingForFree ?? 0) > 0 &&
+                  deliveryFee > 0)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'Belanja ${Formatters.rupiah(state.deliveryQuote!.remainingForFree)} lagi untuk gratis ongkir',
+                      style: AppTextStyles.bodySmall.copyWith(color: AppColors.amberDark),
+                    ),
+                  ),
+                ),
+            ],
             const SizedBox(height: 10),
             Row(
               children: [
@@ -212,7 +277,11 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     final submit = NeuButton(
       expand: true,
       accent: true,
-      onPressed: state.isSubmitting ? null : _placeOrder,
+      onPressed: state.isSubmitting ||
+              (isDelivery &&
+                  (state.isQuoting || state.deliveryQuote?.available != true))
+          ? null
+          : _placeOrder,
       child: state.isSubmitting
           ? const SizedBox(
               height: 22,
