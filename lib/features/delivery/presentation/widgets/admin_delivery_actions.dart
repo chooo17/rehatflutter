@@ -28,9 +28,12 @@ class AdminDeliveryActions extends ConsumerWidget {
   Future<void> _assign(BuildContext context, WidgetRef ref) async {
     List<CourierInfo> couriers;
     try {
-      couriers = await ref.read(couriersProvider.future);
+      couriers = await ref.read(deliveryRepositoryProvider).fetchCouriers();
     } on ApiException catch (e) {
       if (context.mounted) _toast(context, e.message);
+      return;
+    } catch (_) {
+      if (context.mounted) _toast(context, 'Gagal memuat daftar kurir.');
       return;
     }
     if (!context.mounted) return;
@@ -43,7 +46,7 @@ class AdminDeliveryActions extends ConsumerWidget {
           for (final k in couriers)
             SimpleDialogOption(
               onPressed: () => Navigator.pop(c, k.id),
-              child: Text('${k.name} ${k.onDuty ? '• bertugas' : '• tidak bertugas'}'),
+              child: Text('${k.name.isEmpty ? k.phone : k.name} ${k.onDuty ? '• bertugas' : '• tidak bertugas'}'),
             ),
         ],
       ),
@@ -60,17 +63,23 @@ class AdminDeliveryActions extends ConsumerWidget {
 
   Future<void> _refund(BuildContext context, WidgetRef ref) async {
     final ctrl = TextEditingController();
-    final reason = await showDialog<String>(
-      context: context,
-      builder: (c) => AlertDialog(
-        title: const Text('Batalkan & refund ke Saldo Rehat?'),
-        content: TextField(controller: ctrl, decoration: const InputDecoration(labelText: 'Alasan (wajib)')),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(c), child: const Text('Batal')),
-          TextButton(onPressed: () => Navigator.pop(c, ctrl.text.trim()), child: const Text('Refund')),
-        ],
-      ),
-    );
+    String? reason;
+    try {
+      reason = await showDialog<String>(
+        context: context,
+        builder: (c) => AlertDialog(
+          title: const Text('Batalkan & refund ke Saldo Rehat?'),
+          content: TextField(controller: ctrl, decoration: const InputDecoration(labelText: 'Alasan (wajib)')),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(c), child: const Text('Batal')),
+            TextButton(onPressed: () => Navigator.pop(c, ctrl.text.trim()), child: const Text('Refund')),
+          ],
+        ),
+      );
+    } finally {
+      // Tunda: animasi tutup dialog masih memakai controller sesaat.
+      Future.delayed(const Duration(milliseconds: 400), ctrl.dispose);
+    }
     if (reason == null || reason.length < 3) {
       if (reason != null && context.mounted) _toast(context, 'Alasan minimal 3 karakter');
       return;

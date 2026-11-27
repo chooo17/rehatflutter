@@ -52,23 +52,34 @@ class _CourierScreenState extends ConsumerState<CourierScreen> {
 
   Future<void> _fail(OrderModel o) async {
     final ctrl = TextEditingController();
-    final reason = await showDialog<String>(
-      context: context,
-      builder: (c) => AlertDialog(
-        title: Text('Antaran #${o.queueNumber} gagal?'),
-        content: TextField(controller: ctrl, decoration: const InputDecoration(labelText: 'Alasan (mis. pelanggan tidak bisa dihubungi)')),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(c), child: const Text('Batal')),
-          TextButton(onPressed: () => Navigator.pop(c, ctrl.text.trim()), child: const Text('Laporkan')),
-        ],
-      ),
-    );
+    String? reason;
+    try {
+      reason = await showDialog<String>(
+        context: context,
+        builder: (c) => AlertDialog(
+          title: Text('Antaran #${o.queueNumber} gagal?'),
+          content: TextField(controller: ctrl, decoration: const InputDecoration(labelText: 'Alasan (mis. pelanggan tidak bisa dihubungi)')),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(c), child: const Text('Batal')),
+            TextButton(onPressed: () => Navigator.pop(c, ctrl.text.trim()), child: const Text('Laporkan')),
+          ],
+        ),
+      );
+    } finally {
+      // Tunda: animasi tutup dialog masih memakai controller sesaat.
+      Future.delayed(const Duration(milliseconds: 400), ctrl.dispose);
+    }
     if (reason == null || reason.length < 3) return;
-    await _run(() => ref.read(deliveryRepositoryProvider).markFailed(o.id, reason), 'Dilaporkan ke admin');
+    await _run(() => ref.read(deliveryRepositoryProvider).markFailed(o.id, reason!), 'Dilaporkan ke admin');
   }
 
   @override
   Widget build(BuildContext context) {
+    // 403 = bukan kurir / akses dicabut: percuma polling terus.
+    ref.listen(courierDeliveriesProvider, (prev, next) {
+      final e = next.error;
+      if (next.hasError && e is ApiException && e.statusCode == 403) _timer?.cancel();
+    });
     final async = ref.watch(courierDeliveriesProvider);
     final repo = ref.read(deliveryRepositoryProvider);
     return Scaffold(

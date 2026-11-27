@@ -34,7 +34,8 @@ class _LocationPickerState extends State<LocationPicker> {
         _snack('Izin lokasi ditolak. Geser peta untuk menandai lokasi.');
         return;
       }
-      final p = await Geolocator.getCurrentPosition();
+      final p = await Geolocator.getCurrentPosition(
+          locationSettings: const LocationSettings(timeLimit: Duration(seconds: 15)));
       final ll = LatLng(p.latitude, p.longitude);
       _map.move(ll, 17);
       widget.onChanged(ll);
@@ -101,7 +102,7 @@ class _LocationPickerState extends State<LocationPicker> {
               child: Container(
                 color: Colors.white70,
                 padding: const EdgeInsets.symmetric(horizontal: 4),
-                child: Text('© OpenStreetMap', style: AppTextStyles.caption.copyWith(color: Colors.black87)),
+                child: Text('© OpenStreetMap contributors', style: AppTextStyles.caption.copyWith(color: Colors.black87)),
               ),
             ),
           ],
