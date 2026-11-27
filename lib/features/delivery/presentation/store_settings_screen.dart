@@ -9,6 +9,29 @@ import '../../../shared/models/delivery_models.dart';
 import '../data/delivery_repository.dart';
 import 'widgets/location_picker.dart';
 
+/// Parse angka isian admin: buang '.', ',' dan spasi (pemisah ribuan).
+int? parseStoreNumber(String s) => int.tryParse(s.replaceAll(RegExp(r'[.,\s]'), ''));
+
+/// Validasi isian pengaturan toko. Mengembalikan pesan galat, atau null bila valid.
+String? validateStoreSettingsInput({
+  required String radius,
+  required String fee,
+  required String freeMin,
+  required String cutoff,
+  required String address,
+}) {
+  final r = parseStoreNumber(radius);
+  if (r == null || r < 500 || r > 20000) return 'Radius harus 500–20.000 meter.';
+  final f = parseStoreNumber(fee);
+  if (f == null || f < 0 || f > 100000) return 'Ongkir harus Rp 0–100.000.';
+  final m = parseStoreNumber(freeMin);
+  if (m == null || m < 0 || m > 10000000) return 'Gratis ongkir harus Rp 0–10.000.000.';
+  final c = parseStoreNumber(cutoff);
+  if (c == null || c < 0 || c > 240) return 'Batas sebelum tutup harus 0–240 menit.';
+  if (address.trim().length > 300) return 'Alamat toko maksimal 300 karakter.';
+  return null;
+}
+
 /// Admin: saklar delivery, radius, ongkir, jam buka, dan daftar kurir.
 class StoreSettingsScreen extends ConsumerWidget {
   const StoreSettingsScreen({super.key});
@@ -50,7 +73,20 @@ class _SettingsFormState extends ConsumerState<_SettingsForm> {
       : [for (var d = 0; d < 7; d++) StoreHour(dayOfWeek: d, openTime: '10:00', closeTime: '00:00')];
   bool _saving = false;
 
-  void _toast(String m) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m)));
+  @override
+  void dispose() {
+    _radius.dispose();
+    _fee.dispose();
+    _freeMin.dispose();
+    _cutoff.dispose();
+    _address.dispose();
+    super.dispose();
+  }
+
+  void _toast(String m) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m)));
+  }
 
   bool _validTime(String? t) => t != null && RegExp(r'^([01]\d|2[0-3]):[0-5]\d$').hasMatch(t);
 
@@ -60,15 +96,22 @@ class _SettingsFormState extends ConsumerState<_SettingsForm> {
         return _toast('Jam ${StoreHour.dayNames[h.dayOfWeek]} harus format JJ:MM (24.00 ditulis 00:00)');
       }
     }
+    final invalid = validateStoreSettingsInput(
+        radius: _radius.text,
+        fee: _fee.text,
+        freeMin: _freeMin.text,
+        cutoff: _cutoff.text,
+        address: _address.text);
+    if (invalid != null) return _toast(invalid);
     final s = StoreSettings(
       storeLat: _point.latitude,
       storeLng: _point.longitude,
       storeAddress: _address.text.trim(),
       deliveryEnabled: _enabled,
-      radiusM: int.tryParse(_radius.text) ?? widget.settings.radiusM,
-      deliveryFee: int.tryParse(_fee.text) ?? widget.settings.deliveryFee,
-      freeDeliveryMin: int.tryParse(_freeMin.text) ?? widget.settings.freeDeliveryMin,
-      cutoffMinutes: int.tryParse(_cutoff.text) ?? widget.settings.cutoffMinutes,
+      radiusM: parseStoreNumber(_radius.text)!,
+      deliveryFee: parseStoreNumber(_fee.text)!,
+      freeDeliveryMin: parseStoreNumber(_freeMin.text)!,
+      cutoffMinutes: parseStoreNumber(_cutoff.text)!,
     );
     setState(() => _saving = true);
     try {
@@ -80,6 +123,8 @@ class _SettingsFormState extends ConsumerState<_SettingsForm> {
       _toast('Pengaturan disimpan');
     } on ApiException catch (e) {
       _toast(e.message);
+    } catch (_) {
+      _toast('Gagal menyimpan pengaturan.');
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -177,21 +222,27 @@ class _CouriersSection extends ConsumerWidget {
 
   Future<void> _add(BuildContext context, WidgetRef ref) async {
     final ctrl = TextEditingController();
-    final phone = await showDialog<String>(
-      context: context,
-      builder: (c) => AlertDialog(
-        title: const Text('Tambah kurir'),
-        content: TextField(
-          controller: ctrl,
-          keyboardType: TextInputType.phone,
-          decoration: const InputDecoration(labelText: 'No. HP akun kurir', helperText: 'Kurir harus sudah daftar di app sebagai pelanggan'),
+    String? phone;
+    try {
+      phone = await showDialog<String>(
+        context: context,
+        builder: (c) => AlertDialog(
+          title: const Text('Tambah kurir'),
+          content: TextField(
+            controller: ctrl,
+            keyboardType: TextInputType.phone,
+            decoration: const InputDecoration(labelText: 'No. HP akun kurir', helperText: 'Kurir harus sudah daftar di app sebagai pelanggan'),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(c), child: const Text('Batal')),
+            TextButton(onPressed: () => Navigator.pop(c, ctrl.text.trim()), child: const Text('Tambah')),
+          ],
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(c), child: const Text('Batal')),
-          TextButton(onPressed: () => Navigator.pop(c, ctrl.text.trim()), child: const Text('Tambah')),
-        ],
-      ),
-    );
+      );
+    } finally {
+      // Tunda: animasi tutup dialog masih memakai controller sesaat.
+      Future.delayed(const Duration(milliseconds: 400), ctrl.dispose);
+    }
     if (phone == null || phone.isEmpty) return;
     try {
       await ref.read(deliveryRepositoryProvider).addCourier(phone);

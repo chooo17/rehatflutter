@@ -226,10 +226,10 @@ class StoreSettings {
         storeLng: j['store_lng'] == null ? null : _double(j['store_lng']),
         storeAddress: (j['store_address'] ?? '').toString(),
         deliveryEnabled: j['delivery_enabled'] == true,
-        radiusM: _int(j['delivery_radius_m']),
-        deliveryFee: _int(j['delivery_fee']),
-        freeDeliveryMin: _int(j['free_delivery_min']),
-        cutoffMinutes: _int(j['delivery_cutoff_minutes']),
+        radiusM: j['delivery_radius_m'] == null ? 3000 : _int(j['delivery_radius_m']),
+        deliveryFee: j['delivery_fee'] == null ? 5000 : _int(j['delivery_fee']),
+        freeDeliveryMin: j['free_delivery_min'] == null ? 50000 : _int(j['free_delivery_min']),
+        cutoffMinutes: j['delivery_cutoff_minutes'] == null ? 60 : _int(j['delivery_cutoff_minutes']),
       );
 
   Map<String, dynamic> toJson() => {

@@ -5,10 +5,12 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_text_styles.dart';
 import '../../../../shared/models/order_model.dart';
 
-/// Nomor 08xx -> 628xx untuk link wa.me.
+/// Nomor 08xx / 8xx -> 628xx untuk link wa.me.
 String waNumber(String phone) {
   final d = phone.replaceAll(RegExp(r'[^0-9]'), '');
-  return d.startsWith('0') ? '62${d.substring(1)}' : d;
+  if (d.startsWith('0')) return '62${d.substring(1)}';
+  if (d.startsWith('8')) return '62$d';
+  return d;
 }
 
 class DeliveryInfoCard extends StatelessWidget {
@@ -28,7 +30,7 @@ class DeliveryInfoCard extends StatelessWidget {
             Row(children: [
               Icon(s?.icon ?? Icons.delivery_dining_rounded, color: AppColors.amberDark),
               const SizedBox(width: 8),
-              Text(s?.label ?? 'Menunggu pembayaran', style: AppTextStyles.titleMedium),
+              Text(s?.label ?? order.status.label, style: AppTextStyles.titleMedium),
             ]),
             if (order.courierName != null) ...[
               const SizedBox(height: 10),

@@ -10,6 +10,16 @@ import '../../auth/application/auth_controller.dart';
 import '../data/delivery_repository.dart';
 import 'widgets/location_picker.dart';
 
+/// Validasi No. HP penerima: hanya angka/+/-/spasi/kurung, 8–25 karakter, ≥8 digit.
+String? validateRecipientPhone(String? v) {
+  final raw = (v ?? '').trim();
+  final digits = raw.replaceAll(RegExp(r'[^0-9]'), '').length;
+  if (!RegExp(r'^[0-9+\-\s()]+$').hasMatch(raw) || raw.length < 8 || raw.length > 25 || digits < 8) {
+    return 'Nomor HP tidak valid';
+  }
+  return null;
+}
+
 /// Tambah / ubah alamat. `existing` null = alamat baru. Pop dengan [AddressModel] tersimpan.
 class AddressFormScreen extends ConsumerStatefulWidget {
   const AddressFormScreen({super.key, this.existing});
@@ -96,18 +106,18 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
             const SizedBox(height: 6),
             const Text('Geser peta sampai pin tepat di lokasi pengantaran.'),
             const SizedBox(height: 16),
-            TextFormField(controller: _label, decoration: const InputDecoration(labelText: 'Label (mis. Rumah, Kantor)'), validator: _required),
+            TextFormField(controller: _label, maxLength: 30, decoration: const InputDecoration(labelText: 'Label (mis. Rumah, Kantor)'), validator: _required),
             const SizedBox(height: 12),
-            TextFormField(controller: _address, maxLines: 2, decoration: const InputDecoration(labelText: 'Alamat lengkap'),
+            TextFormField(controller: _address, maxLines: 2, maxLength: 300, decoration: const InputDecoration(labelText: 'Alamat lengkap'),
                 validator: (v) => (v ?? '').trim().length < 5 ? 'Minimal 5 karakter' : null),
             const SizedBox(height: 12),
-            TextFormField(controller: _notes, decoration: const InputDecoration(labelText: 'Patokan (opsional)', hintText: 'Mis. pagar hijau, lantai 2')),
+            TextFormField(controller: _notes, maxLength: 200, decoration: const InputDecoration(labelText: 'Patokan (opsional)', hintText: 'Mis. pagar hijau, lantai 2')),
             const SizedBox(height: 12),
-            TextFormField(controller: _name, decoration: const InputDecoration(labelText: 'Nama penerima'), validator: _required),
+            TextFormField(controller: _name, maxLength: 80, decoration: const InputDecoration(labelText: 'Nama penerima'), validator: _required),
             const SizedBox(height: 12),
             TextFormField(controller: _phone, keyboardType: TextInputType.phone,
                 decoration: const InputDecoration(labelText: 'No. HP penerima'),
-                validator: (v) => (v ?? '').replaceAll(RegExp(r'[^0-9]'), '').length < 8 ? 'Nomor HP tidak valid' : null),
+                validator: validateRecipientPhone),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
               value: _isDefault,
