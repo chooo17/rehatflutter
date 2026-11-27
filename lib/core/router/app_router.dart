@@ -37,6 +37,8 @@ import '../../features/stock/presentation/ingredients_screen.dart';
 import '../../features/stock/presentation/recipe_screen.dart';
 import '../../features/home/presentation/home_screen.dart';
 import '../../features/loyalty/presentation/loyalty_history_screen.dart';
+import '../../features/delivery/presentation/address_form_screen.dart';
+import '../../features/delivery/presentation/address_list_screen.dart';
 import '../../features/loyalty/presentation/loyalty_screen.dart';
 import '../../features/menu/presentation/cart_screen.dart';
 import '../../features/menu/presentation/menu_detail_screen.dart';
@@ -48,6 +50,7 @@ import '../../features/order/presentation/order_confirmation_screen.dart';
 import '../../features/order/presentation/order_detail_screen.dart';
 import '../../features/order/presentation/order_history_screen.dart';
 import '../../features/order/presentation/order_tracking_screen.dart';
+import '../../shared/models/delivery_models.dart';
 import '../../shared/models/order_model.dart';
 import '../../features/profile/presentation/edit_profile_screen.dart';
 import '../../features/profile/presentation/help_screen.dart';
@@ -228,6 +231,19 @@ final routerProvider = Provider<GoRouter>((ref) {
         name: RouteNames.notifications,
         parentNavigatorKey: rootKey,
         builder: (context, state) => const NotificationsScreen(),
+      ),
+      GoRoute(
+        path: RouteNames.addressesPath,
+        name: RouteNames.addresses,
+        parentNavigatorKey: rootKey,
+        builder: (context, state) => const AddressListScreen(),
+      ),
+      GoRoute(
+        path: RouteNames.addressFormPath,
+        name: RouteNames.addressForm,
+        parentNavigatorKey: rootKey,
+        builder: (context, state) => AddressFormScreen(
+            existing: state.extra is AddressModel ? state.extra as AddressModel : null),
       ),
       // Shell dengan bottom navigation.
       StatefulShellRoute.indexedStack(
