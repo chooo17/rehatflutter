@@ -32,8 +32,19 @@ const kRehatTagline = (
 /// Panel brand kiri di layar lebar (>= 900px): logo stiker, tagline, dan
 /// kura-kura berjalan menghadap form (aset sudah menghadap kanan — jangan
 /// dicerminkan, tulisan *rht* ikut terbalik).
+///
+/// Disusun sebagai kolom, BUKAN Stack: logo + tagline mendapat ruang dulu
+/// (diperkecil proporsional bila jendela sangat pendek), kura-kura hanya
+/// mengisi SISA ruang di bawahnya (maks [_kuraMax], disembunyikan bila sisa
+/// < [_kuraMin]). Dengan begitu kura-kura tak pernah menimpa tagline — dulu
+/// (Positioned) ia menimpa baris judul di jendela pendek seperti 900x600.
 class AuthBrandPanel extends StatelessWidget {
   const AuthBrandPanel({super.key});
+
+  static const _top = 48.0;
+  static const _gap = 16.0;
+  static const _kuraMax = 340.0;
+  static const _kuraMin = 140.0;
 
   @override
   Widget build(BuildContext context) {
@@ -45,48 +56,67 @@ class AuthBrandPanel extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
       ),
       child: LayoutBuilder(builder: (context, c) {
-        final kuraHeight = (c.maxHeight * 0.45).clamp(200.0, 340.0);
-        return Stack(
+        final brand = Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Positioned(
-              right: 24,
-              bottom: 0,
-              height: kuraHeight,
-              child: Image.asset(
-                AuthBrandAssets.kuraKura,
-                fit: BoxFit.contain,
-                excludeFromSemantics: true,
-                errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+            Semantics(
+              label: 'Rehat Coffeehouse',
+              image: true,
+              child: Transform.rotate(
+                angle: -2 * math.pi / 180,
+                child: Image.asset(
+                  AuthBrandAssets.logoStiker,
+                  width: 200,
+                  excludeFromSemantics: true,
+                  errorBuilder: (_, __, ___) =>
+                      const SizedBox(width: 200, height: 138),
+                ),
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.all(48),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Semantics(
-                    label: 'Rehat Coffeehouse',
-                    image: true,
-                    child: Transform.rotate(
-                      angle: -2 * math.pi / 180,
-                      child: Image.asset(
-                        AuthBrandAssets.logoStiker,
-                        width: 200,
-                        excludeFromSemantics: true,
-                        errorBuilder: (_, __, ___) =>
-                            const SizedBox(width: 200, height: 138),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 28),
-                  ConstrainedBox(
-                    constraints: BoxConstraints(maxWidth: c.maxWidth * 0.6),
-                    child: const _Tagline(titleSize: 34, subtitleSize: 19),
-                  ),
-                ],
-              ),
+            const SizedBox(height: 28),
+            ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: c.maxWidth * 0.6),
+              child: const _Tagline(titleSize: 34, subtitleSize: 19),
             ),
           ],
+        );
+
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(48, _top, 24, 0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxHeight: math.max(0, c.maxHeight - _top - _gap),
+                ),
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.topLeft,
+                  child: brand,
+                ),
+              ),
+              const SizedBox(height: _gap),
+              Expanded(
+                child: LayoutBuilder(builder: (context, k) {
+                  if (k.maxHeight < _kuraMin) return const SizedBox.shrink();
+                  return Align(
+                    alignment: Alignment.bottomRight,
+                    child: SizedBox(
+                      height: math.min(k.maxHeight, _kuraMax),
+                      child: Image.asset(
+                        AuthBrandAssets.kuraKura,
+                        fit: BoxFit.contain,
+                        excludeFromSemantics: true,
+                        errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                      ),
+                    ),
+                  );
+                }),
+              ),
+            ],
+          ),
         );
       }),
     );

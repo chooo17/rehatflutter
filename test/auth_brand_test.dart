@@ -59,6 +59,34 @@ void main() {
           findsNothing);
       semantics.dispose();
     });
+
+    // Regresi: jendela pendek/sempit (tagline terbungkus 2 baris) membuat
+    // kura-kura (dulu Positioned di Stack) menimpa tagline.
+    for (final size in const [Size(900, 600), Size(1000, 560), Size(900, 800)]) {
+      testWidgets('kura-kura tidak menimpa tagline di ${size.width.toInt()}x${size.height.toInt()}',
+          (tester) async {
+        _view(tester, size);
+        await _pump(tester);
+
+        final kura = find.image(_kura);
+        if (kura.evaluate().isEmpty) return; // terlalu sempit → disembunyikan: OK
+        final kuraRect = tester.getRect(kura);
+        for (final line in [kRehatTagline.$1, kRehatTagline.$2]) {
+          final textRect = tester.getRect(find.text(line));
+          expect(kuraRect.overlaps(textRect), isFalse,
+              reason: '"$line" $textRect tertimpa kura-kura $kuraRect');
+        }
+      });
+    }
+
+    testWidgets('kura-kura disembunyikan bila sisa ruang terlalu kecil',
+        (tester) async {
+      _view(tester, const Size(900, 420));
+      await _pump(tester);
+
+      expect(find.image(_kura), findsNothing);
+      expect(find.text(kRehatTagline.$1), findsOneWidget);
+    });
   });
 
   group('layar sempit (< 900)', () {
