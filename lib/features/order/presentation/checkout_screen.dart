@@ -150,6 +150,14 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
           const _SectionLabel('Alamat pengiriman'),
           const SizedBox(height: 10),
           const DeliveryAddressSection(),
+          const SizedBox(height: 8),
+          Text(
+            'Pastikan pin di peta sesuai alamatmu dan nomor penerima aktif. '
+            'Pesanan dengan alamat di luar jangkauan atau penerima yang tidak '
+            'bisa dihubungi dapat dibatalkan oleh Rehat. Poin & stamp masuk '
+            'setelah pesanan terkirim.',
+            style: AppTextStyles.bodySmall,
+          ),
         ],
         const SizedBox(height: 24),
       ],

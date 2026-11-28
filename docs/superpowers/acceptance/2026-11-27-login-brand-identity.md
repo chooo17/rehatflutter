@@ -2,7 +2,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-11-27-login-brand-identity-design.md`
 **Date:** 2026-11-27
-**Status:** Draft
+**Status:** Approved
 
 ---
 
