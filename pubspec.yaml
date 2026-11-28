@@ -105,6 +105,8 @@ flutter:
   uses-material-design: true
   assets:
     - assets/qris/
+    # Logo, maskot & lockup dari design system "Rehat Coffeehouse" (layar auth).
+    - assets/brand/
   # Font di-bundle lokal (bukan unduhan runtime) → teks instan & offline.
   # Inter, Cormorant, Archivo = variable font (satu file untuk semua weight).
   fonts:
