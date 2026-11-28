@@ -78,17 +78,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  width: 60,
-                  height: 60,
-                  decoration: BoxDecoration(
-                    color: AppColors.espresso,
-                    borderRadius: BorderRadius.circular(18),
-                  ),
-                  child: const Icon(Icons.coffee_rounded,
-                      color: AppColors.amber, size: 30),
-                ),
-                const SizedBox(height: 28),
                 Text('Selamat datang kembali', style: AppTextStyles.displayMedium),
                 const SizedBox(height: 8),
                 Text(
